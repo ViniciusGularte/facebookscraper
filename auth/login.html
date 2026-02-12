@@ -1,0 +1,43 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Login</title>
+  </head>
+  <body class="bg-gray-100 min-h-screen flex items-center justify-center p-6">
+    <div class="bg-white w-full max-w-sm rounded-xl shadow p-6">
+      <h1 class="text-xl font-semibold mb-4">Entrar</h1>
+
+      <label class="text-sm text-gray-700">Email</label>
+      <input id="email" class="w-full border rounded px-3 py-2 mb-4" />
+
+      <label class="text-sm text-gray-700">Senha</label>
+      <input
+        id="password"
+        type="password"
+        class="w-full border rounded px-3 py-2 mb-4"
+      />
+
+      <div class="flex gap-2">
+        <button
+          id="loginBtn"
+          class="flex-1 bg-blue-600 text-white rounded py-2"
+        >
+          Entrar
+        </button>
+        <button
+          id="signupBtn"
+          class="flex-1 bg-gray-900 text-white rounded py-2"
+        >
+          Cadastrar
+        </button>
+      </div>
+
+      <div id="err" class="text-sm text-red-600 mt-3 hidden"></div>
+      <div id="ok" class="text-sm text-green-700 mt-3 hidden"></div>
+    </div>
+
+    <script type="module" src="login.mjs"></script>
+  </body>
+</html>

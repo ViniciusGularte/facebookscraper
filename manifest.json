@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "FB Groups Notifier",
+  "version": "0.3.0",
+  "description": "Auth + DB local + botão em grupos + runner",
+  "permissions": ["storage", "tabs", "notifications", "alarms", "scripting"],
+  "host_permissions": ["https://www.facebook.com/*", "https://*.supabase.co/*"],
+  "background": {
+    "service_worker": "background.mjs",
+    "type": "module"
+  },
+  "action": { "default_title": "FB Groups Notifier" },
+  "icons": { "128": "assets/icon.png" },
+  "content_scripts": [
+    {
+      "matches": ["https://www.facebook.com/groups/*"],
+      "js": ["content/injectToggleButton.js", "content/scraper.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
