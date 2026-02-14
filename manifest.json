@@ -1,15 +1,22 @@
 {
   "manifest_version": 3,
-  "name": "FB Groups Notifier",
+  "name": "GrabClientsNow",
   "version": "0.3.0",
-  "description": "Auth + DB local + botão em grupos + runner",
-  "permissions": ["storage", "tabs", "notifications", "alarms", "scripting"],
+  "description": "A Chrome extension to watch Facebook groups and notify about new posts.",
+  "permissions": [
+    "storage",
+    "tabs",
+    "notifications",
+    "alarms",
+    "scripting",
+    "downloads"
+  ],
   "host_permissions": ["https://www.facebook.com/*", "https://*.supabase.co/*"],
   "background": {
     "service_worker": "background.mjs",
     "type": "module"
   },
-  "action": { "default_title": "FB Groups Notifier" },
+  "action": { "default_title": "GrabClientsNow" },
   "icons": { "128": "assets/icon.png" },
   "content_scripts": [
     {

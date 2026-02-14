@@ -177,24 +177,6 @@
     return null;
   }
 
-  function getBestHref(a) {
-    if (!a) return null;
-
-    // prioridade: a.href (DOM property) -> normalmente já resolve/normaliza
-    const prop = a.href;
-    if (prop && prop !== location.href) return prop;
-
-    // fallback: atributo cru
-    const raw = a.getAttribute("href");
-    if (!raw) return null;
-
-    // resolve relativo
-    try {
-      return new URL(raw, location.href).toString();
-    } catch {
-      return raw;
-    }
-  }
   async function materializeHref(a, timeoutMs = 1200) {
     if (!a) return null;
 
@@ -274,6 +256,7 @@
 
     return afterProp || got || afterAttr || null;
   }
+
   function findWeirdTimestampAnchor(root) {
     if (!root) return null;
     const candidates = Array.from(
@@ -316,31 +299,9 @@
     return normalizeFbPostUrl(href2);
   }
 
-  async function extractPost(el) {
-    await sleep(200 + Math.random() * 600);
-
+  // ====== NOVO: extração leve (sem buscar permalink) ======
+  function extractPostLite(el) {
     const root = getPostRoot(el);
-
-    const hrefs = Array.from(root.querySelectorAll('a[role="link"]'))
-      .map((a) => a.getAttribute("href") || a.href)
-      .filter(Boolean);
-
-    log("A count:", hrefs.length);
-    log(
-      "A posts:",
-      hrefs.filter((h) => String(h).includes("/posts/")).slice(0, 5),
-    );
-    log(
-      "A permalink:",
-      hrefs
-        .filter(
-          (h) =>
-            String(h).includes("permalink.php") ||
-            String(h).includes("story_fbid="),
-        )
-        .slice(0, 5),
-    );
-    log("A sample:", hrefs.slice(0, 10));
 
     const textoEl = root.querySelector(
       '[data-ad-rendering-role="story_message"]',
@@ -348,21 +309,32 @@
     const text = textoEl?.innerText?.trim() || "";
 
     const author = pickAuthor(el);
-    const postUrl = await getPostPermalink(el);
-
-    const groupUrl = `https://www.facebook.com/groups/${slug}/`;
-
-    // Debug útil (pode comentar depois)
-    log("author:", author?.name, "|", author?.url);
-    log("postUrl:", postUrl);
 
     return {
       texto: text,
       autor: author.name,
       autorUrl: author.url,
+      timestamp: Date.now(),
+    };
+  }
+
+  // ====== (mantém) extração completa: só use quando precisar ======
+  async function extractPostFull(el) {
+    // pequeno jitter pra parecer humano (opcional)
+    await sleep(120 + Math.random() * 250);
+
+    const lite = extractPostLite(el);
+    const postUrl = await getPostPermalink(el);
+    const groupUrl = `https://www.facebook.com/groups/${slug}/`;
+
+    // Debug útil (pode comentar depois)
+    log("author:", lite?.autor, "|", lite?.autorUrl);
+    log("postUrl:", postUrl);
+
+    return {
+      ...lite,
       postUrl,
       groupUrl,
-      timestamp: Date.now(),
     };
   }
 
@@ -385,9 +357,11 @@
   }
 
   const seen = new Set();
-  function keyFor(post) {
-    if (post.postUrl) return `u:${post.postUrl}`;
-    return `t:${(post.texto || "").slice(0, 120).toLowerCase()}`;
+  function keyForText(texto) {
+    return `t:${(texto || "").slice(0, 120).toLowerCase()}`;
+  }
+  function keyForUrl(url) {
+    return url ? `u:${url}` : null;
   }
 
   async function gateShouldRun() {
@@ -413,6 +387,7 @@
     return profile;
   }
 
+  // ====== ATUALIZADO: só busca link se bater keyword ======
   async function processVisiblePosts(profile) {
     const posts = Array.from(
       document.querySelectorAll("div[aria-posinset]"),
@@ -423,37 +398,54 @@
     let matches = 0;
 
     for (const el of posts) {
-      const post = await extractPost(el);
-      if (!post.texto) continue;
-      if (!matchText(post.texto, profile)) continue;
+      // 1) rápido: texto + autor
+      const lite = extractPostLite(el);
+      if (!lite.texto) continue;
 
-      const k = keyFor(post);
-      if (seen.has(k)) continue;
-      seen.add(k);
+      // 2) filtra por keyword ANTES de pegar link
+      if (!matchText(lite.texto, profile)) continue;
+
+      // 3) dedupe barato por texto (antes do link)
+      const kText = keyForText(lite.texto);
+      if (seen.has(kText)) continue;
+
+      // 4) agora sim pega permalink (caro)
+      const full = await extractPostFull(el);
+
+      const kUrl = keyForUrl(full.postUrl);
+      if (kUrl && seen.has(kUrl)) {
+        // já vimos esse post por URL
+        seen.add(kText);
+        continue;
+      }
+
+      // marca vistos
+      seen.add(kText);
+      if (kUrl) seen.add(kUrl);
 
       matches++;
 
       log(
         "MATCH:",
-        post.autor,
+        full.autor,
         "|",
-        post.texto.slice(0, 80),
+        full.texto.slice(0, 80),
         "| url:",
-        post.postUrl,
+        full.postUrl,
       );
 
       chrome.runtime.sendMessage({
         type: "OPPORTUNITY_FOUND",
         payload: {
           slug,
-          groupUrl: post.groupUrl,
+          groupUrl: full.groupUrl,
           profileName: profile.name,
           post: {
-            texto: post.texto,
-            autor: post.autor,
-            autorUrl: post.autorUrl || null,
-            postUrl: post.postUrl || null,
-            timestamp: post.timestamp,
+            texto: full.texto,
+            autor: full.autor,
+            autorUrl: full.autorUrl || null,
+            postUrl: full.postUrl || null,
+            timestamp: full.timestamp,
           },
         },
       });
