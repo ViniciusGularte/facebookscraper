@@ -8,11 +8,17 @@ import {
   exportCrmLeadsCsv,
 } from "../lib/db.mjs";
 
+import { initI18n, setLang, tFactory, applyDomI18n } from "../lib/i18n.mjs";
+
 const send = (msg) =>
   new Promise((resolve) => chrome.runtime.sendMessage(msg, resolve));
 
 let activeProfileId = "default";
 let extensionEnabled = true;
+
+// i18n
+let LANG = "pt-BR";
+let t = (k) => k;
 
 // pagination
 let leadsPage = 0;
@@ -21,23 +27,61 @@ const LEADS_PAGE_SIZE = 10;
 function qs(id) {
   return document.getElementById(id);
 }
+
+async function bootI18n() {
+  const { lang } = await initI18n();
+  LANG = lang;
+  t = tFactory(LANG);
+
+  document.documentElement.setAttribute("lang", LANG);
+  applyDomI18n(t);
+
+  const sel = qs("langSelect");
+  const sel2 = qs("langSelectModal");
+  if (sel) sel.value = LANG;
+  if (sel2) sel2.value = LANG;
+
+  const onChange = async (v) => {
+    const nl = await setLang(v);
+    LANG = nl;
+    t = tFactory(LANG);
+    document.documentElement.setAttribute("lang", LANG);
+    applyDomI18n(t);
+
+    // Re-render partes que são geradas via JS
+    await loadProfiles();
+    await loadGroups();
+    await loadLeads();
+  };
+
+  sel?.addEventListener("change", () => onChange(sel.value));
+  sel2?.addEventListener("change", () => onChange(sel2.value));
+}
+
 function slugifyId(name) {
   const s = String(name || "")
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "") // remove acentos
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "_")
     .replace(/^_+|_+$/g, "")
     .replace(/_+/g, "_");
-
   return s || "perfil";
 }
 
 function computeProfileId() {
   const name = qs("p_name")?.value?.trim() || "";
-  // prefixo pra evitar colisão com ids reservados
   const base = slugifyId(name);
   return `p_${base}`;
+}
+
+function escapeHtml(s) {
+  return String(s ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }
 
 function renderKwPreview(list, elId, countId, kind /* "inc" | "exc" */) {
@@ -49,7 +93,14 @@ function renderKwPreview(list, elId, countId, kind /* "inc" | "exc" */) {
 
   if (!el) return;
   if (!arr.length) {
-    el.innerHTML = `<span class="small">Nada ainda. Separe por vírgula.</span>`;
+    el.innerHTML = `<span class="small">${escapeHtml(
+      // mantém simples (sem chave dedicada)
+      LANG === "en"
+        ? "Nothing yet. Separate by comma."
+        : LANG === "es"
+          ? "Aún nada. Separa por coma."
+          : "Nada ainda. Separe por vírgula.",
+    )}</span>`;
     return;
   }
 
@@ -75,18 +126,15 @@ function syncProfileEditorUI() {
   renderKwPreview(exc, "p_excPreview", "p_excCount", "exc");
 }
 
-function escapeHtml(s) {
-  return String(s ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
-
 function safeAuthorName(a) {
-  const t = String(a || "").trim();
-  return t ? t : "Anônimo";
+  const tt = String(a || "").trim();
+  return tt
+    ? tt
+    : LANG === "en"
+      ? "Anonymous"
+      : LANG === "es"
+        ? "Anónimo"
+        : "Anônimo";
 }
 
 function setTab(tab) {
@@ -118,14 +166,29 @@ async function refreshAutorunUI() {
 
   if (!r?.ok) {
     dot.className = "dot off";
-    text.textContent = "Monitoramento: erro";
+    text.textContent =
+      LANG === "en"
+        ? "Monitoring: error"
+        : LANG === "es"
+          ? "Monitoreo: error"
+          : "Monitoramento: erro";
     qs("mAutorun").textContent = "—";
     return;
   }
 
   const on = !!r.state.running;
   dot.className = on ? "dot on" : "dot off";
-  text.textContent = on ? "Monitoramento: ON" : "Monitoramento: OFF";
+  text.textContent = on
+    ? LANG === "en"
+      ? "Monitoring: ON"
+      : LANG === "es"
+        ? "Monitoreo: ON"
+        : "Monitoramento: ON"
+    : LANG === "en"
+      ? "Monitoring: OFF"
+      : LANG === "es"
+        ? "Monitoreo: OFF"
+        : "Monitoramento: OFF";
   qs("mAutorun").textContent = on ? "ON" : "OFF";
 }
 
@@ -168,13 +231,46 @@ function closeProfileModal() {
   document.body.style.overflow = "";
 }
 
+function setMsg(text, type) {
+  const el = qs("p_msg");
+  if (!el) return;
+  el.textContent = text;
+  el.className =
+    type === "err" ? "notice err" : type === "ok" ? "notice ok" : "notice";
+}
+
+function fillForm(p) {
+  qs("p_name").value = p?.name || "";
+  qs("p_include").value = (p?.include || []).join(", ");
+  qs("p_exclude").value = (p?.exclude || []).join(", ");
+
+  qs("editorSub").textContent = p?.id
+    ? t("profiles.modal.subEdit", { id: p.id })
+    : t("profiles.modal.subNew");
+  qs("modalTitle").textContent = p?.id
+    ? t("profiles.modal.editTitle")
+    : t("profiles.modal.newTitle");
+
+  const idEl = qs("p_idPreview");
+  if (idEl) idEl.textContent = p?.id ? p.id : computeProfileId();
+
+  syncProfileEditorUI();
+
+  // manter selects do modal sincronizados
+  const sel2 = qs("langSelectModal");
+  if (sel2) sel2.value = LANG;
+}
+
+function clearForm() {
+  fillForm({ id: "", name: "", include: [], exclude: [] });
+  setMsg("", "");
+}
+
 qs("openProfileModal")?.addEventListener("click", () => {
-  qs("modalTitle").textContent = "Novo Perfil";
   fillForm({ id: "", name: "", include: [], exclude: [] });
   openProfileModal();
 });
 qs("closeProfileModal")?.addEventListener("click", closeProfileModal);
-
 qs("profileModal")?.addEventListener("click", (e) => {
   if (e.target === qs("profileModal")) closeProfileModal();
 });
@@ -213,7 +309,7 @@ qs("exportCsv")?.addEventListener("click", async () => {
   await exportCrmLeadsCsv();
 });
 
-// clear (limpa CRM + lista raw)
+// clear
 qs("clearLeads")?.addEventListener("click", async () => {
   await chrome.storage.local.set({ leads: [] });
   await clearCrmLeads();
@@ -233,34 +329,6 @@ qs("leadsNext")?.addEventListener("click", async () => {
 });
 
 // ---------- PROFILE FORM ----------
-function setMsg(text, type) {
-  const el = qs("p_msg");
-  if (!el) return;
-  el.textContent = text;
-  el.className =
-    type === "err" ? "notice err" : type === "ok" ? "notice ok" : "notice";
-}
-
-function fillForm(p) {
-  qs("p_name").value = p?.name || "";
-  qs("p_include").value = (p?.include || []).join(", ");
-  qs("p_exclude").value = (p?.exclude || []).join(", ");
-
-  qs("editorSub").textContent = p?.id ? `Editando: ${p.id}` : "Criar / editar";
-  qs("modalTitle").textContent = p?.id ? "Editar Perfil" : "Novo Perfil";
-
-  // se estiver editando, mostra o id real (não recalcula)
-  const idEl = qs("p_idPreview");
-  if (idEl) idEl.textContent = p?.id ? p.id : computeProfileId();
-
-  // renderiza chips
-  syncProfileEditorUI();
-}
-
-function clearForm() {
-  fillForm({ id: "", name: "", include: [], exclude: [] });
-  setMsg("", "");
-}
 qs("clearForm")?.addEventListener("click", clearForm);
 ["p_name", "p_include", "p_exclude"].forEach((id) => {
   qs(id)?.addEventListener("input", () => syncProfileEditorUI());
@@ -272,45 +340,42 @@ qs("saveProfile")?.addEventListener("click", async () => {
   const exclude = normalizeKeywords(qs("p_exclude").value);
 
   if (!name) {
-    setMsg("Preencha o Nome do perfil.", "err");
+    setMsg(t("profiles.msg.fillName"), "err");
     return;
   }
 
-  // Se está editando, mantém o id atual; se é novo, gera
   const currentShownId = (qs("p_idPreview")?.textContent || "").trim();
   const id =
     currentShownId && currentShownId !== "—"
       ? currentShownId
       : computeProfileId();
-
   const profile = { id, name, include, exclude };
 
   const r = await send({ type: "PROFILES_UPSERT", profile });
   if (!r?.ok) {
-    setMsg("Erro ao salvar.", "err");
+    setMsg(t("profiles.msg.saveErr"), "err");
     return;
   }
 
-  setMsg("Salvo.", "ok");
+  setMsg(t("profiles.msg.saved"), "ok");
   await loadProfiles();
 });
 
 qs("useThisProfile")?.addEventListener("click", async () => {
   const id = (qs("p_idPreview")?.textContent || "").trim();
-
   if (!id || id === "—") {
-    setMsg("Defina um nome para gerar o ID.", "err");
+    setMsg(t("profiles.msg.needNameForId"), "err");
     return;
   }
 
   const r = await send({ type: "SETTINGS_SET_ACTIVE_PROFILE", profileId: id });
   if (!r?.ok) {
-    setMsg("Erro ao ativar perfil.", "err");
+    setMsg(t("profiles.msg.activateErr"), "err");
     return;
   }
 
   await loadProfiles();
-  setMsg(`Perfil ativo: ${id}`, "ok");
+  setMsg(t("profiles.msg.activeNow", { id }), "ok");
 });
 
 // ---------- CARDS ----------
@@ -320,10 +385,10 @@ function profileCard(p) {
 
   const badges = `
     <div class="badges">
-      ${isDefault ? `<span class="badge badge-amber">Base</span>` : ``}
-      ${isActive ? `<span class="badge badge-primary">Ativo</span>` : ``}
-      <span class="badge badge-muted">${p.include?.length || 0} procurar</span>
-      <span class="badge badge-muted">${p.exclude?.length || 0} ignorar</span>
+      ${isDefault ? `<span class="badge badge-amber">${escapeHtml(t("badge.base"))}</span>` : ``}
+      ${isActive ? `<span class="badge badge-primary">${escapeHtml(LANG === "en" ? "Active" : LANG === "es" ? "Activo" : "Ativo")}</span>` : ``}
+      <span class="badge badge-muted">${p.include?.length || 0} ${escapeHtml(LANG === "en" ? "find" : LANG === "es" ? "buscar" : "procurar")}</span>
+      <span class="badge badge-muted">${p.exclude?.length || 0} ${escapeHtml(LANG === "en" ? "ignore" : LANG === "es" ? "ignorar" : "ignorar")}</span>
     </div>
   `;
 
@@ -349,9 +414,9 @@ function profileCard(p) {
       <div class="kws">${kws}${kws2}</div>
 
       <div class="card-actions">
-        <button class="btn btn-primary act-use" data-id="${escapeHtml(p.id)}" type="button">Usar</button>
-        <button class="btn btn-ghost act-edit" data-id="${escapeHtml(p.id)}" type="button">Editar</button>
-        <button class="btn btn-danger act-del" data-id="${escapeHtml(p.id)}" type="button" ${p.id === "default" ? "disabled" : ""}>Deletar</button>
+        <button class="btn btn-primary act-use" data-id="${escapeHtml(p.id)}" type="button">${escapeHtml(t("btn.use"))}</button>
+        <button class="btn btn-ghost act-edit" data-id="${escapeHtml(p.id)}" type="button">${escapeHtml(t("btn.edit"))}</button>
+        <button class="btn btn-danger act-del" data-id="${escapeHtml(p.id)}" type="button" ${p.id === "default" ? "disabled" : ""}>${escapeHtml(t("btn.delete"))}</button>
       </div>
     </div>
   `;
@@ -359,8 +424,8 @@ function profileCard(p) {
 
 function groupCard(g) {
   const badge = g.enabled
-    ? `<span class="badge badge-primary">Ativo</span>`
-    : `<span class="badge badge-muted">Inativo</span>`;
+    ? `<span class="badge badge-primary">${escapeHtml(t("badge.active"))}</span>`
+    : `<span class="badge badge-muted">${escapeHtml(t("badge.inactive"))}</span>`;
 
   return `
     <div class="card">
@@ -373,20 +438,20 @@ function groupCard(g) {
       </div>
 
       <div class="card-actions">
-        <button class="btn btn-primary act-open-group" data-url="${escapeHtml(g.url)}" type="button">Abrir</button>
-        <button class="btn btn-danger act-remove-group" data-slug="${escapeHtml(g.slug)}" type="button">Deletar</button>
+        <button class="btn btn-primary act-open-group" data-url="${escapeHtml(g.url)}" type="button">${escapeHtml(t("btn.open"))}</button>
+        <button class="btn btn-danger act-remove-group" data-slug="${escapeHtml(g.slug)}" type="button">${escapeHtml(t("btn.delete"))}</button>
       </div>
     </div>
   `;
 }
 
 function statusLabel(s) {
-  if (s === "new") return "Novo";
-  if (s === "contacted") return "Contatado";
-  if (s === "followup") return "Follow-up";
-  if (s === "closed") return "Fechado";
-  if (s === "ignored") return "Ignorado";
-  return "Novo";
+  if (s === "new") return t("st.new");
+  if (s === "contacted") return t("st.contacted");
+  if (s === "followup") return t("st.followup");
+  if (s === "closed") return t("st.closed");
+  if (s === "ignored") return t("st.ignored");
+  return t("st.new");
 }
 
 function statusBadgeClass(s) {
@@ -403,7 +468,7 @@ function leadKeyFrom(l) {
   return (
     post.postUrl ||
     post.url ||
-    `${safeAuthorName(post.autor) === "Anônimo" ? "anon" : post.autor}::${l.timestamp || 0}::${l.slug || "nogroup"}`
+    `${safeAuthorName(post.autor) === (LANG === "en" ? "Anonymous" : LANG === "es" ? "Anónimo" : "Anônimo") ? "anon" : post.autor}::${l.timestamp || 0}::${l.slug || "nogroup"}`
   );
 }
 
@@ -461,7 +526,7 @@ function leadCardMerged(raw, meta) {
         <div class="leadTextClamp" id="leadText_${escapeHtml(key)}">${escapeHtml(txt)}</div>
         <div class="leadBodyActions">
           <button class="btn btn-ghost btn-xs leadToggle" data-id="${escapeHtml(key)}" type="button">
-            Ver mais
+            ${escapeHtml(t("leads.seeMore"))}
           </button>
         </div>
       </div>
@@ -469,41 +534,41 @@ function leadCardMerged(raw, meta) {
       <div class="leadFoot">
         <div class="leadLinks">
           <button class="btn btn-primary btn-sm act-open-post" data-url="${escapeHtml(postUrl)}" type="button" ${postUrl ? "" : "disabled"}>
-            Post
+            ${escapeHtml(t("leads.link.post"))}
           </button>
           <button class="btn btn-link btn-sm act-open-profile" data-url="${escapeHtml(autorUrl)}" type="button" ${autorUrl ? "" : "disabled"}>
-            Perfil
+            ${escapeHtml(t("leads.link.profile"))}
           </button>
           <button class="btn btn-link btn-sm act-open-group" data-url="${escapeHtml(groupUrl)}" type="button" ${groupUrl ? "" : "disabled"}>
-            Grupo
+            ${escapeHtml(t("leads.link.group"))}
           </button>
         </div>
 
         <div class="leadCrmGrid">
           <div class="crmField">
-            <div class="crmLabel">Status</div>
-            <select class="select select-sm crmStatus" data-id="${escapeHtml(key)}" aria-label="Status do lead">
-              <option value="new" ${st === "new" ? "selected" : ""}>Novo</option>
-              <option value="contacted" ${st === "contacted" ? "selected" : ""}>Contatado</option>
-              <option value="followup" ${st === "followup" ? "selected" : ""}>Follow-up</option>
-              <option value="closed" ${st === "closed" ? "selected" : ""}>Fechado</option>
-              <option value="ignored" ${st === "ignored" ? "selected" : ""}>Ignorado</option>
+            <div class="crmLabel">${escapeHtml(t("leads.crm.status"))}</div>
+            <select class="select select-sm crmStatus" data-id="${escapeHtml(key)}" data-i18n-aria="leads.crm.status" aria-label="${escapeHtml(t("leads.crm.status"))}">
+              <option value="new" ${st === "new" ? "selected" : ""}>${escapeHtml(t("st.new"))}</option>
+              <option value="contacted" ${st === "contacted" ? "selected" : ""}>${escapeHtml(t("st.contacted"))}</option>
+              <option value="followup" ${st === "followup" ? "selected" : ""}>${escapeHtml(t("st.followup"))}</option>
+              <option value="closed" ${st === "closed" ? "selected" : ""}>${escapeHtml(t("st.closed"))}</option>
+              <option value="ignored" ${st === "ignored" ? "selected" : ""}>${escapeHtml(t("st.ignored"))}</option>
             </select>
           </div>
 
           <div class="crmField">
-            <div class="crmLabel">Nota</div>
+            <div class="crmLabel">${escapeHtml(t("leads.crm.note"))}</div>
             <input
               class="input input-sm crmNote"
               data-id="${escapeHtml(key)}"
-              placeholder="Ex: mandei WhatsApp, voltar amanhã"
+              placeholder="${escapeHtml(t("leads.crm.notePh"))}"
               value="${escapeHtml(note)}"
             />
           </div>
 
           <div class="crmField crmSave">
             <div class="crmLabel">&nbsp;</div>
-            <span class="savePill savePill-idle" id="save_${escapeHtml(key)}" aria-live="polite">—</span>
+            <span class="savePill savePill-idle" id="save_${escapeHtml(key)}" aria-live="polite">${escapeHtml(t("save.idle"))}</span>
           </div>
         </div>
       </div>
@@ -517,8 +582,13 @@ async function loadProfiles() {
   const p = await send({ type: "PROFILES_LIST" });
 
   if (!s?.ok || !p?.ok) {
-    qs("profilesList").innerHTML =
-      `<div class="card"><div class="notice err">Erro ao carregar perfis</div></div>`;
+    qs("profilesList").innerHTML = `<div class="card"><div class="notice err">${
+      LANG === "en"
+        ? "Failed to load profiles"
+        : LANG === "es"
+          ? "Error al cargar perfiles"
+          : "Erro ao carregar perfis"
+    }</div></div>`;
     return;
   }
 
@@ -558,8 +628,13 @@ async function loadProfiles() {
 async function loadGroups() {
   const res = await send({ type: "DB_LIST_GROUPS" });
   if (!res?.ok) {
-    qs("groupsList").innerHTML =
-      `<div class="card"><div class="notice err">Erro ao carregar grupos</div></div>`;
+    qs("groupsList").innerHTML = `<div class="card"><div class="notice err">${
+      LANG === "en"
+        ? "Failed to load groups"
+        : LANG === "es"
+          ? "Error al cargar grupos"
+          : "Erro ao carregar grupos"
+    }</div></div>`;
     qs("groupsEmpty").style.display = "none";
     return;
   }
@@ -652,7 +727,6 @@ function drawLeadsChart(leads) {
   const xAt = (i) => padL + (plotW * i) / (data.length - 1);
   const yAt = (v) => padT + plotH - (plotH * v) / max;
 
-  // grid (muted)
   ctx.strokeStyle = "rgba(102,112,133,0.18)";
   ctx.lineWidth = 1;
   for (let i = 0; i <= 3; i++) {
@@ -665,21 +739,18 @@ function drawLeadsChart(leads) {
 
   const pts = data.map((d, i) => ({ x: xAt(i), y: yAt(d.count) }));
 
-  // linha grossa (accent soft)
   ctx.strokeStyle = "rgba(46,166,111,0.18)";
   ctx.lineWidth = 6;
   ctx.beginPath();
   pts.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
   ctx.stroke();
 
-  // linha fina (accent strong)
   ctx.strokeStyle = "rgba(31,138,88,0.85)";
   ctx.lineWidth = 2.2;
   ctx.beginPath();
   pts.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
   ctx.stroke();
 
-  // pontos
   pts.forEach((p) => {
     ctx.fillStyle = "rgba(31,138,88,0.85)";
     ctx.beginPath();
@@ -694,13 +765,11 @@ function renderTopGroups(leads) {
     const url = l.groupUrl || "";
     const slug = l.slug || "";
     if (!url && !slug) continue;
-
     const key = url || slug;
     by.set(key, (by.get(key) || 0) + 1);
   }
 
   const top = [...by.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10);
-
   const el = qs("topGroups");
   if (!el) return;
 
@@ -724,23 +793,22 @@ function renderTopGroups(leads) {
             }>
               <div class="tgr-left" style="min-width:0;">
                 <div class="tgr-title truncate">${escapeHtml(slug)}</div>
-                <div class="tgr-sub truncate">${openUrl ? escapeHtml(openUrl) : "Sem link salvo"}</div>
+                <div class="tgr-sub truncate">${openUrl ? escapeHtml(openUrl) : escapeHtml(t("top.nolink"))}</div>
               </div>
 
               <div class="tgr-right">
                 <div class="tgr-count">${count}</div>
-                <div class="tgr-label">leads</div>
+                <div class="tgr-label">${escapeHtml(t("top.leads"))}</div>
               </div>
             </button>
           `;
         })
         .join("")
     : `<div class="empty" style="margin: 6px 0 0;">
-         <div class="empty-title">Sem dados ainda</div>
-         <div class="empty-sub">Assim que aparecerem leads, os grupos que mais geram vão aparecer aqui.</div>
+         <div class="empty-title">${escapeHtml(t("top.emptyTitle"))}</div>
+         <div class="empty-sub">${escapeHtml(t("top.emptySub"))}</div>
        </div>`;
 
-  // click -> open
   document.querySelectorAll(".topGroupRow").forEach((row) => {
     row.addEventListener("click", () => {
       const url = row.getAttribute("data-url");
@@ -770,7 +838,7 @@ function setSavePill(id, mode, text) {
           ? "savePill-err"
           : "savePill-idle",
   );
-  el.textContent = text || "—";
+  el.textContent = text || t("save.idle");
 }
 
 function scheduleSave(id, patch) {
@@ -779,34 +847,32 @@ function scheduleSave(id, patch) {
 
   if (saveTimers.has(key)) clearTimeout(saveTimers.get(key));
 
-  setSavePill(key, "saving", "Salvando…");
+  setSavePill(key, "saving", t("save.saving"));
 
-  const t = setTimeout(async () => {
+  const tt = setTimeout(async () => {
     try {
       await patchCrmLead(key, patch);
-      setSavePill(key, "ok", "Salvo");
-      setTimeout(() => setSavePill(key, "idle", "—"), 1200);
+      setSavePill(key, "ok", t("save.ok"));
+      setTimeout(() => setSavePill(key, "idle", t("save.idle")), 1200);
     } catch {
-      setSavePill(key, "err", "Erro");
+      setSavePill(key, "err", t("save.err"));
     }
   }, 450);
 
-  saveTimers.set(key, t);
+  saveTimers.set(key, tt);
 }
 
 function bindLeadInteractions() {
-  // expand/collapse
   document.querySelectorAll(".leadToggle").forEach((btn) => {
     btn.addEventListener("click", () => {
       const id = btn.getAttribute("data-id");
       const card = btn.closest(".leadCard");
       if (!id || !card) return;
       const expanded = card.classList.toggle("expanded");
-      btn.textContent = expanded ? "Ver menos" : "Ver mais";
+      btn.textContent = expanded ? t("leads.seeLess") : t("leads.seeMore");
     });
   });
 
-  // open links
   document.querySelectorAll(".act-open-post").forEach((b) => {
     b.addEventListener("click", () => {
       const url = b.getAttribute("data-url");
@@ -826,7 +892,6 @@ function bindLeadInteractions() {
     });
   });
 
-  // autosave status
   document.querySelectorAll(".crmStatus").forEach((sel) => {
     sel.addEventListener("change", () => {
       const id = sel.getAttribute("data-id");
@@ -834,7 +899,6 @@ function bindLeadInteractions() {
     });
   });
 
-  // autosave note
   document.querySelectorAll(".crmNote").forEach((inp) => {
     inp.addEventListener("blur", () => {
       const id = inp.getAttribute("data-id");
@@ -885,7 +949,6 @@ async function loadLeads() {
 
   bindLeadInteractions();
 
-  // pager UI
   const pager = qs("leadsPager");
   const info = qs("leadsPagerInfo");
   const prev = qs("leadsPrev");
@@ -893,7 +956,11 @@ async function loadLeads() {
 
   if (pager && info && prev && next) {
     pager.style.display = total > LEADS_PAGE_SIZE ? "flex" : "none";
-    info.textContent = `Mostrando ${Math.min(total, start + 1)}–${Math.min(total, end)} de ${total}`;
+    info.textContent = t("leads.pagerInfo", {
+      a: Math.min(total, start + 1),
+      b: Math.min(total, end),
+      t: total,
+    });
     prev.disabled = leadsPage <= 0;
     next.disabled = leadsPage >= maxPage;
   }
@@ -904,11 +971,14 @@ async function loadLeads() {
 
 // ---------- BOOT ----------
 async function boot() {
+  await bootI18n();
+
   const auth = await send({ type: "AUTH_STATUS" });
 
   if (!auth?.ok || !auth.session?.user) {
     qs("blocked").style.display = "block";
     qs("app").style.display = "none";
+    applyDomI18n(t);
     return;
   }
 
@@ -923,6 +993,22 @@ async function boot() {
   await loadProfiles();
   await loadGroups();
   await loadLeads();
+  let leadsReloadT = null;
+
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== "local") return;
+    if (!changes.leads) return;
+
+    clearTimeout(leadsReloadT);
+    leadsReloadT = setTimeout(() => {
+      leadsPage = 0;
+      loadLeads();
+    }, 250);
+  });
+
+  // garante sincronismo do modal select
+  const sel2 = qs("langSelectModal");
+  if (sel2) sel2.value = LANG;
 }
 
 boot();

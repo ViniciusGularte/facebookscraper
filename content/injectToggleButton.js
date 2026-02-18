@@ -1,14 +1,91 @@
 (() => {
-  const GROUP_REGEX = /^https:\/\/www\.facebook\.com\/groups\/([^\/\?\#]+)/;
+  const GROUP_REGEX =
+    /^https:\/\/(?:www|web|m)\.facebook\.com\/groups\/([^\/\?\#]+)/i;
   const WIDGET_ID = "ext-fb-notifs-widget";
   const STYLE_ID = "ext-fb-notifs-style";
+  const LANG_KEY = "lang";
 
   const send = (msg) =>
     new Promise((resolve) => chrome.runtime.sendMessage(msg, resolve));
 
   let currentSlug = null;
   let mounting = false;
-  let hiddenByUser = false; // se o cara fechar, não reaparece até trocar de grupo
+  let hiddenByUser = false;
+  let LANG = "pt-BR";
+
+  const TXT = {
+    "pt-BR": {
+      title: "Monitoramento do Grupo",
+      close: "Fechar",
+      status: "Status",
+      active: "ATIVO",
+      inactive: "INATIVO",
+      monitoringThis: "Monitorando este grupo",
+      enableThis: "Ativar neste grupo",
+      login: "Faça login na extensão.",
+      limit: "Limite atingido ({n}).",
+      saveErr: "Erro ao salvar.",
+      enabled: "Ativado para este grupo.",
+      disabled: "Desativado neste grupo.",
+    },
+    en: {
+      title: "Group Monitoring",
+      close: "Close",
+      status: "Status",
+      active: "ACTIVE",
+      inactive: "INACTIVE",
+      monitoringThis: "Monitoring this group",
+      enableThis: "Enable for this group",
+      login: "Please sign in to the extension.",
+      limit: "Limit reached ({n}).",
+      saveErr: "Failed to save.",
+      enabled: "Enabled for this group.",
+      disabled: "Disabled for this group.",
+    },
+    es: {
+      title: "Monitoreo del Grupo",
+      close: "Cerrar",
+      status: "Estado",
+      active: "ACTIVO",
+      inactive: "INACTIVO",
+      monitoringThis: "Monitoreando este grupo",
+      enableThis: "Activar en este grupo",
+      login: "Inicia sesión en la extensión.",
+      limit: "Límite alcanzado ({n}).",
+      saveErr: "Error al guardar.",
+      enabled: "Activado para este grupo.",
+      disabled: "Desactivado en este grupo.",
+    },
+  };
+
+  function normLang(v) {
+    const s = String(v || "").trim();
+    if (s === "pt" || s === "pt-BR") return "pt-BR";
+    if (s.toLowerCase().startsWith("pt")) return "pt-BR";
+    if (s.toLowerCase().startsWith("es")) return "es";
+    if (s.toLowerCase().startsWith("en")) return "en";
+    if (s === "es") return "es";
+    if (s === "en") return "en";
+    return "pt-BR";
+  }
+
+  async function loadLang() {
+    try {
+      const r = await chrome.storage.local.get({ [LANG_KEY]: "" });
+      LANG = normLang(r[LANG_KEY] || navigator.language || "");
+    } catch {
+      LANG = normLang(navigator.language || "");
+    }
+  }
+
+  function t(key, vars) {
+    const dict = TXT[LANG] || TXT["pt-BR"];
+    const raw = dict[key] ?? TXT["pt-BR"][key] ?? key;
+    if (!vars) return String(raw);
+    return String(raw).replace(/\{(\w+)\}/g, (_, k) =>
+      vars[k] == null ? "" : String(vars[k]),
+    );
+  }
 
   function getSlugFromUrl(href) {
     const m = String(href || "").match(GROUP_REGEX);
@@ -17,7 +94,6 @@
 
   function ensureStyle() {
     if (document.getElementById(STYLE_ID)) return;
-
     const style = document.createElement("style");
     style.id = STYLE_ID;
     style.textContent = `
@@ -196,10 +272,8 @@
   function setStateUI(ui, enabled) {
     ui.dot.className = enabled ? "extDot on" : "extDot";
     ui.mainBtn.className = enabled ? "extMainBtn" : "extMainBtn off";
-    ui.mainBtn.textContent = enabled
-      ? "Monitorando este grupo"
-      : "Ativar neste grupo";
-    ui.pillV.textContent = enabled ? "ATIVO" : "INATIVO";
+    ui.mainBtn.textContent = enabled ? t("monitoringThis") : t("enableThis");
+    ui.pillV.textContent = enabled ? t("active") : t("inactive");
   }
 
   function setMsg(ui, text, type) {
@@ -217,7 +291,6 @@
     const card = document.createElement("div");
     card.className = "extJarvisCard";
 
-    // Top
     const top = document.createElement("div");
     top.className = "extJarvisTop";
 
@@ -232,7 +305,7 @@
 
     const h = document.createElement("div");
     h.className = "extJarvisH";
-    h.textContent = "Monitoramento do Grupo";
+    h.textContent = t("title");
 
     const s = document.createElement("div");
     s.className = "extJarvisS";
@@ -247,13 +320,12 @@
     const closeBtn = document.createElement("button");
     closeBtn.className = "extIconBtn";
     closeBtn.type = "button";
-    closeBtn.title = "Fechar";
+    closeBtn.title = t("close");
     closeBtn.innerHTML = `<span style="font-size:18px;line-height:0;">×</span>`;
 
     top.appendChild(titleWrap);
     top.appendChild(closeBtn);
 
-    // Body
     const body = document.createElement("div");
     body.className = "extJarvisBody";
 
@@ -269,7 +341,7 @@
 
     const pillK = document.createElement("div");
     pillK.className = "extPillK";
-    pillK.textContent = "Status";
+    pillK.textContent = t("status");
 
     const pillV = document.createElement("div");
     pillV.className = "extPillV";
@@ -291,7 +363,6 @@
     card.appendChild(body);
     root.appendChild(card);
 
-    // mount animation
     requestAnimationFrame(() => card.classList.add("isOn"));
 
     closeBtn.addEventListener("click", () => {
@@ -307,6 +378,8 @@
     mounting = true;
 
     try {
+      await loadLang();
+
       if (document.getElementById(WIDGET_ID) && currentSlug === slug) return;
 
       removeWidget();
@@ -314,16 +387,13 @@
       hiddenByUser = false;
 
       const url = `https://www.facebook.com/groups/${slug}`;
-
       const status = await send({ type: "GROUP_CAN_INJECT", slug });
 
-      // não logado => não mostra
       if (!status?.ok) {
         removeWidget();
         return;
       }
 
-      // se não permitido e não existe => não mostra (tua regra)
       if (!status.allowed && !status.existing) {
         removeWidget();
         return;
@@ -343,7 +413,7 @@
 
         const fresh = await send({ type: "GROUP_CAN_INJECT", slug });
         if (!fresh?.ok) {
-          setMsg(ui, "Faça login na extensão.", "err");
+          setMsg(ui, t("login"), "err");
           setBusy(ui.mainBtn, false);
           removeWidget();
           return;
@@ -352,7 +422,7 @@
         const enabledNow = !!fresh.existing?.enabled;
 
         if (!enabledNow && !fresh.allowed && !fresh.existing) {
-          setMsg(ui, `Limite atingido (${fresh.limit}).`, "err");
+          setMsg(ui, t("limit", { n: fresh.limit }), "err");
           setBusy(ui.mainBtn, false);
           removeWidget();
           return;
@@ -363,18 +433,14 @@
           : await send({ type: "GROUP_ENABLE", slug, url });
 
         if (!res?.ok) {
-          setMsg(ui, "Erro ao salvar.", "err");
+          setMsg(ui, t("saveErr"), "err");
           setBusy(ui.mainBtn, false);
           return;
         }
 
         enabled = !!res.group?.enabled;
         setStateUI(ui, enabled);
-        setMsg(
-          ui,
-          enabled ? "Ativado para este grupo." : "Desativado neste grupo.",
-          "ok",
-        );
+        setMsg(ui, enabled ? t("enabled") : t("disabled"), "ok");
         setBusy(ui.mainBtn, false);
       });
     } finally {
@@ -392,7 +458,6 @@
       return;
     }
 
-    // se usuário fechou manualmente, só volta quando trocar de grupo
     if (hiddenByUser && slug === currentSlug) return;
     if (hiddenByUser && slug !== currentSlug) hiddenByUser = false;
 
@@ -401,13 +466,11 @@
       return;
     }
 
-    // se está no mesmo grupo mas widget sumiu (re-render), remonta
     if (!document.getElementById(WIDGET_ID) && !hiddenByUser) {
       await mountForSlug(slug);
     }
   }
 
-  // ----- SPA HOOKS + OBSERVER -----
   function hookHistory() {
     const _pushState = history.pushState;
     history.pushState = function (...args) {
@@ -428,7 +491,6 @@
 
   function observeSpa() {
     const mo = new MutationObserver(() => {
-      // FB mexe muito no DOM; debounce simples
       if (observeSpa._t) return;
       observeSpa._t = setTimeout(() => {
         observeSpa._t = null;
@@ -436,17 +498,11 @@
       }, 250);
     });
 
-    mo.observe(document.documentElement, {
-      childList: true,
-      subtree: true,
-    });
+    mo.observe(document.documentElement, { childList: true, subtree: true });
   }
 
   hookHistory();
   observeSpa();
-
-  // fallback bem leve (não precisa 800ms)
   setInterval(tick, 1500);
-
   tick();
 })();

@@ -1,14 +1,15 @@
+// content/scraper.js
 (() => {
+  // suporta: https://www.facebook.com/groups/<slug|gid>
+  //          https://web.facebook.com/groups/<slug|gid>
+  //          https://m.facebook.com/groups/<slug|gid>
   const GROUP_REGEX =
     /^https:\/\/(www|web|m)\.facebook\.com\/groups\/([^\/\?\#]+)/;
 
-  const m = location.href.match(GROUP_REGEX);
-  if (!m) return;
-
-  const slug = m[2];
-  const LOG_PREFIX = `[FB Scraper][${slug}]`;
-  const log = (...a) => console.log(LOG_PREFIX, ...a);
-  const err = (...a) => console.error(LOG_PREFIX, ...a);
+  // ------------------------
+  // infra
+  // ------------------------
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   const send = (msg, timeoutMs = 8000) =>
     new Promise((resolve) => {
@@ -27,16 +28,28 @@
       });
     });
 
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  function currentSlug() {
+    const m = String(location.href || "").match(GROUP_REGEX);
+    return m ? m[2] : null;
+  }
 
+  function LOG_PREFIX() {
+    return `[FB Scraper][${currentSlug() || "?"}]`;
+  }
+  const log = (...a) => console.log(LOG_PREFIX(), ...a);
+  const err = (...a) => console.error(LOG_PREFIX(), ...a);
+
+  // ------------------------
+  // match / parsing helpers
+  // ------------------------
   function matchText(text, profile) {
     const t = (text ?? "").toLowerCase();
-    const hasInclude = (profile.include ?? []).some((k) =>
-      t.includes(String(k).toLowerCase()),
-    );
-    const hasExclude = (profile.exclude ?? []).some((k) =>
-      t.includes(String(k).toLowerCase()),
-    );
+    const inc = Array.isArray(profile?.include) ? profile.include : [];
+    const exc = Array.isArray(profile?.exclude) ? profile.exclude : [];
+
+    // include: precisa ter pelo menos 1 (se não tiver include, nunca dá match)
+    const hasInclude = inc.some((k) => t.includes(String(k).toLowerCase()));
+    const hasExclude = exc.some((k) => t.includes(String(k).toLowerCase()));
     return hasInclude && !hasExclude;
   }
 
@@ -93,13 +106,13 @@
         "fbclid",
       ].forEach((k) => u.searchParams.delete(k));
 
-      // Caso 1: /groups/<gid|slug>/posts/<pid>/
+      // /groups/<gid|slug>/posts/<pid>/
       if (u.pathname.includes("/groups/") && u.pathname.includes("/posts/")) {
         const p = `${u.origin}${u.pathname}`.replace(/\/$/, "") + "/";
         return p;
       }
 
-      // Caso 2: permalink.php?story_fbid=&id=
+      // permalink.php?story_fbid=&id=
       if (u.pathname.endsWith("/permalink.php")) {
         const story = u.searchParams.get("story_fbid");
         const id = u.searchParams.get("id");
@@ -109,7 +122,7 @@
         return clean.toString();
       }
 
-      // Caso 3: story_fbid em qualquer lugar
+      // story_fbid&id em qualquer lugar
       if (u.searchParams.get("story_fbid") && u.searchParams.get("id")) {
         const clean = new URL(u.origin + "/permalink.php");
         clean.searchParams.set("story_fbid", u.searchParams.get("story_fbid"));
@@ -125,20 +138,16 @@
   }
 
   function getPostRoot(el) {
-    // fica no item do feed (mais estável)
     return el?.closest?.("div[aria-posinset]") || el;
   }
 
-  // ✅ Autor em grupo: /groups/<gid>/user/<uid>/  OU profile.php
   function pickAuthor(el) {
     const root = getPostRoot(el);
 
-    // 1) Ancora o bloco certo: profile_name
     const header = root.querySelector(
       '[data-ad-rendering-role="profile_name"]',
     );
 
-    // 2) Pega o <a> do autor dentro desse bloco
     const a =
       header?.querySelector(
         'a[role="link"][href*="/groups/"][href*="/user/"]',
@@ -148,7 +157,6 @@
       root.querySelector('a[role="link"][href*="/groups/"][href*="/user/"]') ||
       root.querySelector('a[role="link"][href*="profile.php"]');
 
-    // 3) Nome: pegar do span/b dentro do <a> (mais confiável)
     const nameNode = a?.querySelector("span") || a?.querySelector("b") || a;
     const name =
       (nameNode?.textContent || "").replace(/\s+/g, " ").trim() || "?";
@@ -159,22 +167,19 @@
     };
   }
 
-  function findPostPermalinkIn(node) {
-    if (!node) return null;
-
-    // 1) primeiro: pega QUALQUER <a> com /groups/.../posts/ (sem role="link")
-    const a1 = node.querySelector('a[href*="/groups/"][href*="/posts/"]');
-    if (a1) return a1.getAttribute("href") || a1.href;
-
-    // 2) fallback: permalink.php
-    const a2 = node.querySelector('a[href*="permalink.php"]');
-    if (a2) return a2.getAttribute("href") || a2.href;
-
-    // 3) fallback: story_fbid
-    const a3 = node.querySelector('a[href*="story_fbid="][href*="id="]');
-    if (a3) return a3.getAttribute("href") || a3.href;
-
-    return null;
+  function findWeirdTimestampAnchor(root) {
+    if (!root) return null;
+    const candidates = Array.from(
+      root.querySelectorAll(
+        'a[role="link"][target="_blank"], a[target="_blank"]',
+      ),
+    );
+    return (
+      candidates.find((a) => {
+        const h = (a.getAttribute("href") || "").trim();
+        return h.startsWith("?__cft__") || h.includes("#?igf");
+      }) || null
+    );
   }
 
   async function materializeHref(a, timeoutMs = 1200) {
@@ -183,7 +188,6 @@
     const beforeAttr = a.getAttribute("href") || "";
     const beforeProp = a.href || "";
 
-    // já tá bom?
     const isGood = (u) =>
       u &&
       (u.includes("/posts/") ||
@@ -191,7 +195,6 @@
         u.includes("story_fbid="));
     if (isGood(beforeProp)) return beforeProp;
 
-    // espera o href mudar
     const changed = new Promise((resolve) => {
       const obs = new MutationObserver(() => {
         const nowProp = a.href || "";
@@ -205,14 +208,12 @@
         }
       });
       obs.observe(a, { attributes: true, attributeFilter: ["href"] });
-
       setTimeout(() => {
         obs.disconnect();
         resolve(null);
       }, timeoutMs);
     });
 
-    // tenta “ativar” igual hover/focus real
     try {
       a.scrollIntoView({ block: "center", inline: "nearest" });
     } catch {}
@@ -250,33 +251,15 @@
 
     const got = await changed;
 
-    // lê de novo (às vezes muda sem disparar observer por troca de nó)
     const afterProp = a.href || "";
     const afterAttr = a.getAttribute("href") || "";
 
     return afterProp || got || afterAttr || null;
   }
 
-  function findWeirdTimestampAnchor(root) {
-    if (!root) return null;
-    const candidates = Array.from(
-      root.querySelectorAll(
-        'a[role="link"][target="_blank"], a[target="_blank"]',
-      ),
-    );
-
-    return (
-      candidates.find((a) => {
-        const h = (a.getAttribute("href") || "").trim();
-        return h.startsWith("?__cft__") || h.includes("#?igf");
-      }) || null
-    );
-  }
-
   async function getPostPermalink(el) {
     const root = getPostRoot(el) || el;
 
-    // 1) tenta achar link bom “normal”
     const direct = Array.from(root.querySelectorAll("a[role='link'], a"))
       .map((a) => a.href)
       .find(
@@ -289,7 +272,6 @@
       );
     if (direct) return normalizeFbPostUrl(direct);
 
-    // 2) pega o anchor “quebrado” e materializa
     const weird = findWeirdTimestampAnchor(root);
     if (!weird) return null;
 
@@ -299,7 +281,6 @@
     return normalizeFbPostUrl(href2);
   }
 
-  // ====== NOVO: extração leve (sem buscar permalink) ======
   function extractPostLite(el) {
     const root = getPostRoot(el);
 
@@ -318,18 +299,14 @@
     };
   }
 
-  // ====== (mantém) extração completa: só use quando precisar ======
-  async function extractPostFull(el) {
-    // pequeno jitter pra parecer humano (opcional)
+  async function extractPostFull(el, slug) {
     await sleep(120 + Math.random() * 250);
 
     const lite = extractPostLite(el);
     const postUrl = await getPostPermalink(el);
-    const groupUrl = `https://www.facebook.com/groups/${slug}/`;
 
-    // Debug útil (pode comentar depois)
-    log("author:", lite?.autor, "|", lite?.autorUrl);
-    log("postUrl:", postUrl);
+    // mantém o groupUrl sempre no host "www" (pra padrão)
+    const groupUrl = `https://www.facebook.com/groups/${slug}/`;
 
     return {
       ...lite,
@@ -356,7 +333,11 @@
     }
   }
 
+  // ------------------------
+  // dedupe + gate/profile
+  // ------------------------
   const seen = new Set();
+
   function keyForText(texto) {
     return `t:${(texto || "").slice(0, 120).toLowerCase()}`;
   }
@@ -364,13 +345,13 @@
     return url ? `u:${url}` : null;
   }
 
-  async function gateShouldRun() {
+  async function gateShouldRun(slug) {
     const status = await send({ type: "GROUP_CAN_INJECT", slug });
     if (!status?.ok || !status?.existing?.enabled) {
       log("Gate falhou:", status?.code || "disabled/not_saved");
-      return false;
+      return { ok: false, status };
     }
-    return true;
+    return { ok: true, status };
   }
 
   async function getActiveProfile() {
@@ -380,15 +361,14 @@
     ]);
     const activeId = db_v1?.settings?.activeProfileId || "default";
     const profile = profiles_v1?.[activeId];
-    if (!profile) {
-      log("Sem perfil ativo:", activeId);
-      return null;
-    }
+    if (!profile) return null;
     return profile;
   }
 
-  // ====== ATUALIZADO: só busca link se bater keyword ======
-  async function processVisiblePosts(profile) {
+  // ------------------------
+  // main scan
+  // ------------------------
+  async function processVisiblePosts(profile, slug) {
     const posts = Array.from(
       document.querySelectorAll("div[aria-posinset]"),
     ).slice(0, 40);
@@ -396,43 +376,31 @@
     log("Posts visíveis:", posts.length);
 
     let matches = 0;
+    let evaluated = 0;
 
     for (const el of posts) {
-      // 1) rápido: texto + autor
       const lite = extractPostLite(el);
       if (!lite.texto) continue;
 
-      // 2) filtra por keyword ANTES de pegar link
+      evaluated++;
+
       if (!matchText(lite.texto, profile)) continue;
 
-      // 3) dedupe barato por texto (antes do link)
       const kText = keyForText(lite.texto);
       if (seen.has(kText)) continue;
 
-      // 4) agora sim pega permalink (caro)
-      const full = await extractPostFull(el);
+      const full = await extractPostFull(el, slug);
 
       const kUrl = keyForUrl(full.postUrl);
       if (kUrl && seen.has(kUrl)) {
-        // já vimos esse post por URL
         seen.add(kText);
         continue;
       }
 
-      // marca vistos
       seen.add(kText);
       if (kUrl) seen.add(kUrl);
 
       matches++;
-
-      log(
-        "MATCH:",
-        full.autor,
-        "|",
-        full.texto.slice(0, 80),
-        "| url:",
-        full.postUrl,
-      );
 
       chrome.runtime.sendMessage({
         type: "OPPORTUNITY_FOUND",
@@ -451,56 +419,158 @@
       });
     }
 
-    return matches;
+    return { matches, evaluated, scanned: posts.length };
   }
 
-  async function runOnce() {
-    if (!(await gateShouldRun())) return;
+  async function runOnce({ runId, roundMax = 3 } = {}) {
+    const slug = currentSlug();
+    if (!slug) {
+      log("Não está em /groups/. Abort.");
+      return { ok: false, code: "NOT_IN_GROUP" };
+    }
+
+    const gate = await gateShouldRun(slug);
+    if (!gate.ok) return { ok: false, code: "GATE_BLOCK", gate };
 
     const profile = await getActiveProfile();
-    if (!profile) return;
+    if (!profile) {
+      log("Sem profile ativo.");
+      return { ok: false, code: "NO_PROFILE" };
+    }
 
-    log("Perfil ativo:", profile.name);
+    log("Rodando scrape. runId:", runId || "-", "| profile:", profile.name);
 
-    await sleep(4000 + Math.random() * 7000);
+    // jitter inicial
+    await sleep(1500 + Math.random() * 2500);
 
     await gentleScroll({ steps: 2 });
 
     let feed = await waitForFeed(25000);
     if (!feed.length) {
-      log("Feed vazio. Tentando scroll extra e re-tentar...");
+      log("Feed vazio. Tentando scroll extra...");
       await gentleScroll({ steps: 2 });
       feed = await waitForFeed(20000);
       if (!feed.length) {
         log("Feed ainda vazio. Abort.");
-        return;
+        return { ok: false, code: "EMPTY_FEED" };
       }
     }
 
-    const maxRounds = 3;
     let totalMatches = 0;
+    let totalEvaluated = 0;
+    let totalScanned = 0;
 
-    for (let round = 1; round <= maxRounds; round++) {
+    for (let round = 1; round <= roundMax; round++) {
       log("Round:", round);
 
-      const m = await processVisiblePosts(profile);
-      totalMatches += m;
+      const r = await processVisiblePosts(profile, slug);
+      totalMatches += r.matches;
+      totalEvaluated += r.evaluated;
+      totalScanned += r.scanned;
 
-      if (m > 0) {
+      if (r.matches > 0) {
         await gentleScroll({ steps: 2 });
-        await sleep(1200 + Math.random() * 1200);
+        await sleep(900 + Math.random() * 900);
         continue;
       }
 
-      if (round < maxRounds) {
+      if (round < roundMax) {
         await gentleScroll({ steps: 1 });
-        await sleep(900 + Math.random() * 900);
+        await sleep(700 + Math.random() * 700);
       }
     }
 
-    log("Finalizado. Total matches:", totalMatches);
-    await sleep(2000 + Math.random() * 4000);
+    log("Finalizado. totalMatches:", totalMatches);
+
+    return {
+      ok: true,
+      slug,
+      runId: runId || null,
+      stats: {
+        totalMatches,
+        totalEvaluated,
+        totalScanned,
+      },
+    };
   }
 
-  runOnce().catch((e) => err("Erro fatal:", e));
+  // ------------------------
+  // control: only run when runner arms it
+  // ------------------------
+  let running = false;
+  let armed = false;
+  let activeRunId = null;
+
+  async function startRun(runId) {
+    if (running) return { ok: true, code: "ALREADY_RUNNING" };
+    running = true;
+    armed = true;
+    activeRunId = runId || null;
+
+    try {
+      const res = await runOnce({ runId: activeRunId, roundMax: 3 });
+
+      // avisa o background que terminou esse grupo (para trocar a aba/URL)
+      chrome.runtime.sendMessage({
+        type: "SCRAPER_DONE",
+        payload: {
+          runId: activeRunId,
+          slug: res?.slug || currentSlug() || null,
+          ok: !!res?.ok,
+          code: res?.code || null,
+          stats: res?.stats || null,
+        },
+      });
+
+      return res;
+    } catch (e) {
+      err("Erro fatal:", e);
+      chrome.runtime.sendMessage({
+        type: "SCRAPER_DONE",
+        payload: {
+          runId: activeRunId,
+          slug: currentSlug() || null,
+          ok: false,
+          code: "FATAL",
+        },
+      });
+      return { ok: false, code: "FATAL" };
+    } finally {
+      running = false;
+      // mantém armed=true se você quiser permitir retrigger pelo runner
+      // se quiser auto-desarmar, troca pra: armed = false;
+    }
+  }
+
+  chrome.runtime.onMessage.addListener((msg, sender, reply) => {
+    if (!msg || typeof msg.type !== "string") return;
+
+    if (msg.type === "SCRAPER_START") {
+      // opcional: o runner pode mandar { runId }
+      startRun(msg.runId);
+      reply?.({ ok: true });
+      return true;
+    }
+
+    if (msg.type === "SCRAPER_STOP") {
+      armed = false;
+      activeRunId = null;
+      reply?.({ ok: true });
+      return true;
+    }
+
+    if (msg.type === "SCRAPER_STATUS") {
+      reply?.({
+        ok: true,
+        running,
+        armed,
+        runId: activeRunId,
+        href: location.href,
+        slug: currentSlug(),
+      });
+      return true;
+    }
+  });
+
+  // Nada de auto-run aqui.
 })();

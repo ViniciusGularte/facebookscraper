@@ -14,25 +14,63 @@
         <div class="brand">
           <div class="brandMark" aria-hidden="true"></div>
           <div>
-            <h1>GrabClientsNow</h1>
-            <p>Oportunidades em tempo real a partir de posts em grupos.</p>
+            <h1 data-i18n="app.name">GrabClientsNow</h1>
+            <p data-i18n="app.tagline">
+              Oportunidades em tempo real a partir de posts em grupos.
+            </p>
           </div>
         </div>
 
         <div class="actions">
-          <div class="pill" title="Abrir grupos automaticamente em intervalos">
+          <div
+            class="pill"
+            data-i18n-title="btn.toggleMonitoring"
+            title="Abrir grupos automaticamente em intervalos"
+          >
             <span id="autorunDot" class="dot off"></span>
-            <span id="autorunText">Monitoramento: —</span>
+            <span id="autorunText">—</span>
           </div>
 
-          <button id="autorunBtn" class="btn btn-primary" type="button">
+          <button
+            id="autorunBtn"
+            class="btn btn-primary"
+            type="button"
+            data-i18n="btn.toggleMonitoring"
+          >
             Ligar/Desligar Monitoramento
           </button>
 
-          <button id="supportBtn" class="btn btn-ghost" type="button">
+          <div class="pill" style="padding: 0 10px">
+            <span class="small" style="margin-right: 8px" data-i18n="lang.label"
+              >Idioma</span
+            >
+            <select
+              id="langSelect"
+              class="select select-sm"
+              style="height: 34px"
+            >
+              <option value="pt-BR">PT</option>
+              <option value="es">ES</option>
+              <option value="en">EN</option>
+            </select>
+          </div>
+
+          <button
+            id="supportBtn"
+            class="btn btn-ghost"
+            type="button"
+            data-i18n="btn.support"
+          >
             Suporte
           </button>
-          <button id="logoutBtn" class="btn btn-ink" type="button">Sair</button>
+          <button
+            id="logoutBtn"
+            class="btn btn-ink"
+            type="button"
+            data-i18n="btn.logout"
+          >
+            Sair
+          </button>
         </div>
       </div>
 
@@ -40,14 +78,20 @@
       <div id="blocked" class="panel" style="display: none">
         <div class="panel-header">
           <div>
-            <div class="panel-title">Você precisa estar logado</div>
-            <div class="panel-sub">Abra a extensão e faça login.</div>
+            <div class="panel-title" data-i18n="blocked.title">
+              Você precisa estar logado
+            </div>
+            <div class="panel-sub" data-i18n="blocked.sub">
+              Abra a extensão e faça login.
+            </div>
           </div>
         </div>
         <div class="panel-body">
           <div class="empty">
-            <div class="empty-title">Sem sessão ativa.</div>
-            <div class="empty-sub">
+            <div class="empty-title" data-i18n="blocked.emptyTitle">
+              Sem sessão ativa.
+            </div>
+            <div class="empty-sub" data-i18n="blocked.emptySub">
               Faça login para carregar perfis, grupos e histórico de
               oportunidades.
             </div>
@@ -57,68 +101,74 @@
 
       <!-- APP -->
       <div id="app" style="display: none">
-        <!-- OVERVIEW ROW -->
         <div class="overview">
-          <!-- LEFT: Visão do dia -->
           <section class="panel">
             <div class="panel-header">
               <div>
-                <div class="panel-title">Visão do dia</div>
-                <div class="panel-sub">Resumo operacional</div>
+                <div class="panel-title" data-i18n="overview.title">
+                  Visão do dia
+                </div>
+                <div class="panel-sub" data-i18n="overview.sub">
+                  Resumo operacional
+                </div>
               </div>
             </div>
 
             <div class="panel-body">
               <div class="metricsGrid">
                 <div class="metric">
-                  <div class="k">Perfil ativo</div>
+                  <div class="k" data-i18n="m.activeProfile">Perfil ativo</div>
                   <div class="v" id="mActiveProfile">—</div>
                 </div>
-
                 <div class="metric">
-                  <div class="k">Grupos ativos</div>
+                  <div class="k" data-i18n="m.activeGroups">Grupos ativos</div>
                   <div class="v" id="mGroupsActive">—</div>
                 </div>
-
                 <div class="metric">
-                  <div class="k">Oportunidades hoje</div>
+                  <div class="k" data-i18n="m.leadsToday">
+                    Oportunidades hoje
+                  </div>
                   <div class="v" id="mLeadsToday">—</div>
                 </div>
-
                 <div class="metric">
-                  <div class="k">Monitoramento</div>
+                  <div class="k" data-i18n="m.monitoring">Monitoramento</div>
                   <div class="v" id="mAutorun">—</div>
                 </div>
               </div>
 
               <div class="chartWrap">
                 <div class="chartHead">
-                  <div class="chartTitle">Oportunidades nos últimos 7 dias</div>
+                  <div class="chartTitle" data-i18n="chart.title">
+                    Oportunidades nos últimos 7 dias
+                  </div>
                 </div>
 
                 <canvas id="chartLeads" width="560" height="160"></canvas>
 
                 <div id="chartEmpty" class="chartEmpty" style="display: none">
-                  <div class="chartEmptyTitle">Sem dados ainda.</div>
-                  <div class="chartEmptySub">
+                  <div class="chartEmptyTitle" data-i18n="chart.emptyTitle">
+                    Sem dados ainda.
+                  </div>
+                  <div class="chartEmptySub" data-i18n="chart.emptySub">
                     Adicione grupos e ligue o monitoramento para começar.
                   </div>
                 </div>
               </div>
 
               <div class="hintLine">
-                Sugestão: comece em <b>Grupos</b> → ative 3–10 grupos → ligue o
-                <b>Monitoramento</b>.
+                <span data-i18n="hint.start">Sugestão: comece em</span>
+                <b data-i18n="nav.groups">Grupos</b>
+                <span data-i18n="hint.step">→ ative 3–10 grupos → ligue o</span>
+                <b data-i18n="m.monitoring">Monitoramento</b>.
               </div>
             </div>
           </section>
 
-          <!-- RIGHT: Top Grupos (subiu para a overview) -->
           <section class="panel">
             <div class="panel-header">
               <div>
-                <div class="panel-title">Top Grupos</div>
-                <div class="panel-sub">
+                <div class="panel-title" data-i18n="top.title">Top Grupos</div>
+                <div class="panel-sub" data-i18n="top.sub">
                   Mais Oportunidades (histórico local)
                 </div>
               </div>
@@ -129,7 +179,6 @@
           </section>
         </div>
 
-        <!-- NAV -->
         <div class="panel" style="margin: 14px 0">
           <div class="panel-header">
             <div>
@@ -137,24 +186,44 @@
             </div>
 
             <div class="tabs">
-              <button id="tabLeads" class="tab active" type="button">
+              <button
+                id="tabLeads"
+                class="tab active"
+                type="button"
+                data-i18n="nav.leads"
+              >
                 Oportunidades
               </button>
-              <button id="tabGroups" class="tab" type="button">Grupos</button>
-              <button id="tabProfiles" class="tab" type="button">Perfis</button>
+              <button
+                id="tabGroups"
+                class="tab"
+                type="button"
+                data-i18n="nav.groups"
+              >
+                Grupos
+              </button>
+              <button
+                id="tabProfiles"
+                class="tab"
+                type="button"
+                data-i18n="nav.profiles"
+              >
+                Perfis
+              </button>
             </div>
           </div>
         </div>
 
-        <!-- SINGLE COLUMN: views 100% -->
         <div class="grid grid-single">
           <div>
             <!-- LEADS -->
             <section id="viewLeads" class="panel viewEnter">
               <div class="panel-header">
                 <div>
-                  <div class="panel-title">Oportunidades</div>
-                  <div class="panel-sub">
+                  <div class="panel-title" data-i18n="leads.title">
+                    Oportunidades
+                  </div>
+                  <div class="panel-sub" data-i18n="leads.sub">
                     Posts de grupos que deram match com seu perfil.
                   </div>
                 </div>
@@ -164,13 +233,24 @@
                     id="refreshLeads"
                     class="btn btn-primary"
                     type="button"
+                    data-i18n="btn.refresh"
                   >
                     Atualizar
                   </button>
-                  <button id="exportCsv" class="btn btn-ghost" type="button">
+                  <button
+                    id="exportCsv"
+                    class="btn btn-ghost"
+                    type="button"
+                    data-i18n="btn.exportCsv"
+                  >
                     Exportar CSV
                   </button>
-                  <button id="clearLeads" class="btn btn-danger" type="button">
+                  <button
+                    id="clearLeads"
+                    class="btn btn-danger"
+                    type="button"
+                    data-i18n="btn.clear"
+                  >
                     Limpar
                   </button>
                 </div>
@@ -178,17 +258,25 @@
 
               <div class="panel-body">
                 <div id="leadsEmpty" class="empty" style="display: none">
-                  <div class="empty-title">Nenhuma oportunidade ainda</div>
+                  <div class="empty-title" data-i18n="leads.emptyTitle">
+                    Nenhuma oportunidade ainda
+                  </div>
                   <div class="empty-sub">
-                    1) Ative 3–10 grupos<br />
-                    2) Ligue o monitoramento<br />
-                    3) Deixe o Facebook aberto<br />
+                    <span data-i18n="leads.emptySub1">1) Ative 3–10 grupos</span
+                    ><br />
+                    <span data-i18n="leads.emptySub2"
+                      >2) Ligue o monitoramento</span
+                    ><br />
+                    <span data-i18n="leads.emptySub3"
+                      >3) Deixe o Facebook aberto</span
+                    ><br />
                   </div>
                   <div class="empty-actions">
                     <button
                       class="btn btn-primary"
                       id="emptyGoGroups"
                       type="button"
+                      data-i18n="btn.goGroups"
                     >
                       Ir para Grupos
                     </button>
@@ -196,6 +284,7 @@
                       class="btn btn-ghost"
                       id="emptyToggleAutorun"
                       type="button"
+                      data-i18n="btn.turnOnMonitoring"
                     >
                       Ligar monitoramento
                     </button>
@@ -204,20 +293,21 @@
 
                 <div id="leadsList" class="list"></div>
 
-                <!-- (opcional) espaço pronto para paginação futura -->
                 <div id="leadsPager" class="pager" style="display: none">
                   <button
                     class="btn btn-ghost btn-sm"
                     type="button"
                     id="leadsPrev"
+                    data-i18n="btn.prev"
                   >
                     Anterior
                   </button>
-                  <div class="pagerText" id="leadsPagerText">Página —</div>
+                  <div class="pagerText" id="leadsPagerInfo">—</div>
                   <button
                     class="btn btn-ghost btn-sm"
                     type="button"
                     id="leadsNext"
+                    data-i18n="btn.next"
                   >
                     Próxima
                   </button>
@@ -233,15 +323,17 @@
             >
               <div class="panel-header">
                 <div>
-                  <div class="panel-title">Grupos</div>
+                  <div class="panel-title" data-i18n="groups.title">Grupos</div>
                   <div class="panel-sub">
-                    Ativos: <span id="limitText">—</span>
+                    <span data-i18n="groups.subActive">Ativos:</span>
+                    <span id="limitText">—</span>
                   </div>
                 </div>
                 <button
                   id="refreshGroups"
                   class="btn btn-primary"
                   type="button"
+                  data-i18n="btn.refresh"
                 >
                   Atualizar
                 </button>
@@ -249,8 +341,10 @@
 
               <div class="panel-body">
                 <div id="groupsEmpty" class="empty" style="display: none">
-                  <div class="empty-title">Nenhum grupo salvo</div>
-                  <div class="empty-sub">
+                  <div class="empty-title" data-i18n="groups.emptyTitle">
+                    Nenhum grupo salvo
+                  </div>
+                  <div class="empty-sub" data-i18n="groups.emptySub">
                     Entre nos grupos do seu nicho e ative aqui. Depois ligue o
                     monitoramento.
                   </div>
@@ -258,18 +352,30 @@
                   <div class="empty-steps">
                     <div class="step">
                       <div class="stepN">1</div>
-                      <div class="stepT">Entre no grupo</div>
-                      <div class="stepS">precisa ser membro</div>
+                      <div class="stepT" data-i18n="groups.step1t">
+                        Entre no grupo
+                      </div>
+                      <div class="stepS" data-i18n="groups.step1s">
+                        precisa ser membro
+                      </div>
                     </div>
                     <div class="step">
                       <div class="stepN">2</div>
-                      <div class="stepT">Salve e ative</div>
-                      <div class="stepS">até 10 ativos</div>
+                      <div class="stepT" data-i18n="groups.step2t">
+                        Salve e ative
+                      </div>
+                      <div class="stepS" data-i18n="groups.step2s">
+                        até 10 ativos
+                      </div>
                     </div>
                     <div class="step">
                       <div class="stepN">3</div>
-                      <div class="stepT">Monitore</div>
-                      <div class="stepS">deixe o FB aberto</div>
+                      <div class="stepT" data-i18n="groups.step3t">
+                        Monitore
+                      </div>
+                      <div class="stepS" data-i18n="groups.step3s">
+                        deixe o FB aberto
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -286,8 +392,10 @@
             >
               <div class="panel-header">
                 <div>
-                  <div class="panel-title">Perfis</div>
-                  <div class="panel-sub">
+                  <div class="panel-title" data-i18n="profiles.title">
+                    Perfis
+                  </div>
+                  <div class="panel-sub" data-i18n="profiles.sub">
                     Perfil = palavras para procurar/ignorar
                   </div>
                 </div>
@@ -297,6 +405,7 @@
                     id="openProfileModal"
                     class="btn btn-primary"
                     type="button"
+                    data-i18n="profiles.new"
                   >
                     Novo Perfil
                   </button>
@@ -304,6 +413,7 @@
                     id="refreshProfiles"
                     class="btn btn-ghost"
                     type="button"
+                    data-i18n="btn.refresh"
                   >
                     Atualizar
                   </button>
@@ -322,17 +432,54 @@
           <div class="modal-content">
             <div class="modal-header">
               <div>
-                <div class="modal-title" id="modalTitle">Novo Perfil</div>
-                <div class="modal-sub" id="editorSub">Criar / editar</div>
+                <div
+                  class="modal-title"
+                  id="modalTitle"
+                  data-i18n="profiles.modal.newTitle"
+                >
+                  Novo Perfil
+                </div>
+                <div
+                  class="modal-sub"
+                  id="editorSub"
+                  data-i18n="profiles.modal.subNew"
+                >
+                  Criar / editar
+                </div>
               </div>
-              <div class="headerActions">
-                <button id="clearForm" class="btn btn-ghost" type="button">
+
+              <div class="headerActions" style="gap: 10px">
+                <div class="pill" style="padding: 0 10px">
+                  <span
+                    class="small"
+                    style="margin-right: 8px"
+                    data-i18n="lang.label"
+                    >Idioma</span
+                  >
+                  <select
+                    id="langSelectModal"
+                    class="select select-sm"
+                    style="height: 34px"
+                  >
+                    <option value="pt-BR">PT</option>
+                    <option value="es">ES</option>
+                    <option value="en">EN</option>
+                  </select>
+                </div>
+
+                <button
+                  id="clearForm"
+                  class="btn btn-ghost"
+                  type="button"
+                  data-i18n="btn.clearForm"
+                >
                   Limpar
                 </button>
                 <button
                   id="closeProfileModal"
                   class="btn btn-ink"
                   type="button"
+                  data-i18n="btn.close"
                 >
                   Fechar
                 </button>
@@ -341,41 +488,46 @@
 
             <div class="modal-body">
               <div class="form">
-                <!-- ID gerado (read-only) -->
                 <div class="idRow">
                   <div>
-                    <div class="label">ID do perfil</div>
+                    <div class="label" data-i18n="profiles.idLabel">
+                      ID do perfil
+                    </div>
                     <div class="idPill">
-                      <span class="idLabel">Gerado automaticamente:</span>
+                      <span class="idLabel" data-i18n="profiles.idAuto"
+                        >Gerado automaticamente:</span
+                      >
                       <code id="p_idPreview">—</code>
                     </div>
-                    <div class="hint">
+                    <div class="hint" data-i18n="profiles.idHint">
                       Baseado no nome. Você não precisa preencher ID.
                     </div>
                   </div>
                 </div>
 
                 <div>
-                  <div class="label">Nome do perfil</div>
+                  <div class="label" data-i18n="profiles.nameLabel">
+                    Nome do perfil
+                  </div>
                   <input
                     id="p_name"
                     class="input"
+                    data-i18n-placeholder="profiles.namePh"
                     placeholder="Ex: Psicólogo (Clínico)"
                   />
-                  <div class="hint">
-                    Dica: use o nicho + cidade (ex: “Designer Pelotas”, “Terapia
-                    Online”).
+                  <div class="hint" data-i18n="profiles.nameHint">
+                    Dica: use o nicho + cidade...
                   </div>
                 </div>
 
-                <!-- INCLUDE -->
                 <div class="kwBlock">
                   <div class="kwHead">
                     <div>
-                      <div class="label">Palavras para encontrar</div>
-                      <div class="hint">
-                        Separe por <b>vírgula</b> ou <b>Enter</b>. Ex:
-                        orçamento, preciso de, indicação
+                      <div class="label" data-i18n="profiles.incLabel">
+                        Palavras para encontrar
+                      </div>
+                      <div class="hint" data-i18n="profiles.incHint">
+                        Separe por vírgula ou Enter...
                       </div>
                     </div>
                     <div class="kwCount">
@@ -388,20 +540,21 @@
                   <textarea
                     id="p_include"
                     class="textarea kwTextarea"
-                    placeholder="orçamento, preciso de, alguém indica&#10;consulta, atendimento, online"
+                    data-i18n-placeholder="profiles.incPh"
+                    placeholder="orçamento, preciso de..."
                   ></textarea>
 
                   <div class="kwPreview" id="p_incPreview"></div>
                 </div>
 
-                <!-- EXCLUDE -->
                 <div class="kwBlock">
                   <div class="kwHead">
                     <div>
-                      <div class="label">Palavras para ignorar</div>
-                      <div class="hint">
-                        Use para filtrar ruído. Ex: curso, formação, vaga,
-                        emprego
+                      <div class="label" data-i18n="profiles.excLabel">
+                        Palavras para ignorar
+                      </div>
+                      <div class="hint" data-i18n="profiles.excHint">
+                        Use para filtrar ruído...
                       </div>
                     </div>
                     <div class="kwCount">
@@ -414,7 +567,8 @@
                   <textarea
                     id="p_exclude"
                     class="textarea kwTextarea"
-                    placeholder="curso, formação, vaga, emprego"
+                    data-i18n-placeholder="profiles.excPh"
+                    placeholder="curso, formação..."
                   ></textarea>
 
                   <div class="kwPreview" id="p_excPreview"></div>
@@ -426,6 +580,7 @@
                     class="btn btn-success"
                     style="flex: 1"
                     type="button"
+                    data-i18n="btn.save"
                   >
                     Salvar
                   </button>
@@ -434,6 +589,7 @@
                     class="btn btn-primary"
                     style="flex: 1"
                     type="button"
+                    data-i18n="btn.use"
                   >
                     Marcar como ativo
                   </button>

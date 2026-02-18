@@ -1,3 +1,4 @@
+// background.mjs
 import { ensureValidSession, getSession } from "./lib/supabaseAuth.mjs";
 import {
   canInjectOrToggle,
@@ -22,10 +23,11 @@ import { CONFIG } from "./lib/config.mjs";
 const AUTORUN_KEY = "autorun_v1";
 const AUTORUN_ALARM = "autorun_tick";
 
+// ------------------------
+// lifecycle
+// ------------------------
 chrome.runtime.onInstalled.addListener(async () => {
   await ensureDefaultProfilesPersisted();
-
-  // tick a cada 1 min; intervalo real é controlado por intervalMs no state
   chrome.alarms.create(AUTORUN_ALARM, { periodInMinutes: 1 });
 });
 
@@ -40,6 +42,9 @@ chrome.action.onClicked.addListener(async () => {
   });
 });
 
+// ------------------------
+// notifications
+// ------------------------
 function notify(title, message) {
   chrome.notifications.create({
     type: "basic",
@@ -55,6 +60,9 @@ chrome.notifications.onClicked.addListener(() => {
   });
 });
 
+// ------------------------
+// auth + state
+// ------------------------
 async function requireAuth() {
   const session = await ensureValidSession();
   return session?.user ? session : null;
@@ -65,10 +73,13 @@ async function getAutorunState() {
   return (
     st ?? {
       running: false,
-      tabId: null,
+      windowId: null, // runner window
       index: 0,
-      intervalMs: 1 * 60 * 1000, // 5 min default
+      intervalMs: 60_000,
       lastRunAt: 0,
+      activeRunId: null,
+      busy: false,
+      watchdogAt: 0,
     }
   );
 }
@@ -80,19 +91,81 @@ async function setAutorunState(patch) {
   return next;
 }
 
-async function ensureAutorunTab(tabId) {
-  if (tabId) {
-    try {
-      const t = await chrome.tabs.get(tabId);
-      if (t?.id) return t.id;
-    } catch {
-      // caiu
-    }
-  }
-  const t = await chrome.tabs.create({ url: "about:blank", active: false });
-  return t.id;
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
 }
 
+async function getRunnerTabId(windowId) {
+  try {
+    const w = await chrome.windows.get(windowId, { populate: true });
+    const tab = w?.tabs?.[0];
+    return tab?.id || null;
+  } catch {
+    return null;
+  }
+}
+
+async function ensureRunnerWindow(urlToOpen) {
+  const st = await getAutorunState();
+
+  // 1) se window existe, reusa e troca URL na tab 0
+  if (st.windowId) {
+    try {
+      const tabId = await getRunnerTabId(st.windowId);
+      if (tabId) {
+        await chrome.tabs.update(tabId, { url: urlToOpen, active: true });
+        return { windowId: st.windowId, tabId };
+      }
+      // window existe mas sem tab? (raro) -> recria
+    } catch {}
+  }
+
+  // 2) cria window já com a URL do grupo (NADA de about:blank)
+  const w = await chrome.windows.create({
+    url: urlToOpen,
+    type: "popup",
+    focused: false,
+    width: 520,
+    height: 760,
+    left: 30,
+    top: 30,
+  });
+
+  const tabId = w?.tabs?.[0]?.id || null;
+
+  await setAutorunState({ windowId: w.id });
+  return { windowId: w.id, tabId };
+}
+
+async function waitTabComplete(tabId, timeoutMs = 25000) {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    try {
+      const t = await chrome.tabs.get(tabId);
+      if (t?.status === "complete") return true;
+    } catch {
+      return false;
+    }
+    await sleep(250);
+  }
+  return false;
+}
+
+async function sendToTabWithRetry(tabId, msg, tries = 18, gapMs = 350) {
+  for (let i = 0; i < tries; i++) {
+    try {
+      const res = await chrome.tabs.sendMessage(tabId, msg);
+      if (res?.ok) return true;
+      return false;
+    } catch {}
+    await sleep(gapMs);
+  }
+  return false;
+}
+
+// ------------------------
+// autorun tick (window-only)
+// ------------------------
 chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name !== AUTORUN_ALARM) return;
 
@@ -102,7 +175,12 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
   const st = await getAutorunState();
   if (!st.running) return;
 
-  // respeita intervalo configurado
+  // watchdog: destrava travado
+  if (st.busy && st.watchdogAt && Date.now() - st.watchdogAt > 90_000) {
+    await setAutorunState({ busy: false, activeRunId: null, watchdogAt: 0 });
+  }
+  if (st.busy) return;
+
   const now = Date.now();
   if (st.lastRunAt && now - st.lastRunAt < (st.intervalMs || 0)) return;
 
@@ -115,20 +193,38 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
   const idx = Math.abs(st.index || 0) % enabled.length;
   const target = enabled[idx];
 
-  const tabId = await ensureAutorunTab(st.tabId);
-
-  await chrome.tabs.update(tabId, { url: target.url, active: false });
+  const runId =
+    (globalThis.crypto && crypto.randomUUID && crypto.randomUUID()) ||
+    `run_${Date.now()}_${Math.random().toString(16).slice(2)}`;
 
   await setAutorunState({
-    tabId,
-    index: idx + 1,
-    lastRunAt: now,
+    busy: true,
+    watchdogAt: Date.now(),
+    activeRunId: runId,
   });
 
-  // opcional: notificação leve
-  // notify("Autorun", `Abrindo: ${target.slug}`);
+  // ✅ garante window e já navega no grupo (sem abrir tab extra)
+  const { tabId } = await ensureRunnerWindow(target.url);
+
+  if (!tabId) {
+    await setAutorunState({
+      busy: false,
+      activeRunId: null,
+      watchdogAt: 0,
+      lastRunAt: now,
+    });
+    return;
+  }
+
+  await waitTabComplete(tabId, 25000);
+
+  // dispara scraper
+  await sendToTabWithRetry(tabId, { type: "SCRAPER_START", runId });
 });
 
+// ------------------------
+// messages
+// ------------------------
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   (async () => {
     if (msg?.type === "AUTH_STATUS") {
@@ -137,7 +233,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       return;
     }
 
-    // recebe achado do content scraper (sem bloquear por auth gate, mas você pode exigir)
     if (msg?.type === "OPPORTUNITY_FOUND") {
       const payload = msg.payload || {};
       const groupUrl = payload.groupUrl || payload.group_url || "";
@@ -149,47 +244,67 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       const postUrl = post.postUrl || post.url || "";
       const autorUrl = post.autorUrl || "";
 
-      // notificação
       notify(
         `Oportunidade detectada (${profileName})`,
         `${autor}: ${texto.slice(0, 120)}...`,
       );
 
-      // dedupe simples (por postUrl se existir, senão por texto)
-      chrome.storage.local.get({ leads: [] }, (data) => {
-        const leads = Array.isArray(data.leads) ? data.leads : [];
+      // ✅ salva no storage (pro dashboard)
+      const { leads = [] } = await chrome.storage.local.get({ leads: [] });
+      const arr = Array.isArray(leads) ? leads : [];
 
-        const key = postUrl
-          ? `u:${postUrl}`
-          : `t:${texto.slice(0, 120).toLowerCase()}`;
+      const key = postUrl
+        ? `u:${postUrl}`
+        : `t:${String(texto).slice(0, 120).toLowerCase()}`;
 
-        const exists = leads.some((l) => l?.key === key);
-        if (exists) {
-          sendResponse({ ok: true, deduped: true });
-          return;
-        }
+      const exists = arr.some((l) => l?.key === key);
+      if (exists) {
+        sendResponse({ ok: true, deduped: true });
+        return;
+      }
 
-        leads.push({
-          key,
-          timestamp: Date.now(),
-          slug: payload.slug || null,
-          groupUrl,
-          profileName,
-          post: {
-            autor,
-            autorUrl,
-            texto,
-            postUrl,
-            timestamp: post.timestamp || Date.now(),
-          },
-        });
-
-        chrome.storage.local.set({ leads }, () => {
-          sendResponse({ ok: true });
-        });
+      arr.push({
+        key,
+        timestamp: Date.now(),
+        slug: payload.slug || null,
+        groupUrl,
+        profileName,
+        post: {
+          autor,
+          autorUrl,
+          texto,
+          postUrl,
+          timestamp: post.timestamp || Date.now(),
+        },
       });
 
-      return true; // async
+      await chrome.storage.local.set({ leads: arr });
+
+      sendResponse({ ok: true, saved: true });
+      return;
+    }
+
+    // ✅ encerra ciclo e libera próximo tick
+    if (msg?.type === "SCRAPER_DONE") {
+      const st = await getAutorunState();
+      const now = Date.now();
+
+      const doneRunId = msg?.payload?.runId || null;
+      if (st.activeRunId && doneRunId && st.activeRunId !== doneRunId) {
+        sendResponse({ ok: true, ignored: true });
+        return;
+      }
+
+      await setAutorunState({
+        busy: false,
+        watchdogAt: 0,
+        index: (st.index || 0) + 1,
+        lastRunAt: now,
+        activeRunId: null,
+      });
+
+      sendResponse({ ok: true, advanced: true });
+      return;
     }
 
     const session = await requireAuth();
@@ -274,7 +389,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         return;
       }
 
-      // ---- AUTORUN API ----
       case "AUTORUN_STATUS": {
         const st = await getAutorunState();
         sendResponse({ ok: true, state: st });
@@ -282,17 +396,42 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       }
 
       case "AUTORUN_START": {
-        const intervalMs = Math.max(60_000, Number(msg.intervalMs || 300_000)); // min 1 min
-        const st = await setAutorunState({ running: true, intervalMs });
+        const intervalMs = Math.max(60_000, Number(msg.intervalMs || 60_000));
+        const st = await setAutorunState({
+          running: true,
+          intervalMs,
+          lastRunAt: 0,
+          busy: false,
+          watchdogAt: 0,
+          activeRunId: null,
+          windowId: null, // ✅ zera pra não reaproveitar lixo
+          index: 0,
+        });
         notify("Autorun", "Iniciado");
         sendResponse({ ok: true, state: st });
         return;
       }
 
       case "AUTORUN_STOP": {
-        const st = await setAutorunState({ running: false });
+        const st0 = await getAutorunState();
+
+        await setAutorunState({
+          running: false,
+          busy: false,
+          watchdogAt: 0,
+          activeRunId: null,
+        });
+
+        // opcional: fecha runner window
+        if (st0?.windowId) {
+          try {
+            await chrome.windows.remove(st0.windowId);
+          } catch {}
+          await setAutorunState({ windowId: null });
+        }
+
         notify("Autorun", "Pausado");
-        sendResponse({ ok: true, state: st });
+        sendResponse({ ok: true });
         return;
       }
 
@@ -306,9 +445,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         sendResponse({ ok: false, code: "UNKNOWN_MESSAGE" });
         return;
     }
-  })().catch((err) => {
-    sendResponse({ ok: false, code: err?.message || "ERROR" });
-  });
+  })().catch((e) => sendResponse({ ok: false, code: e?.message || "ERROR" }));
 
   return true;
 });
