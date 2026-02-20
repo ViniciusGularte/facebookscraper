@@ -1351,14 +1351,44 @@ async function runPostMonitorCycle() {
         }, MONITOR_CYCLE_TIMEOUT_MS);
       }),
     ]);
-    const posts = Array.isArray(latestPosts) ? latestPosts : [];
-    const matched = posts.filter((post) => postMatchesKeywordConfig(post, monitorConfig));
+    const fetchedPosts = Array.isArray(latestPosts) ? latestPosts : [];
+    const selectedIds = Array.isArray(monitorConfig.selectedGroupIds)
+      ? monitorConfig.selectedGroupIds
+      : [];
+    const posts =
+      selectedIds.length > 0
+        ? fetchedPosts.filter((post) =>
+            selectedIds.includes(String(post?.group_id || "")),
+          )
+        : fetchedPosts;
+    const matched = posts.filter((post) =>
+      postMatchesKeywordConfig(post, monitorConfig),
+    );
     const wasWarmupCycle = !monitorWarmupDone;
+
+    log(
+      `[MONITOR] Ciclo concluído: ${posts.length} post(s) em grupos selecionados (total feed: ${fetchedPosts.length}), ${matched.length} match(es).`,
+    );
+    posts.slice(0, 20).forEach((post, idx) => {
+      const content = String(post?.post_text || post?.marketplace_text || "")
+        .replace(/\s+/g, " ")
+        .trim();
+      const postUrl = post?.post_url || post?.marketplace_listing_url || "";
+      log(`[MONITOR][POST ${idx + 1}]`);
+      log(`  Grupo: ${post?.group_name || "Grupo"}`);
+      log(`  Pessoa: ${post?.poster_name || "Pessoa"}`);
+      log(`  Tipo: ${post?.post_type || "post"}`);
+      log(`  Conteúdo: ${content || "(sem texto)"}`);
+      log(`  Link grupo: ${post?.group_url || "(sem link)"}`);
+      log(`  Link pessoa: ${post?.user_profile_url || "(sem link)"}`);
+      log(`  Link post: ${postUrl || "(sem link)"}`);
+    });
 
     chrome.runtime.sendMessage({
       type: "monitorRawPosts",
       profileName: monitorConfig.profileName,
       total: posts.length,
+      fetchedTotal: fetchedPosts.length,
       posts,
     });
 
@@ -1392,6 +1422,7 @@ async function runPostMonitorCycle() {
     scheduleNextMonitorAlarm(delayMs);
   } catch (err) {
     const errorMessage = await serializeError(err);
+    log(`[MONITOR] Erro no ciclo: ${errorMessage}`);
     chrome.runtime.sendMessage({
       type: "monitorError",
       error: errorMessage,
@@ -1420,6 +1451,11 @@ function getLatestTimestamp(posts) {
 async function fetchGroupFeedPosts() {
   const tokens = await fetchAllAuthTokens();
   const [lsd, userId, fbDtsg, rev, hsi, spinR, spinB, spinT] = tokens;
+  if (!lsd || !userId || !fbDtsg || !rev || !hsi || !spinR || !spinB || !spinT) {
+    throw new Error(
+      "Não foi possível extrair os tokens de autenticação do Facebook. Abra uma aba em facebook.com e tente novamente.",
+    );
+  }
 
   const GRAPHQL_URL = "https://www.facebook.com/api/graphql/";
   const DOC_ID = "25164462503148437";
@@ -1674,9 +1710,12 @@ async function fetchGroupFeedPosts() {
       break;
     }
 
-    await sleep(5000);
+    if (pageNum > 1) {
+      await sleep(5000);
+    }
 
     try {
+      log(`[FEED] Buscando página ${pageNum}${nextCursor ? " (com cursor)" : " (primeira página)"}...`);
       const body = buildFeedRequestBody(nextCursor);
       const { json, cursor } = await fetchFeedPage(body);
 
@@ -1690,6 +1729,7 @@ async function fetchGroupFeedPosts() {
       }
 
       const pagePosts = extractPostsFromFeedResponse(json);
+      log(`[FEED] Página ${pageNum}: ${pagePosts?.length || 0} post(s) extraído(s).`);
 
       if (!pagePosts || pagePosts.length === 0) {
         log(
