@@ -1189,7 +1189,9 @@ const LEADS_HISTORY_STORAGE_KEY = "leadsHistory";
 const LEADS_HISTORY_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const MONITOR_CYCLE_TIMEOUT_MS = 180000;
 const MONITOR_ALARM_NAME = "post-monitor-cycle";
+const SLEEP_SCHEDULE_ALARM_NAME = "sleep-schedule-check";
 const MONITOR_RUNTIME_STORAGE_KEY = "postMonitorRuntime";
+const SLEEP_SCHEDULE_STORAGE_KEY = "sleepSchedule";
 let monitorConfig = {
   selectedGroupIds: [],
   positiveKeywords: [],
@@ -1198,6 +1200,56 @@ let monitorConfig = {
   minMinutes: 3,
   maxMinutes: 7,
 };
+let isSleepModeActive = false;
+let wasRunningBeforeSleep = false;
+
+function getDefaultSleepSchedule() {
+  return {
+    enabled: true,
+    startHour: 22,
+    startMinute: 0,
+    endHour: 7,
+    endMinute: 0,
+    days: [1, 2, 3, 4, 5, 6, 0], // Mon..Sun (Date.getDay convention: 0=Sun)
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+  };
+}
+
+async function loadSleepSchedule() {
+  const data = await chrome.storage.local.get([SLEEP_SCHEDULE_STORAGE_KEY]);
+  const raw = data?.[SLEEP_SCHEDULE_STORAGE_KEY];
+  if (!raw || typeof raw !== "object") {
+    const fallback = getDefaultSleepSchedule();
+    await chrome.storage.local.set({ [SLEEP_SCHEDULE_STORAGE_KEY]: fallback });
+    return fallback;
+  }
+  return {
+    ...getDefaultSleepSchedule(),
+    ...raw,
+    days: Array.isArray(raw.days) ? raw.days : getDefaultSleepSchedule().days,
+  };
+}
+
+function isSleepWindowNow(schedule) {
+  if (!schedule?.enabled) return false;
+  const now = new Date();
+  const day = now.getDay();
+  if (!schedule.days.includes(day)) return false;
+
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const start = Number(schedule.startHour) * 60 + Number(schedule.startMinute);
+  const end = Number(schedule.endHour) * 60 + Number(schedule.endMinute);
+
+  if (start === end) return false;
+  if (start < end) {
+    return nowMinutes >= start && nowMinutes < end;
+  }
+  return nowMinutes >= start || nowMinutes < end;
+}
+
+function ensureSleepScheduleAlarm() {
+  chrome.alarms.create(SLEEP_SCHEDULE_ALARM_NAME, { periodInMinutes: 1 });
+}
 
 async function saveMonitorRuntime() {
   await chrome.storage.local.set({
@@ -1205,6 +1257,8 @@ async function saveMonitorRuntime() {
       running: isMonitorRunning,
       warmupDone: monitorWarmupDone,
       config: monitorConfig,
+      sleepModeActive: isSleepModeActive,
+      wasRunningBeforeSleep,
     },
   });
 }
@@ -1219,6 +1273,8 @@ async function loadMonitorRuntime() {
     running: !!runtime.running,
     warmupDone: !!runtime.warmupDone,
     config: runtime.config || null,
+    sleepModeActive: !!runtime.sleepModeActive,
+    wasRunningBeforeSleep: !!runtime.wasRunningBeforeSleep,
   };
 }
 
@@ -1319,6 +1375,7 @@ function getRandomMonitorDelayMs(minMinutes, maxMinutes) {
 async function stopPostMonitor(notifyUi = true) {
   isMonitorRunning = false;
   isMonitorCycleRunning = false;
+  wasRunningBeforeSleep = false;
   chrome.alarms.clear(MONITOR_ALARM_NAME);
   await saveMonitorRuntime();
 
@@ -1330,8 +1387,61 @@ async function stopPostMonitor(notifyUi = true) {
   }
 }
 
+async function applySleepModeTransition() {
+  const schedule = await loadSleepSchedule();
+  const shouldSleepNow = isSleepWindowNow(schedule);
+
+  if (shouldSleepNow && !isSleepModeActive) {
+    isSleepModeActive = true;
+    if (isMonitorRunning) {
+      wasRunningBeforeSleep = true;
+      isMonitorRunning = false;
+      chrome.alarms.clear(MONITOR_ALARM_NAME);
+      chrome.runtime.sendMessage({
+        type: "monitorSleep",
+        active: true,
+        message: "Sleep mode active — monitoring paused.",
+      });
+      chrome.runtime.sendMessage({
+        type: "monitorState",
+        running: false,
+      });
+    } else {
+      chrome.runtime.sendMessage({
+        type: "monitorSleep",
+        active: true,
+        message: "Sleep mode active.",
+      });
+    }
+    await saveMonitorRuntime();
+    return;
+  }
+
+  if (!shouldSleepNow && isSleepModeActive) {
+    isSleepModeActive = false;
+    chrome.runtime.sendMessage({
+      type: "monitorSleep",
+      active: false,
+      message: "Sleep mode ended.",
+    });
+
+    if (wasRunningBeforeSleep) {
+      wasRunningBeforeSleep = false;
+      isMonitorRunning = true;
+      await saveMonitorRuntime();
+      chrome.runtime.sendMessage({
+        type: "monitorState",
+        running: true,
+      });
+      void runPostMonitorCycle();
+      return;
+    }
+    await saveMonitorRuntime();
+  }
+}
+
 async function runPostMonitorCycle() {
-  if (!isMonitorRunning || isMonitorCycleRunning) return;
+  if (!isMonitorRunning || isMonitorCycleRunning || isSleepModeActive) return;
   isMonitorCycleRunning = true;
 
   try {
@@ -2197,17 +2307,27 @@ chrome.runtime.onUpdateAvailable.addListener((details) => {
 });
 
 chrome.alarms.onAlarm.addListener(async (alarm) => {
-  if (alarm.name !== MONITOR_ALARM_NAME) return;
+  if (alarm.name === SLEEP_SCHEDULE_ALARM_NAME) {
+    await applySleepModeTransition();
+    return;
+  }
 
-  const runtime = await loadMonitorRuntime();
-  if (!runtime.running) return;
+  if (alarm.name === MONITOR_ALARM_NAME) {
+    const runtime = await loadMonitorRuntime();
+    if (!runtime.running) return;
 
-  isMonitorRunning = true;
-  monitorWarmupDone = runtime.warmupDone;
-  if (runtime.config) monitorConfig = runtime.config;
+    isMonitorRunning = true;
+    monitorWarmupDone = runtime.warmupDone;
+    isSleepModeActive = !!runtime.sleepModeActive;
+    wasRunningBeforeSleep = !!runtime.wasRunningBeforeSleep;
+    if (runtime.config) monitorConfig = runtime.config;
+    if (isSleepModeActive) return;
 
-  void runPostMonitorCycle();
+    void runPostMonitorCycle();
+  }
 });
+
+ensureSleepScheduleAlarm();
 
 // Handler principal de mensagens
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -2398,9 +2518,22 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         isFirstRun = true;
         cutoffTimestamp = 0;
         monitorWarmupDone = false;
+        isSleepModeActive = false;
+        wasRunningBeforeSleep = false;
         isMonitorRunning = true;
         await saveMonitorRuntime();
         chrome.alarms.clear(MONITOR_ALARM_NAME);
+        ensureSleepScheduleAlarm();
+        await applySleepModeTransition();
+
+        if (isSleepModeActive) {
+          sendResponse({
+            success: true,
+            running: false,
+            sleeping: true,
+          });
+          return;
+        }
 
         chrome.runtime.sendMessage({
           type: "monitorState",
@@ -2436,8 +2569,40 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sendResponse({
         success: true,
         running: runtime.running || isMonitorRunning,
+        sleepModeActive: runtime.sleepModeActive || isSleepModeActive,
         config: runtime.config || monitorConfig,
       });
+    })();
+    return true;
+  }
+
+  // ── getSleepSchedule ──────────────────────────────────────
+  if (message.type === "getSleepSchedule") {
+    (async () => {
+      const schedule = await loadSleepSchedule();
+      sendResponse({ success: true, schedule });
+    })();
+    return true;
+  }
+
+  // ── setSleepSchedule ──────────────────────────────────────
+  if (message.type === "setSleepSchedule") {
+    (async () => {
+      try {
+        const next = {
+          ...getDefaultSleepSchedule(),
+          ...(message.schedule || {}),
+        };
+        await chrome.storage.local.set({ [SLEEP_SCHEDULE_STORAGE_KEY]: next });
+        ensureSleepScheduleAlarm();
+        await applySleepModeTransition();
+        sendResponse({ success: true, schedule: next });
+      } catch (err) {
+        sendResponse({
+          success: false,
+          error: err?.message || "Failed to save sleep schedule.",
+        });
+      }
     })();
     return true;
   }
