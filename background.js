@@ -1,0 +1,2479 @@
+/**
+ * background.js — Background script da extensão Chrome
+ * Responsável por:
+ *  - Buscar grupos do Facebook do usuário
+ *  - Buscar posts do feed de grupos
+ *  - Verificar login e extrair tokens de autenticação
+ *  - Obter a data de criação do perfil
+ */
+
+"use strict";
+
+// ─────────────────────────────────────────────────────────────
+// PARSER DE JSON PERMISSIVO (jsonrepair)
+// Converte JSON malformado/parcial em JSON válido
+// ─────────────────────────────────────────────────────────────
+
+class JsonParseError extends Error {
+  constructor(message, position) {
+    super(`${message} at position ${position}`);
+    this.position = position;
+  }
+}
+
+// Códigos de espaço em branco aceitos
+const SPACE = 32;
+const NEWLINE = 10;
+const TAB = 9;
+const CARRIAGE = 13;
+const NBSP = 160;
+const EN_SPACE = 8192;
+const HAIR_SPACE = 8202;
+const NARROW_NBSP = 8239;
+const MATH_SPACE = 8287;
+const IDEOGRAPHIC = 12288;
+
+function isHexChar(ch) {
+  return /^[0-9A-Fa-f]$/.test(ch);
+}
+function isDigit(ch) {
+  return ch >= "0" && ch <= "9";
+}
+function isPrintable(ch) {
+  return ch >= " ";
+}
+function isSpecialChar(ch) {
+  return ",:[]/{}()\n+".includes(ch);
+}
+function isAlpha(ch) {
+  return (
+    (ch >= "a" && ch <= "z") ||
+    (ch >= "A" && ch <= "Z") ||
+    ch === "_" ||
+    ch === "$"
+  );
+}
+function isAlphaNumeric(ch) {
+  return isAlpha(ch) || (ch >= "0" && ch <= "9");
+}
+function isSpecialArray(ch) {
+  return ",[]/{}\n+".includes(ch);
+}
+function isQuoteOrWord(ch) {
+  return isQuote(ch) || /^[[{\w-]$/.test(ch);
+}
+function isEscapeChar(ch) {
+  return (
+    "\n" === ch || "\r" === ch || "\t" === ch || "\b" === ch || "\f" === ch
+  );
+}
+
+const URL_PROTOCOL_REGEX = /^(http|https|ftp|mailto|file|data|irc):\/\/$/;
+const URL_CHAR_REGEX = /^[A-Za-z0-9-._~:/?#@!$&'()*+;=]$/;
+
+function isWhitespace(str, pos) {
+  const code = str.charCodeAt(pos);
+  return (
+    code === SPACE || code === NEWLINE || code === TAB || code === CARRIAGE
+  );
+}
+
+function isWhitespaceNoNewline(str, pos) {
+  const code = str.charCodeAt(pos);
+  return code === SPACE || code === TAB || code === CARRIAGE;
+}
+
+function isUnicodeSpace(str, pos) {
+  const code = str.charCodeAt(pos);
+  return (
+    code === NBSP ||
+    (code >= EN_SPACE && code <= HAIR_SPACE) ||
+    code === NARROW_NBSP ||
+    code === MATH_SPACE ||
+    code === IDEOGRAPHIC
+  );
+}
+
+function isQuote(ch) {
+  return isDoubleQuote(ch) || isSingleQuote(ch);
+}
+function isDoubleQuote(ch) {
+  return ch === '"' || ch === "\u201C" || ch === "\u201D";
+}
+function isStandardDoubleQuote(ch) {
+  return ch === '"';
+}
+function isSingleQuote(ch) {
+  return (
+    ch === "'" ||
+    ch === "\u2018" ||
+    ch === "\u2019" ||
+    ch === "`" ||
+    ch === "\u00B4"
+  );
+}
+function isStandardSingleQuote(ch) {
+  return ch === "'";
+}
+
+function removeLastOccurrence(str, char, remove = false) {
+  const idx = str.lastIndexOf(char);
+  if (idx === -1) return str;
+  return str.substring(0, idx) + (remove ? "" : str.substring(idx + 1));
+}
+
+function insertBeforeTrailingWhitespace(str, insertion) {
+  let end = str.length;
+  if (!isWhitespace(str, end - 1)) return str + insertion;
+  while (isWhitespace(str, end - 1)) end--;
+  return str.substring(0, end) + insertion + str.substring(end);
+}
+
+function removeCharAt(str, pos, count) {
+  return str.substring(0, pos) + str.substring(pos + count);
+}
+
+const ESCAPE_MAP = {
+  "\b": "\\b",
+  "\f": "\\f",
+  "\n": "\\n",
+  "\r": "\\r",
+  "\t": "\\t",
+};
+const UNESCAPE_MAP = {
+  '"': '"',
+  "\\": "\\",
+  "/": "/",
+  b: "\b",
+  f: "\f",
+  n: "\n",
+  r: "\r",
+  t: "\t",
+};
+
+/**
+ * Tenta corrigir e parsear JSON malformado.
+ * Retorna string JSON válida ou lança JsonParseError.
+ */
+function repairJson(input) {
+  let pos = 0;
+  let output = "";
+
+  skipCodeFences(["```", "[```", "{```"]);
+
+  if (!parseValue()) {
+    throw new JsonParseError("Unexpected end of json string", input.length);
+  }
+
+  skipCodeFences(["```", "```]", "```}"]);
+
+  const hasComma = consumeChar(",");
+  if (hasComma) skipWhitespace();
+
+  if (isQuoteOrWord(input[pos]) && /[,\n][ \t\r]*$/.test(output)) {
+    if (!hasComma) output = insertBeforeTrailingWhitespace(output, ",");
+    parseImplicitArray();
+  } else if (hasComma) {
+    output = removeLastOccurrence(output, ",");
+  }
+
+  while (input[pos] === "}" || input[pos] === "]") {
+    pos++;
+    skipWhitespace();
+  }
+
+  if (pos >= input.length) return output;
+
+  // ── Funções internas ──────────────────────────────────────
+
+  function parseValue() {
+    skipWhitespace();
+    const result =
+      parseObject() ||
+      parseArray() ||
+      parseString() ||
+      parseNumber() ||
+      parseLiteral("true", "true") ||
+      parseLiteral("false", "false") ||
+      parseLiteral("null", "null") ||
+      parseLiteral("True", "true") ||
+      parseLiteral("False", "false") ||
+      parseLiteral("None", "null") ||
+      parseUnquotedString(false) ||
+      parseRegexLiteral();
+
+    skipWhitespace();
+    return result;
+  }
+
+  function skipWhitespace(includeNewlines = true) {
+    const start = pos;
+    let moved;
+    do {
+      moved = skipSpaceChars(includeNewlines);
+      if (moved) moved = skipComment();
+    } while (moved);
+    return pos > start;
+  }
+
+  function skipSpaceChars(includeNewlines) {
+    const checker = includeNewlines ? isWhitespace : isWhitespaceNoNewline;
+    let acc = "";
+    for (;;) {
+      if (checker(input, pos)) {
+        acc += input[pos];
+        pos++;
+      } else if (isUnicodeSpace(input, pos)) {
+        acc += " ";
+        pos++;
+      } else break;
+    }
+    if (acc.length > 0) {
+      output += acc;
+      return true;
+    }
+    return false;
+  }
+
+  function skipComment() {
+    if (input[pos] === "/" && input[pos + 1] === "*") {
+      while (pos < input.length && !isEndOfBlockComment(input, pos)) pos++;
+      pos += 2;
+      return true;
+    }
+    if (input[pos] === "/" && input[pos + 1] === "/") {
+      while (pos < input.length && input[pos] !== "\n") pos++;
+      return true;
+    }
+    return false;
+  }
+
+  function skipCodeFences(fences) {
+    if (matchAndSkip(fences)) {
+      if (isAlpha(input[pos]))
+        while (pos < input.length && isAlphaNumeric(input[pos])) pos++;
+      skipWhitespace();
+      return true;
+    }
+    return false;
+  }
+
+  function matchAndSkip(options) {
+    for (const opt of options) {
+      const end = pos + opt.length;
+      if (input.slice(pos, end) === opt) {
+        pos = end;
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function consumeChar(ch) {
+    if (input[pos] === ch) {
+      output += input[pos];
+      pos++;
+      return true;
+    }
+    return false;
+  }
+
+  function skipChar(ch) {
+    if (input[pos] === ch) {
+      pos++;
+      return true;
+    }
+    return false;
+  }
+
+  function skipEllipsis() {
+    skipWhitespace();
+    if (
+      input[pos] === "." &&
+      input[pos + 1] === "." &&
+      input[pos + 2] === "."
+    ) {
+      pos += 3;
+      skipWhitespace();
+      skipChar(",");
+      return true;
+    }
+    return false;
+  }
+
+  function parseObject() {
+    if (input[pos] !== "{") return false;
+
+    output += "{";
+    pos++;
+    skipWhitespace();
+    if (input[pos] === ",") {
+      pos++;
+    }
+    skipWhitespace();
+
+    let first = true;
+    while (pos < input.length && input[pos] !== "}") {
+      let needsComma;
+      if (first) {
+        needsComma = true;
+        first = false;
+      } else {
+        needsComma = consumeChar(",");
+        if (!needsComma) output = insertBeforeTrailingWhitespace(output, ",");
+        skipWhitespace();
+      }
+
+      skipEllipsis();
+      if (!parseString() && !parseUnquotedString(true)) {
+        if (["}", "{", "]", "[", undefined].includes(input[pos])) {
+          output = removeLastOccurrence(output, ",");
+        } else {
+          throwObjectKeyExpected();
+        }
+        break;
+      }
+
+      skipWhitespace();
+      const hasColon = consumeChar(":");
+      const atEnd = pos >= input.length;
+
+      if (!hasColon) {
+        if (isQuoteOrWord(input[pos]) || atEnd)
+          output = insertBeforeTrailingWhitespace(output, ":");
+        else throwColonExpected();
+      }
+
+      if (!parseValue()) {
+        if (hasColon || atEnd) output += "null";
+        else throwColonExpected();
+      }
+    }
+
+    if (input[pos] === "}") {
+      output += "}";
+      pos++;
+    } else output = insertBeforeTrailingWhitespace(output, "}");
+
+    return true;
+  }
+
+  function parseArray() {
+    if (input[pos] !== "[") return false;
+
+    output += "[";
+    pos++;
+    skipWhitespace();
+    if (input[pos] === ",") {
+      pos++;
+    }
+    skipWhitespace();
+
+    let first = true;
+    while (pos < input.length && input[pos] !== "]") {
+      if (first) {
+        first = false;
+      } else {
+        if (!consumeChar(","))
+          output = insertBeforeTrailingWhitespace(output, ",");
+      }
+      skipEllipsis();
+      if (!parseValue()) {
+        output = removeLastOccurrence(output, ",");
+        break;
+      }
+    }
+
+    if (input[pos] === "]") {
+      output += "]";
+      pos++;
+    } else output = insertBeforeTrailingWhitespace(output, "]");
+
+    return true;
+  }
+
+  function parseImplicitArray() {
+    let first = true;
+    let hasMore = true;
+    while (hasMore) {
+      if (first) {
+        first = false;
+      } else {
+        if (!consumeChar(","))
+          output = insertBeforeTrailingWhitespace(output, ",");
+      }
+      hasMore = parseValue();
+    }
+    if (!hasMore) output = removeLastOccurrence(output, ",");
+    output = `[\n${output}\n]`;
+  }
+
+  function parseNumber() {
+    const start = pos;
+
+    if (input[pos] === "-") {
+      pos++;
+      if (isEndOfInput()) {
+        appendNumberSuffix(start);
+        return true;
+      }
+      if (!isDigit(input[pos])) {
+        pos = start;
+        return false;
+      }
+    }
+
+    while (isDigit(input[pos])) pos++;
+
+    if (input[pos] === ".") {
+      pos++;
+      if (isEndOfInput()) {
+        appendNumberSuffix(start);
+        return true;
+      }
+      if (!isDigit(input[pos])) {
+        pos = start;
+        return false;
+      }
+      while (isDigit(input[pos])) pos++;
+    }
+
+    if (input[pos] === "e" || input[pos] === "E") {
+      pos++;
+      if (input[pos] === "-" || input[pos] === "+") pos++;
+      if (isEndOfInput()) {
+        appendNumberSuffix(start);
+        return true;
+      }
+      if (!isDigit(input[pos])) {
+        pos = start;
+        return false;
+      }
+      while (isDigit(input[pos])) pos++;
+    }
+
+    if (!isEndOfInput()) {
+      pos = start;
+      return false;
+    }
+    if (pos > start) {
+      const raw = input.slice(start, pos);
+      output += /^0\d/.test(raw) ? `"${raw}"` : raw;
+      return true;
+    }
+    return false;
+  }
+
+  function parseLiteral(token, replacement) {
+    if (input.slice(pos, pos + token.length) === token) {
+      output += replacement;
+      pos += token.length;
+      return true;
+    }
+    return false;
+  }
+
+  function parseRegexLiteral() {
+    if (input[pos] !== "/") return;
+    const start = pos;
+    for (
+      pos++;
+      pos < input.length && (input[pos] !== "/" || input[pos - 1] === "\\");
+      pos++
+    );
+    pos++;
+    output += `"${input.substring(start, pos)}"`;
+    return true;
+  }
+
+  function parseString(strict = false, stopAt = -1) {
+    let hadBackslash = input[pos] === "\\";
+    if (hadBackslash) {
+      pos++;
+    }
+
+    if (!isQuote(input[pos])) return false;
+
+    const quoteType = isStandardDoubleQuote(input[pos])
+      ? isStandardDoubleQuote
+      : isStandardSingleQuote(input[pos])
+        ? isStandardSingleQuote
+        : isSingleQuote(input[pos])
+          ? isSingleQuote
+          : isDoubleQuote;
+
+    const startPos = pos;
+    const outputStart = output.length;
+    let strOutput = '"';
+
+    pos++;
+    for (;;) {
+      if (pos >= input.length) {
+        const nonWsPos = findLastNonWhitespace(pos - 1);
+        if (!strict && isSpecialChar(input.charAt(nonWsPos))) {
+          pos = startPos;
+          output = output.substring(0, outputStart);
+          return parseString(true);
+        }
+        strOutput = insertBeforeTrailingWhitespace(strOutput, '"');
+        output += strOutput;
+        return true;
+      }
+
+      if (pos === stopAt) {
+        strOutput = insertBeforeTrailingWhitespace(strOutput, '"');
+        output += strOutput;
+        return true;
+      }
+
+      if (quoteType(input[pos])) {
+        const closingPos = pos;
+        const strOutputStart = strOutput.length;
+        strOutput += '"';
+        pos++;
+        output += strOutput;
+        skipWhitespace(false);
+
+        if (
+          strict ||
+          pos >= input.length ||
+          isSpecialChar(input[pos]) ||
+          isQuote(input[pos]) ||
+          isDigit(input[pos])
+        ) {
+          concatenateStrings();
+          return true;
+        }
+
+        const prevNonWs = findLastNonWhitespace(closingPos - 1);
+        const prevChar = input.charAt(prevNonWs);
+
+        if (prevChar === ",") {
+          pos = startPos;
+          output = output.substring(0, outputStart);
+          return parseString(false, prevNonWs);
+        }
+        if (isSpecialChar(prevChar)) {
+          pos = startPos;
+          output = output.substring(0, outputStart);
+          return parseString(true);
+        }
+
+        output = output.substring(0, outputStart);
+        pos = closingPos + 1;
+        strOutput = `${strOutput.substring(0, strOutputStart)}\\${strOutput.substring(strOutputStart)}`;
+      } else {
+        if (strict && isSpecialArray(input[pos])) {
+          if (
+            input[pos - 1] === ":" &&
+            URL_PROTOCOL_REGEX.test(input.substring(startPos + 1, pos + 2))
+          ) {
+            while (pos < input.length && URL_CHAR_REGEX.test(input[pos])) {
+              strOutput += input[pos];
+              pos++;
+            }
+          }
+          strOutput = insertBeforeTrailingWhitespace(strOutput, '"');
+          output += strOutput;
+          concatenateStrings();
+          return true;
+        }
+
+        if (input[pos] === "\\") {
+          const nextCh = input.charAt(pos + 1);
+          if (UNESCAPE_MAP[nextCh] !== undefined) {
+            strOutput += input.slice(pos, pos + 2);
+            pos += 2;
+          } else if (nextCh === "u") {
+            let hexLen = 2;
+            while (hexLen < 6 && isHexChar(input[pos + hexLen])) hexLen++;
+            if (hexLen === 6) {
+              strOutput += input.slice(pos, pos + 6);
+              pos += 6;
+            } else if (pos + hexLen >= input.length) {
+              pos = input.length;
+            } else throwInvalidUnicode();
+          } else {
+            strOutput += nextCh;
+            pos += 2;
+          }
+        } else {
+          const ch = input.charAt(pos);
+          if (ch === '"' && input[pos - 1] !== "\\") {
+            strOutput += `\\${ch}`;
+            pos++;
+          } else if (isEscapeChar(ch)) {
+            strOutput += ESCAPE_MAP[ch];
+            pos++;
+          } else {
+            if (!isPrintable(ch)) throwInvalidChar(ch);
+            strOutput += ch;
+            pos++;
+          }
+        }
+      }
+
+      if (hadBackslash) skipChar("\\");
+    }
+  }
+
+  function concatenateStrings() {
+    let concatenated = false;
+    for (skipWhitespace(); input[pos] === "+"; ) {
+      concatenated = true;
+      pos++;
+      skipWhitespace();
+      output = removeLastOccurrence(output, '"', true);
+      const outLen = output.length;
+      const success = parseString();
+      if (success) output = removeCharAt(output, outLen, 1);
+      else output = insertBeforeTrailingWhitespace(output, '"');
+    }
+    return concatenated;
+  }
+
+  function parseUnquotedString(isObjectKey) {
+    const start = pos;
+    if (isAlpha(input[pos])) {
+      while (pos < input.length && isAlphaNumeric(input[pos])) pos++;
+      let lookAhead = pos;
+      while (isWhitespace(input, lookAhead)) lookAhead++;
+      if (input[lookAhead] === "(") {
+        pos = lookAhead + 1;
+        parseValue();
+        if (input[pos] === ")") {
+          pos++;
+          if (input[pos] === ";") pos++;
+        }
+        return true;
+      }
+    }
+
+    while (
+      pos < input.length &&
+      !isSpecialArray(input[pos]) &&
+      !isQuote(input[pos]) &&
+      (!isObjectKey || input[pos] !== ":")
+    )
+      pos++;
+
+    if (
+      input[pos - 1] === ":" &&
+      URL_PROTOCOL_REGEX.test(input.substring(start, pos + 2))
+    ) {
+      while (pos < input.length && URL_CHAR_REGEX.test(input[pos])) pos++;
+    }
+
+    if (pos > start) {
+      while (isWhitespace(input, pos - 1) && pos > 0) pos--;
+      const raw = input.slice(start, pos);
+      output += raw === "undefined" ? "null" : JSON.stringify(raw);
+      if (input[pos] === '"') pos++;
+      return true;
+    }
+  }
+
+  function findLastNonWhitespace(idx) {
+    while (idx > 0 && isWhitespace(input, idx)) idx--;
+    return idx;
+  }
+
+  function isEndOfInput() {
+    return (
+      pos >= input.length ||
+      isSpecialChar(input[pos]) ||
+      isWhitespace(input, pos)
+    );
+  }
+
+  function appendNumberSuffix(start) {
+    output += `${input.slice(start, pos)}0`;
+  }
+
+  // Error helpers
+  function throwInvalidChar(ch) {
+    throw new JsonParseError(`Invalid character ${JSON.stringify(ch)}`, pos);
+  }
+  function throwObjectKeyExpected() {
+    throw new JsonParseError("Object key expected", pos);
+  }
+  function throwColonExpected() {
+    throw new JsonParseError("Colon expected", pos);
+  }
+  function throwInvalidUnicode() {
+    const seq = input.slice(pos, pos + 6);
+    throw new JsonParseError(`Invalid unicode character "${seq}"`, pos);
+  }
+  function throwUnexpectedChar() {
+    throw new JsonParseError(
+      `Unexpected character ${JSON.stringify(input[pos])}`,
+      pos,
+    );
+  }
+
+  throwUnexpectedChar();
+}
+
+function isEndOfBlockComment(str, pos) {
+  return str[pos] === "*" && str[pos + 1] === "/";
+}
+
+// ─────────────────────────────────────────────────────────────
+// UTILITÁRIOS GERAIS
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Aguarda um número de milissegundos.
+ * @param {number} ms
+ */
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Serializa um erro em string legível.
+ */
+async function serializeError(error) {
+  if (typeof error === "string") return error;
+  if (error instanceof Error) return error.message;
+  if (error && typeof error === "object" && "message" in error)
+    return error.message;
+  if (error && typeof error === "object") {
+    try {
+      return JSON.stringify(error);
+    } catch {}
+  }
+  return "An unknown error occurred.";
+}
+
+/**
+ * Envia uma mensagem de log para o front-end (popup).
+ * Fallback para console.log se o runtime não estiver disponível.
+ */
+function log(message, ...args) {
+  const timestamp = new Date().toLocaleTimeString();
+  const fullMessage =
+    args.length > 0
+      ? `${message} ${args
+          .map((a) => {
+            if (a instanceof Error) return a.stack || a.message;
+            if (typeof a === "object") return JSON.stringify(a, null, 2);
+            return String(a);
+          })
+          .join(" ")}`
+      : message;
+
+  try {
+    chrome.runtime.sendMessage({
+      type: "backgroundLog",
+      timestamp,
+      message: fullMessage,
+    });
+  } catch {
+    console.log(`[${timestamp}] ${fullMessage}`);
+  }
+}
+
+/**
+ * Envia uma mensagem de erro ao front-end.
+ */
+async function sendErrorToFrontend(errorMessage, severity) {
+  try {
+    chrome.runtime.sendMessage({ type: "error", errorMessage, severity });
+  } catch (err) {
+    log("Failed sending error message to front-end: ", err);
+    throw err;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// AUTENTICAÇÃO E TOKENS DO FACEBOOK
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Acessa facebook.com/settings e extrai o token fb_dtsg (CSRF).
+ * @returns {{ loggedin: boolean, fb_dtsg?: string }}
+ */
+async function fetchFbDtsgToken() {
+  let token = "";
+  try {
+    const html = await fetchFacebookSettingsHtmlViaTab();
+    const match = html.match(
+      /"DTSGInitialData",\s*\[[^\]]*\],\s*\{[^{}]*"token"\s*:\s*"([^"]+)"[^{}]*\}/,
+    );
+
+    if (match && match[1]) {
+      token = match[1];
+    } else {
+      log("Error fetching FB_DSTG");
+      return { loggedin: false };
+    }
+  } catch (err) {
+    log("Error fetching data:", err);
+    return { loggedin: false };
+  }
+  return { fb_dtsg: token, loggedin: true };
+}
+
+/**
+ * Acessa facebook.com/settings e extrai o actorID (ID do usuário logado).
+ * @returns {{ loggedIn: boolean, userId?: string }}
+ */
+async function fetchCurrentUserId() {
+  try {
+    const html = await fetchFacebookSettingsHtmlViaTab();
+    const match = html.match(/"actorID":\s*"(\d+)"/) || html.match(/"actorId":\s*"(\d+)"/);
+
+    if (match && match[1]) return { loggedIn: true, userId: match[1] };
+
+    log("Error fetching actorID");
+    return { loggedIn: false };
+  } catch (err) {
+    log("Error fetching data:", err);
+    return { loggedIn: false };
+  }
+}
+
+/**
+ * Extrai TODOS os tokens/cookies necessários para chamadas GraphQL.
+ * Faz até 3 tentativas com delay de 5s entre elas.
+ *
+ * @returns {Promise<string[]>} [lsd, actorId, fb_dtsg, rev, hsi, spin_r, spin_b, spin_t]
+ */
+async function fetchAllAuthTokens() {
+  const MAX_RETRIES = 2;
+
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const html = await fetchFacebookSettingsHtmlViaTab();
+
+      const lsd = html.match(/"token":\s*"([^"]+)"/)?.[1] ?? null;
+      const userId = html.match(/"actorId":\s*"([^"]+)"/)?.[1] ?? null;
+      const dtsg =
+        html.match(
+          /"DTSGInitialData",\s*\[[^\]]*\],\s*\{[^{}]*"token"\s*:\s*"([^"]+)"[^{}]*\}/,
+        )?.[1] ?? null;
+      const rev = html.match(/"consistency":\s*{"rev":\s*(\d+)}/)?.[1] ?? null;
+      const hsi = html.match(/"hsi":\s*"([^"]+)"/)?.[1] ?? null;
+      const spinR = html.match(/"__spin_r":\s*(\d+),/)?.[1] ?? null;
+      const spinB = html.match(/"__spin_b":\s*"([^"]+)"/)?.[1] ?? null;
+      const spinT = html.match(/"__spin_t":\s*(\d+),/)?.[1] ?? null;
+
+      if (lsd && userId && dtsg && rev && hsi && spinR && spinB && spinT) {
+        return [lsd, userId, dtsg, rev, hsi, spinR, spinB, spinT];
+      }
+
+      const preview = html.slice(0, 160).replace(/\s+/g, " ");
+      throw new Error(
+        `Failed to extract all required cookies. /settings preview: ${preview}`,
+      );
+    } catch (err) {
+      attempt++;
+      log(
+        `Error getting cookies (attempt ${attempt}/${MAX_RETRIES + 1}):`,
+        err,
+      );
+      if (attempt <= MAX_RETRIES) {
+        log("Retrying in 5 seconds...");
+        await sleep(5000);
+      } else {
+        log("Max retries reached for fetchAllAuthTokens");
+        return [];
+      }
+    }
+  }
+}
+
+/**
+ * Obtém o token fb_dtsg ou envia erro ao front-end se não estiver logado.
+ * @returns {Promise<string>}
+ */
+async function getAuthToken() {
+  const result = await fetchFbDtsgToken();
+  if (result.loggedin) {
+    if (result.fb_dtsg) return result.fb_dtsg;
+  } else {
+    sendErrorToFrontend(
+      "Not logged in. Please log in to Facebook and try again.",
+      "STOP",
+    );
+  }
+  return "";
+}
+
+const FACEBOOK_URL_PATTERNS = [
+  "https://www.facebook.com/*",
+  "https://web.facebook.com/*",
+];
+
+async function fetchViaFacebookTabForGroups(url, options = {}) {
+  const tabs = await chrome.tabs.query({ url: FACEBOOK_URL_PATTERNS });
+  if (!tabs.length) {
+    throw new Error(
+      "Nenhuma aba do Facebook aberta. Abra facebook.com e tente novamente.",
+    );
+  }
+
+  const tab = tabs.find((t) => t.active) || tabs[0];
+  if (typeof tab.id !== "number") {
+    throw new Error("Aba do Facebook inválida.");
+  }
+  const tabUrl = tab.url || "";
+  const tabOrigin = tabUrl ? new URL(tabUrl).origin : "https://www.facebook.com";
+  const requestUrl = url.startsWith("/") ? `${tabOrigin}${url}` : url;
+
+  const execResults = await chrome.scripting.executeScript({
+    target: { tabId: tab.id },
+    world: "MAIN",
+    func: async (requestUrl, requestMethod, requestHeaders, requestBody) => {
+      try {
+        const response = await fetch(requestUrl, {
+          method: requestMethod,
+          headers: requestHeaders,
+          ...(requestMethod !== "GET" ? { body: requestBody } : {}),
+          credentials: "include",
+        });
+        const text = await response.text();
+        return { ok: response.ok, status: response.status, text };
+      } catch (error) {
+        return {
+          ok: false,
+          status: 0,
+          error: error?.message || "Failed to fetch",
+        };
+      }
+    },
+    args: [
+      requestUrl,
+      options.method || "POST",
+      options.headers || {},
+      options.body || "",
+    ],
+  });
+
+  const result = execResults?.[0]?.result;
+  if (!result) {
+    throw new Error("Sem resposta da aba do Facebook para buscar grupos.");
+  }
+  return result;
+}
+
+let isGroupsFetchRunning = false;
+let shouldStopGroupsFetch = false;
+
+async function fetchFacebookSettingsHtmlViaTab() {
+  const response = await fetchViaFacebookTabForGroups("/settings", {
+    method: "GET",
+    headers: {
+      accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    },
+  });
+
+  const html = String(response?.text || "");
+  if (!response?.ok) {
+    const preview = html.slice(0, 160).replace(/\s+/g, " ");
+    throw new Error(
+      `Falha ao buscar /settings (HTTP ${response?.status || 0}). Preview: ${preview || "empty"}`,
+    );
+  }
+
+  return html;
+}
+
+// ─────────────────────────────────────────────────────────────
+// GRUPOS DO FACEBOOK
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Busca grupos do usuário via GraphQL do Facebook.
+ * Faz paginação automática usando end_cursor.
+ *
+ * @param {string} cursor   - Cursor de paginação (vazio para primeira página)
+ * @param {string} fbDtsg   - Token CSRF fb_dtsg
+ * @returns {Promise<object[]|{ noGroups: boolean, groups: [] }>}
+ */
+
+async function fetchFacebookGroups(
+  cursor,
+  fbDtsg,
+  runningCount = 0,
+  emitChunks = false,
+) {
+  if (shouldStopGroupsFetch) return [];
+
+  // ⚠️ doc_id é um identificador interno do Facebook que pode mudar.
+  // Se a função parar de funcionar, capture o payload real no DevTools:
+  //   Network → filtrar "graphql" → procurar GroupsCometPinnedGroupsDialogQuery → copiar doc_id
+  const DOC_ID_FIRST_PAGE = "7740459739385247"; // GroupsCometPinnedGroupsDialogQuery
+  const DOC_ID_PAGINATION = "7218669964900608"; // GroupsCometUnpinnedGroupsPaginationListPaginatedQuery
+
+  // O header x-fb-lsd NÃO deve ser enviado nessa requisição.
+  // O código original não o incluía e funcionava corretamente.
+  // Adicionar origin ou x-fb-lsd faz o Facebook retornar body vazio (content-length: 0).
+  const headers = {
+    "Content-Type": "application/x-www-form-urlencoded",
+    "x-fb-friendly-name": "GroupsCometAllJoinedGroupsSectionPaginationQuery",
+  };
+
+  let body;
+  if (cursor) {
+    // Paginação — busca grupos não fixados com cursor
+    const vars = `variables=%7B%22count%22%3A10%2C%22cursor%22%3A%22${cursor}%22%2C%22ordering%22%3A%5B%22viewer_added%22%5D%2C%22scale%22%3A1%7D`;
+    body = `fb_dtsg=${fbDtsg}&fb_api_caller_class=RelayModern&fb_api_req_friendly_name=GroupsCometUnpinnedGroupsPaginationListPaginatedQuery&${vars}&server_timestamps=true&doc_id=${DOC_ID_PAGINATION}`;
+  } else {
+    // Primeira página — busca grupos fixados
+    const vars = `variables=%7B%22ordering%22%3A%5B%22viewer_added%22%5D%2C%22scale%22%3A1%7D`;
+    body = `fb_dtsg=${fbDtsg}&fb_api_caller_class=RelayModern&fb_api_req_friendly_name=GroupsCometPinnedGroupsDialogQuery&${vars}&server_timestamps=true&doc_id=${DOC_ID_FIRST_PAGE}`;
+  }
+
+  try {
+    // Esta chamada precisa partir do contexto de uma aba facebook.com
+    // para evitar bloqueio por origem chrome-extension://.
+    const response = await fetchViaFacebookTabForGroups(
+      "/api/graphql/",
+      { headers, body },
+    );
+    if (!response.ok) {
+      throw new Error(response.error || "Falha ao buscar grupos no Facebook.");
+    }
+    const rawText = (response.text || "").replace(/^for\s*\(;;\);\s*/, "");
+    const json = JSON.parse(rawText);
+    const groupsTab = json?.data?.viewer?.groups_tab;
+
+    if (!groupsTab) throw new Error("Invalid response format");
+
+    const hasPinned = groupsTab.pinned_groups?.edges?.length > 0;
+    const hasUnpinned = groupsTab.tab_groups_list?.edges?.length > 0;
+    const isEmpty = !hasPinned && !hasUnpinned && !cursor;
+
+    /**
+     * Mapeia um edge de grupo para objeto simplificado.
+     */
+    const mapGroup = (edge) => ({
+      id: edge.node.id,
+      name: edge.node.name,
+      image: edge.node.profile_picture.uri,
+      privacy: edge.node.privacy_info.title.text,
+      members: edge.node.group_member_profiles.formatted_count_text,
+    });
+
+    let groups = [];
+
+    // Adiciona grupos fixados (apenas na primeira página)
+    if (!cursor && groupsTab.pinned_groups?.edges) {
+      groups = groupsTab.pinned_groups.edges.map(mapGroup);
+    }
+
+    // Adiciona grupos não fixados
+    if (groupsTab.tab_groups_list?.edges) {
+      const unpinned = groupsTab.tab_groups_list.edges.map(mapGroup);
+      groups = groups.concat(unpinned);
+
+      const accumulatedCount = runningCount + groups.length;
+      if (emitChunks) {
+        chrome.runtime.sendMessage({
+          type: "groupsChunk",
+          groups,
+          count: accumulatedCount,
+        });
+      }
+      chrome.runtime.sendMessage({
+        type: "groupsFetched",
+        count: accumulatedCount,
+      });
+
+      const pageInfo = groupsTab.tab_groups_list.page_info;
+      if (pageInfo.has_next_page && pageInfo.end_cursor && !shouldStopGroupsFetch) {
+        await sleep(1000);
+        if (shouldStopGroupsFetch) return groups;
+        const nextPage = await fetchFacebookGroups(
+          pageInfo.end_cursor,
+          fbDtsg,
+          accumulatedCount,
+          emitChunks,
+        );
+        if (Array.isArray(nextPage)) groups = groups.concat(nextPage);
+        else if (nextPage?.groups) groups = groups.concat(nextPage.groups);
+      }
+    }
+
+    if (isEmpty && groups.length === 0 && !cursor) {
+      return { noGroups: true, groups: [] };
+    }
+
+    return groups;
+  } catch (err) {
+    throw err;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// DATA DE CRIAÇÃO DO PERFIL
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Busca a data de criação do perfil do usuário logado via GraphQL.
+ * @returns {Promise<{ creationDate: string }>}
+ */
+async function fetchProfileCreationDate() {
+  try {
+    const tokens = await fetchAllAuthTokens();
+    const [lsd, userId, fbDtsg, rev, hsi, spinR, spinB, spinT] = tokens;
+
+    if (!lsd || !userId || !fbDtsg) {
+      log(
+        "getCreationDate: missing required cookies, skipping account age detection.",
+      );
+      return { creationDate: "" };
+    }
+
+    const headers = {
+      accept: "*/*",
+      "accept-language": "en-US,en;q=0.9",
+      "content-type": "application/x-www-form-urlencoded",
+      origin: "https://www.facebook.com",
+      referer: "https://www.facebook.com/",
+      "x-asbd-id": "359341",
+      "x-fb-friendly-name": "ProfileCometDirectoryAuthenticityModalQuery",
+      "x-fb-lsd": lsd || "",
+    };
+
+    const variables = { scale: 2, userID: userId };
+    const body =
+      `av=${userId}` +
+      `&__aaid=0&__user=${userId}&__a=1&__req=1m&__hs=19873.HYP:comet_pkg.2.1..2.1&dpr=1&__ccg=EXCELLENT` +
+      `&__rev=${rev}&__s=nosession&__hsi=${hsi}&__dyn=&__csr=&__comet_req=15` +
+      `&fb_dtsg=${encodeURIComponent(fbDtsg)}&jazoest=25454&lsd=${encodeURIComponent(lsd)}` +
+      `&__spin_r=${spinR}&__spin_b=${encodeURIComponent(spinB)}&__spin_t=${spinT}` +
+      `&fb_api_caller_class=RelayModern&fb_api_req_friendly_name=ProfileCometDirectoryAuthenticityModalQuery` +
+      `&variables=${encodeURIComponent(JSON.stringify(variables))}&server_timestamps=true&doc_id=25692243083796369`;
+
+    const response = await fetch("https://www.facebook.com/api/graphql/", {
+      method: "POST",
+      headers,
+      body,
+    });
+    if (!response.ok) {
+      log("getCreationDate: non-OK response from GraphQL.");
+      return { creationDate: "" };
+    }
+
+    const text = await response.text();
+    const match = text.match(/"PROFILE_JOIN_DATE","value":"([^"]+)"/);
+    if (!match) {
+      log("getCreationDate: PROFILE_JOIN_DATE not found in response.");
+      return { creationDate: "" };
+    }
+
+    const creationDate = match[1].replace(/\s+/g, " ").trim();
+    if (!creationDate) return { creationDate: "" };
+
+    return { creationDate };
+  } catch (err) {
+    log("getCreationDate: error fetching join date:", err);
+    return { creationDate: "" };
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// FEED DE POSTS DOS GRUPOS
+// ─────────────────────────────────────────────────────────────
+
+// Estado global do feed (reset a cada nova busca)
+let isFirstRun = true;
+let cutoffTimestamp = 0;
+let isMonitorRunning = false;
+let isMonitorCycleRunning = false;
+let monitorWarmupDone = false;
+const LEADS_HISTORY_STORAGE_KEY = "leadsHistory";
+const LEADS_HISTORY_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const MONITOR_CYCLE_TIMEOUT_MS = 180000;
+const MONITOR_ALARM_NAME = "post-monitor-cycle";
+const MONITOR_RUNTIME_STORAGE_KEY = "postMonitorRuntime";
+let monitorConfig = {
+  selectedGroupIds: [],
+  positiveKeywords: [],
+  negativeKeywords: [],
+  profileName: "",
+  minMinutes: 3,
+  maxMinutes: 7,
+};
+
+async function saveMonitorRuntime() {
+  await chrome.storage.local.set({
+    [MONITOR_RUNTIME_STORAGE_KEY]: {
+      running: isMonitorRunning,
+      warmupDone: monitorWarmupDone,
+      config: monitorConfig,
+    },
+  });
+}
+
+async function loadMonitorRuntime() {
+  const data = await chrome.storage.local.get([MONITOR_RUNTIME_STORAGE_KEY]);
+  const runtime = data?.[MONITOR_RUNTIME_STORAGE_KEY];
+  if (!runtime || typeof runtime !== "object") {
+    return { running: false, warmupDone: false, config: null };
+  }
+  return {
+    running: !!runtime.running,
+    warmupDone: !!runtime.warmupDone,
+    config: runtime.config || null,
+  };
+}
+
+function scheduleNextMonitorAlarm(delayMs) {
+  const delayInMinutes = Math.max(0.1, delayMs / 60000);
+  chrome.alarms.create(MONITOR_ALARM_NAME, { delayInMinutes });
+}
+
+function pruneLeadsHistory(leads) {
+  const now = Date.now();
+  return (Array.isArray(leads) ? leads : []).filter((lead) => {
+    const ts = Number(lead?.detectedAt) || 0;
+    return ts > 0 && now - ts <= LEADS_HISTORY_TTL_MS;
+  });
+}
+
+function buildLeadHistoryId(post, profileName) {
+  const postId = String(post?.post_id || "unknown");
+  const groupId = String(post?.group_id || "unknown");
+  const profile = String(profileName || "default");
+  return `${profile}::${groupId}::${postId}`;
+}
+
+async function saveLeadsToHistory(matches, profileName) {
+  const data = await chrome.storage.local.get([LEADS_HISTORY_STORAGE_KEY]);
+  const current = pruneLeadsHistory(data?.[LEADS_HISTORY_STORAGE_KEY]);
+  const byId = new Map(current.map((lead) => [String(lead.id), lead]));
+  const now = Date.now();
+
+  for (const post of Array.isArray(matches) ? matches : []) {
+    const id = buildLeadHistoryId(post, profileName);
+    byId.set(id, {
+      id,
+      detectedAt: now,
+      profileName: profileName || "",
+      group_id: post?.group_id || "",
+      group_name: post?.group_name || "",
+      group_url: post?.group_url || "",
+      poster_name: post?.poster_name || "",
+      user_profile_url: post?.user_profile_url || "",
+      post_id: post?.post_id || "",
+      post_type: post?.post_type || "",
+      post_text: post?.post_text || "",
+      marketplace_text: post?.marketplace_text || "",
+      post_url: post?.post_url || post?.marketplace_listing_url || "",
+    });
+  }
+
+  const merged = Array.from(byId.values()).sort(
+    (a, b) => Number(b.detectedAt) - Number(a.detectedAt),
+  );
+  const pruned = pruneLeadsHistory(merged);
+  await chrome.storage.local.set({ [LEADS_HISTORY_STORAGE_KEY]: pruned });
+}
+
+async function getLeadsHistory() {
+  const data = await chrome.storage.local.get([LEADS_HISTORY_STORAGE_KEY]);
+  const history = pruneLeadsHistory(data?.[LEADS_HISTORY_STORAGE_KEY]);
+  await chrome.storage.local.set({ [LEADS_HISTORY_STORAGE_KEY]: history });
+  return history;
+}
+
+function normalizeKeywordList(input) {
+  if (!Array.isArray(input)) return [];
+  return input
+    .map((v) => String(v || "").trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function postMatchesKeywordConfig(post, config) {
+  const text = `${post?.post_text || ""} ${post?.marketplace_text || ""}`
+    .toLowerCase()
+    .trim();
+
+  if (!text) return false;
+
+  if (config.selectedGroupIds?.length > 0) {
+    const gid = String(post?.group_id || "");
+    if (!config.selectedGroupIds.includes(gid)) return false;
+  }
+
+  const hasPositive =
+    config.positiveKeywords.length === 0 ||
+    config.positiveKeywords.some((kw) => text.includes(kw));
+  if (!hasPositive) return false;
+
+  const hasNegative = config.negativeKeywords.some((kw) => text.includes(kw));
+  return !hasNegative;
+}
+
+function getRandomMonitorDelayMs(minMinutes, maxMinutes) {
+  const min = Math.max(1, Number(minMinutes) || 3);
+  const max = Math.max(min, Number(maxMinutes) || 7);
+  const randomMinutes = min + Math.random() * (max - min);
+  return Math.floor(randomMinutes * 60 * 1000);
+}
+
+async function stopPostMonitor(notifyUi = true) {
+  isMonitorRunning = false;
+  isMonitorCycleRunning = false;
+  chrome.alarms.clear(MONITOR_ALARM_NAME);
+  await saveMonitorRuntime();
+
+  if (notifyUi) {
+    chrome.runtime.sendMessage({
+      type: "monitorState",
+      running: false,
+    });
+  }
+}
+
+async function runPostMonitorCycle() {
+  if (!isMonitorRunning || isMonitorCycleRunning) return;
+  isMonitorCycleRunning = true;
+
+  try {
+    chrome.runtime.sendMessage({
+      type: "monitorTick",
+      running: true,
+      profileName: monitorConfig.profileName,
+      phase: "start",
+      message: "Iniciando ciclo de checagem...",
+    });
+
+    const latestPosts = await Promise.race([
+      fetchGroupFeedPosts(),
+      new Promise((_, reject) => {
+        setTimeout(() => {
+          reject(new Error("Timeout no ciclo de monitor (3 min)."));
+        }, MONITOR_CYCLE_TIMEOUT_MS);
+      }),
+    ]);
+    const posts = Array.isArray(latestPosts) ? latestPosts : [];
+    const matched = posts.filter((post) => postMatchesKeywordConfig(post, monitorConfig));
+    const wasWarmupCycle = !monitorWarmupDone;
+
+    chrome.runtime.sendMessage({
+      type: "monitorRawPosts",
+      profileName: monitorConfig.profileName,
+      total: posts.length,
+      posts,
+    });
+
+    if (!wasWarmupCycle) {
+      if (matched.length > 0) {
+        await saveLeadsToHistory(matched, monitorConfig.profileName);
+        chrome.runtime.sendMessage({
+          type: "monitorMatches",
+          profileName: monitorConfig.profileName,
+          matches: matched,
+        });
+      }
+    } else {
+      monitorWarmupDone = true;
+    }
+
+    const delayMs = getRandomMonitorDelayMs(
+      monitorConfig.minMinutes,
+      monitorConfig.maxMinutes,
+    );
+    chrome.runtime.sendMessage({
+      type: "monitorTick",
+      running: true,
+      profileName: monitorConfig.profileName,
+      polledCount: posts.length,
+      matchedCount: wasWarmupCycle ? 0 : matched.length,
+      warmup: wasWarmupCycle,
+      nextDelayMs: delayMs,
+    });
+    await saveMonitorRuntime();
+    scheduleNextMonitorAlarm(delayMs);
+  } catch (err) {
+    const errorMessage = await serializeError(err);
+    chrome.runtime.sendMessage({
+      type: "monitorError",
+      error: errorMessage,
+    });
+
+    const retryMs = getRandomMonitorDelayMs(3, 5);
+    scheduleNextMonitorAlarm(retryMs);
+  } finally {
+    isMonitorCycleRunning = false;
+  }
+}
+
+/**
+ * Retorna o maior timestamp (posted_unix) entre os posts.
+ */
+function getLatestTimestamp(posts) {
+  return posts.reduce((max, post) => Math.max(max, post.posted_unix), 0);
+}
+
+/**
+ * Busca os posts mais recentes do feed de grupos.
+ * Faz até 6 páginas de resultados, parando quando achar posts já vistos.
+ *
+ * @returns {Promise<object[]>} Lista de posts em ordem cronológica reversa
+ */
+async function fetchGroupFeedPosts() {
+  const tokens = await fetchAllAuthTokens();
+  const [lsd, userId, fbDtsg, rev, hsi, spinR, spinB, spinT] = tokens;
+
+  const GRAPHQL_URL = "https://www.facebook.com/api/graphql/";
+  const DOC_ID = "25164462503148437";
+  const MAX_PAGES = 6;
+
+  const headers = {
+    accept: "*/*",
+    "accept-language": "en-US,en;q=0.9",
+    "content-type": "application/x-www-form-urlencoded",
+    origin: "https://www.facebook.com",
+    priority: "u=1, i",
+    referer: "https://www.facebook.com/?filter=groups&sk=h_chr",
+    "sec-ch-ua": '"Brave";v="125", "Chromium";v="125", "Not.A/Brand";v="24"',
+    "sec-gpc": "1",
+    "x-asbd-id": "129477",
+    "x-fb-friendly-name": "CometNewsFeedPaginationQuery",
+    "x-fb-lsd": lsd || "",
+  };
+
+  /**
+   * Gera o corpo da requisição GraphQL para o feed.
+   * @param {string} cursor - Cursor de paginação (vazio para 1ª página)
+   */
+  function buildFeedRequestBody(cursor) {
+    const clientQueryId =
+      Math.random().toString(36).substring(2, 15) +
+      Math.random().toString(36).substring(2, 15);
+    const vpvToken =
+      Math.random().toString(36).substring(2, 15) +
+      Math.random().toString(36).substring(2, 15);
+    const payloads = Array.from({ length: 6 }, () =>
+      Math.random().toString(36).substring(2, 15),
+    ).join("");
+    const originalQid = Math.floor(1e18 * Math.random());
+    const qid = Math.floor(1e18 * Math.random());
+    const vsid = Math.floor(1e18 * Math.random());
+
+    const recentVPVs = JSON.stringify([
+      {
+        client_vpv_token: vpvToken,
+        evt: "vpv",
+        feed_backend_data_serialized_payloads: payloads,
+        fetch_tracking: false,
+        original_qid: originalQid.toString(),
+        qid: qid.toString(),
+        timestamp: Date.now(),
+        vsid: vsid.toString(),
+        vspos: 27,
+      },
+    ]);
+
+    const variables = {
+      RELAY_INCREMENTAL_DELIVERY: true,
+      clientQueryId,
+      clientSession: null,
+      connectionClass: "EXCELLENT",
+      count: 5,
+      ...(cursor ? { cursor } : {}),
+      experimentalValues: null,
+      feedLocation: "NEWSFEED",
+      feedStyle: "MOST_RECENT_GROUPS_FEED",
+      feedbackSource: 1,
+      focusCommentID: null,
+      orderby: ["MOST_RECENT"],
+      privacySelectorRenderLocation: "COMET_STREAM",
+      recentVPVs: JSON.parse(recentVPVs),
+      refreshMode: "COLD_START",
+      renderLocation: "homepage_stream",
+      scale: 2,
+      shouldChangeBRSLabelFieldName: true,
+      shouldChangeSponsoredAuctionDistanceFieldName: false,
+      shouldChangeSponsoredDataFieldName: true,
+      shouldObfuscateCategoryField: true,
+      shouldUseBRSLabelFieldNameV1: false,
+      shouldUseBRSLabelFieldNameV2: true,
+      shouldUseSponsoredAuctionLabelFieldNameV1: false,
+      shouldUseSponsoredAuctionLabelFieldNameV2: false,
+      useDefaultActor: false,
+      __relay_internal__pv__GHLShouldChangeSponsoredAuctionDistanceFieldNamerelayprovider: false,
+      __relay_internal__pv__GHLShouldUseSponsoredAuctionLabelFieldNameV1relayprovider: false,
+      __relay_internal__pv__GHLShouldUseSponsoredAuctionLabelFieldNameV2relayprovider: false,
+      __relay_internal__pv__GHLShouldChangeSponsoredDataFieldNamerelayprovider: true,
+      __relay_internal__pv__GHLShouldChangeAdIdFieldNamerelayprovider: true,
+      __relay_internal__pv__FBReels_enable_view_dubbed_audio_type_gkrelayprovider: false,
+      __relay_internal__pv__CometUFICommentAvatarStickerAnimatedImagerelayprovider: false,
+      __relay_internal__pv__IsWorkUserrelayprovider: false,
+      __relay_internal__pv__FBReels_deprecate_short_form_video_context_gkrelayprovider: true,
+      __relay_internal__pv__FeedDeepDiveTopicPillThreadViewEnabledrelayprovider: false,
+      __relay_internal__pv__CometImmersivePhotoCanUserDisable3DMotionrelayprovider: false,
+      __relay_internal__pv__WorkCometIsEmployeeGKProviderrelayprovider: false,
+      __relay_internal__pv__IsMergQAPollsrelayprovider: false,
+      __relay_internal__pv__FBReels_enable_meta_ai_label_gkrelayprovider: true,
+      __relay_internal__pv__FBReelsMediaFooter_comet_enable_reels_ads_gkrelayprovider: true,
+      __relay_internal__pv__CometUFIReactionsEnableShortNamerelayprovider: false,
+      __relay_internal__pv__CometUFIShareActionMigrationrelayprovider: true,
+      __relay_internal__pv__CometUFI_dedicated_comment_routable_dialog_gkrelayprovider: false,
+      __relay_internal__pv__StoriesArmadilloReplyEnabledrelayprovider: true,
+      __relay_internal__pv__FBReelsIFUTileContent_reelsIFUPlayOnHoverrelayprovider: true,
+      __relay_internal__pv__GroupsCometGYSJFeedItemHeightrelayprovider: 150,
+      __relay_internal__pv__StoriesShouldIncludeFbNotesrelayprovider: false,
+    };
+
+    return (
+      `av=${userId}&__aaid=0&__user=${userId}&__a=1&__req=8` +
+      `&__hs=19873.HYP:comet_pkg.2.1..2.1&dpr=1&__ccg=EXCELLENT` +
+      `&__rev=${rev}&__s=ww8l4e:w5wqeg:i0zg8a&__hsi=${hsi}` +
+      `&__dyn=&__csr=&__comet_req=15&fb_dtsg=${fbDtsg}&jazoest=25398&lsd=${lsd}` +
+      `&__spin_r=${spinR}&__spin_b=${spinB}&__spin_t=${spinT}` +
+      `&fb_api_caller_class=RelayModern&fb_api_req_friendly_name=CometNewsFeedPaginationQuery` +
+      `&variables=${JSON.stringify(variables)}&server_timestamps=true&doc_id=${DOC_ID}`
+    );
+  }
+
+  /**
+   * Faz a requisição ao feed com até 3 tentativas.
+   * @param {string} body - Corpo da requisição
+   * @returns {Promise<{ json: any, cursor: string|null }>}
+   */
+  function parseFacebookFeedPayload(rawText) {
+    const stripped = String(rawText || "")
+      .replace(/^for\s*\(;;\);\s*/, "")
+      .trim();
+
+    if (!stripped) return null;
+
+    if (stripped.startsWith("<!DOCTYPE") || stripped.startsWith("<html")) {
+      throw new Error("Facebook retornou HTML em vez de JSON (sessão/bloqueio).");
+    }
+
+    try {
+      return JSON.parse(stripped);
+    } catch {}
+
+    try {
+      const repaired = repairJson(stripped);
+      return JSON.parse(repaired);
+    } catch {}
+
+    // Fallback: algumas respostas vêm em múltiplas linhas JSON independentes.
+    const parsedLines = [];
+    for (const line of stripped.split("\n")) {
+      const chunk = line.trim();
+      if (!chunk) continue;
+      if (!chunk.startsWith("{") && !chunk.startsWith("[")) continue;
+
+      try {
+        parsedLines.push(JSON.parse(chunk));
+        continue;
+      } catch {}
+
+      try {
+        parsedLines.push(JSON.parse(repairJson(chunk)));
+      } catch {}
+    }
+
+    if (parsedLines.length > 0) return parsedLines;
+
+    const preview = stripped.slice(0, 120).replace(/\s+/g, " ");
+    throw new Error(`Resposta não parseável do feed. Preview: ${preview}`);
+  }
+
+  async function fetchFeedPage(body) {
+    let retries = 3;
+
+    while (retries > 0) {
+      try {
+        const response = await fetchViaFacebookTabForGroups("/api/graphql/", {
+          headers,
+          body,
+        });
+        const rawText = String(response?.text || "");
+        if (!response?.ok) {
+          const preview = rawText.slice(0, 140).replace(/\s+/g, " ");
+          throw new Error(
+            `Feed HTTP ${response?.status || 0}. Preview: ${preview || "empty"}`,
+          );
+        }
+
+        const cursor = rawText.match('"end_cursor":"([^"]+)"')?.[1] ?? null;
+        const parsed = parseFacebookFeedPayload(rawText);
+        if (!parsed) return { json: [], cursor };
+
+        // Verifica se o feed retornou edges vazias
+        const hasEmptyEdges = checkForEmptyEdges(parsed);
+        if (hasEmptyEdges) {
+          log("[INFO] No more posts available (empty edges)");
+          return { json: [], cursor };
+        }
+
+        if (
+          rawText.includes("A server error missing_required_variable_value occured")
+        ) {
+          log("[NOT_AN_ERROR] missing_required_variable_value");
+          if (retries === 0) return { json: [], cursor: null };
+          log(`Retrying... (${retries}/5)`);
+          await sleep(retries === 1 ? 15000 : 5000);
+          retries--;
+          continue;
+        }
+
+        return extractJsonResult(parsed, cursor);
+      } catch (err) {
+        retries--;
+        if (retries === 0) {
+          log("Error Fetching feed. after retries:", err);
+          throw err;
+        }
+        log(`Retrying... (${5 - retries}/5)`);
+        await sleep(retries < 3 ? 60000 : 30000);
+      }
+    }
+
+    log("responseJson is empty");
+    return { json: [], cursor: null };
+  }
+
+  function checkForEmptyEdges(parsed) {
+    if (Array.isArray(parsed)) {
+      for (const item of parsed) {
+        const edges = item?.data?.viewer?.news_feed?.edges;
+        if (edges && Array.isArray(edges) && edges.length === 0) return true;
+      }
+    } else if (typeof parsed === "object" && parsed !== null) {
+      const edges = parsed?.data?.viewer?.news_feed?.edges;
+      if (edges && Array.isArray(edges) && edges.length === 0) return true;
+    }
+    return false;
+  }
+
+  function extractJsonResult(parsed, cursor) {
+    if (Array.isArray(parsed)) return { json: parsed, cursor };
+    if (typeof parsed === "object" && parsed !== null) {
+      if (parsed.data && Array.isArray(parsed.data))
+        return { json: parsed.data, cursor };
+      for (const key of Object.keys(parsed)) {
+        if (Array.isArray(parsed[key])) return { json: parsed[key], cursor };
+      }
+    }
+    return { json: parsed, cursor };
+  }
+
+  // ── Loop de paginação do feed ─────────────────────────────
+
+  let isDone = false;
+  let pageNum = 0;
+  let nextCursor = "";
+  let allPosts = [];
+
+  while (!isDone) {
+    if (++pageNum > MAX_PAGES) {
+      log("Too many requests, stopping");
+      break;
+    }
+
+    await sleep(5000);
+
+    try {
+      const body = buildFeedRequestBody(nextCursor);
+      const { json, cursor } = await fetchFeedPage(body);
+
+      if (!json || (Array.isArray(json) && json.length === 0)) {
+        log("[INFO] No more posts available - response is empty");
+        if (isFirstRun) {
+          isFirstRun = false;
+          cutoffTimestamp = Math.floor(Date.now() / 1000);
+        }
+        break;
+      }
+
+      const pagePosts = extractPostsFromFeedResponse(json);
+
+      if (!pagePosts || pagePosts.length === 0) {
+        log(
+          "[INFO] No posts found in processed response - no more posts available",
+        );
+        if (isFirstRun) {
+          isFirstRun = false;
+          cutoffTimestamp = Math.floor(Date.now() / 1000);
+        }
+        break;
+      }
+
+      // Processa cada post, parando se já passou do cutoff
+      for (const post of pagePosts) {
+        if (!post.post_id) continue;
+        const postTime =
+          typeof post.posted_unix === "number" ? post.posted_unix : 0;
+
+        if (cutoffTimestamp && postTime && postTime <= cutoffTimestamp) {
+          isDone = true;
+          break;
+        }
+
+        if (!allPosts.some((p) => p.post_id === post.post_id)) {
+          allPosts.push(post);
+        }
+      }
+
+      if (isFirstRun) {
+        isFirstRun = false;
+        cutoffTimestamp =
+          allPosts.length > 0
+            ? getLatestTimestamp(allPosts)
+            : Math.floor(Date.now() / 1000);
+        break;
+      }
+
+      if (cursor) {
+        nextCursor = cursor;
+      } else {
+        log("[INFO] No more pages available (no cursor)");
+        break;
+      }
+    } catch (err) {
+      const msg = await serializeError(err);
+      sendErrorToFrontend(`Error processing posts. ${msg}`, "STOP");
+      return;
+    }
+  }
+
+  if (allPosts.length > 0) cutoffTimestamp = getLatestTimestamp(allPosts);
+  return allPosts.reverse();
+}
+
+// ─────────────────────────────────────────────────────────────
+// PROCESSAMENTO DE POSTS DO FEED
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Decodifica strings escapadas do Facebook (unicode, newlines, etc.).
+ */
+function decodeText(text) {
+  if (!text) return text;
+  return text
+    .replace(/\\n/g, "\n")
+    .replace(/\\u([a-fA-F0-9]{4})/g, (_, hex) =>
+      String.fromCharCode(parseInt(hex, 16)),
+    )
+    .replace(/\u203c\ufe0f/g, "‼️")
+    .replace(/\\\//g, "/");
+}
+
+/**
+ * Remove campos indesejados ("extensions", "children") de objetos aninhados.
+ */
+function cleanupResponseObject(obj) {
+  if (typeof obj !== "object" || obj === null) return obj;
+  if (Array.isArray(obj)) return obj.map(cleanupResponseObject);
+
+  const cleaned = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (key !== "extensions" && key !== "children") {
+      cleaned[key] = cleanupResponseObject(value);
+    }
+  }
+  return cleaned;
+}
+
+/**
+ * Verifica recursivamente se um objeto contém dados de marketplace_listing_seller.
+ */
+function hasMarketplaceListingSeller(obj) {
+  if (typeof obj !== "object" || obj === null) return false;
+  if (Array.isArray(obj)) return obj.some(hasMarketplaceListingSeller);
+  return (
+    "marketplace_listing_seller" in obj ||
+    Object.values(obj).some(hasMarketplaceListingSeller)
+  );
+}
+
+/**
+ * Verifica recursivamente se um objeto contém `sponsored_data` com conteúdo.
+ */
+function findSponsoredData(node) {
+  const stack = [node];
+  while (stack.length) {
+    const current = stack.pop();
+    if (current && typeof current === "object") {
+      if (Object.prototype.hasOwnProperty.call(current, "sponsored_data")) {
+        const data = current.sponsored_data;
+        if (
+          data != null &&
+          (typeof data !== "object" || Object.keys(data).length > 0)
+        )
+          return data;
+      }
+      for (const val of Object.values(current)) {
+        if (val && typeof val === "object") stack.push(val);
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Extrai posts da resposta bruta do feed do Facebook.
+ * @param {any} responseData - JSON parseado do feed
+ * @returns {object[]}
+ */
+function extractPostsFromFeedResponse(responseData) {
+  const posts = [];
+
+  try {
+    // Caso: resposta com viewer.news_feed.edges no primeiro item
+    const firstEdges = responseData?.[0]?.data?.viewer?.news_feed?.edges;
+    if (firstEdges) {
+      for (const edge of firstEdges) {
+        const post = parsePostFromEdge({ data: edge });
+        if (post) posts.push(post);
+      }
+    }
+
+    if (Array.isArray(responseData)) {
+      for (const item of responseData) {
+        if (!item || typeof item !== "object") continue;
+
+        // Caso: item com label específico de paginação do feed
+        if (
+          item.label ===
+          "CometNewsFeed_viewerConnection$stream$CometNewsFeed_viewer_news_feed"
+        ) {
+          const post = parsePostFromEdge(item);
+          if (post) posts.push(post);
+          continue;
+        }
+
+        // Caso: item com data.viewer.news_feed.edges
+        if (item.data?.viewer?.news_feed?.edges) {
+          for (const edge of item.data.viewer.news_feed.edges) {
+            const post = parsePostFromEdge({ data: edge });
+            if (post) posts.push(post);
+          }
+        }
+      }
+    } else {
+      log("responseJson is not an array, it's:", typeof responseData);
+    }
+  } catch (err) {
+    log("Error processing Facebook response:", err);
+  }
+
+  return posts;
+}
+
+/**
+ * Recebe um edge do feed e retorna um objeto de post normalizado, ou null.
+ * Distingue entre post de marketplace e post regular.
+ */
+function parsePostFromEdge(edgeWrapper) {
+  if (!edgeWrapper.data) return null;
+
+  let node = edgeWrapper.data;
+  if (node.node) node = node.node;
+  else if (!node.post_id) return null;
+
+  node = cleanupResponseObject(node);
+
+  // Descarta posts patrocinados
+  if (findSponsoredData(node)) return null;
+
+  // Post de marketplace (repost)
+  if (hasMarketplaceListingSeller(node)) return parseMarketplacePost(node);
+
+  // Post regular (com texto ou imagem)
+  if (isRegularPost(node)) return parseRegularPost(node);
+
+  return null;
+}
+
+/**
+ * Verifica se o node é um post regular válido (com texto ou anexo visual).
+ */
+function isRegularPost(node) {
+  if (hasMarketplaceListingSeller(node)) return false;
+
+  const hasText =
+    node?.comet_sections?.content?.story?.message?.text ||
+    node?.comet_sections?.content?.story?.comet_sections?.message?.story
+      ?.message?.text;
+
+  if (hasText) return true;
+
+  const attachments = node?.comet_sections?.content?.story?.attachments;
+  if (!attachments || !Array.isArray(attachments)) return true;
+
+  for (const attachment of attachments) {
+    const att = attachment.styles?.attachment;
+    if (att) {
+      if (att.all_subattachments?.nodes?.length > 0) return true;
+      const media = att.media;
+      if (
+        media &&
+        (media.photo_image ||
+          media.image ||
+          media.viewer_image ||
+          media.thumbnailImage)
+      )
+        return true;
+    }
+    if (
+      attachment.media &&
+      (attachment.media.photo_image ||
+        attachment.media.image ||
+        attachment.media.viewer_image)
+    )
+      return true;
+    if (
+      attachment.target?.media &&
+      (attachment.target.media.photo_image || attachment.target.media.image)
+    )
+      return true;
+  }
+
+  return true;
+}
+
+/**
+ * Extrai dados de um post de marketplace (produto compartilhado no grupo).
+ */
+function parseMarketplacePost(node) {
+  const post = {
+    group_name: "Unknown",
+    group_id: "Unknown",
+    poster_name: "Unknown",
+    post_text: "",
+    images: [],
+    marketplace_text: "",
+    price: "Unknown",
+    location: "Unknown",
+    post_url: "",
+    marketplace_listing_url: "",
+    group_url: "",
+    user_profile_url: "",
+    post_id: "Unknown",
+    post_type: "marketplace_repost",
+    posted_unix: 0,
+  };
+
+  // Grupo
+  const groupNode =
+    node?.comet_sections?.context_layout?.story?.comet_sections?.title?.story
+      ?.to;
+  if (groupNode) {
+    post.group_name = decodeText(groupNode.name || "Unknown");
+    post.group_id = groupNode.id || "Unknown";
+    post.group_url = groupNode.url || "";
+  } else {
+    log("[ERROR] No groupInfoNode found");
+  }
+
+  // Timestamp
+  const timestampStory =
+    node?.comet_sections?.context_layout?.story?.comet_sections?.metadata?.[1]
+      ?.story;
+  if (timestampStory) {
+    post.posted_unix = timestampStory.creation_time;
+  } else if (node?.comet_sections?.timestamp) {
+    post.posted_unix = node.comet_sections.timestamp;
+  } else if (node?.comet_sections?.timestamp?.story?.creation_time) {
+    post.posted_unix = node.comet_sections.timestamp.story.creation_time;
+  } else {
+    log("no TimeStampNode found in marketplace.");
+  }
+
+  // Autor
+  const actorNode = node?.comet_sections?.content?.story?.actors?.[0];
+  if (actorNode) {
+    post.poster_name = decodeText(actorNode.name || "Unknown");
+    post.user_profile_url = actorNode.url || "";
+  } else {
+    log("[ERROR] No ActorsNode found");
+  }
+
+  // Conteúdo do post
+  const contentStory = node?.comet_sections?.content?.story;
+  if (contentStory) {
+    if (contentStory.message?.text)
+      post.post_text = decodeText(contentStory.message.text);
+    if (contentStory.wwwURL) post.post_url = contentStory.wwwURL;
+    if (contentStory.post_id) post.post_id = contentStory.post_id;
+  } else {
+    log("[ERROR] No storyNode found");
+  }
+
+  // Anexos (imagens, preço, localização)
+  const attachments = node?.comet_sections?.content?.story?.attachments;
+  if (attachments && Array.isArray(attachments)) {
+    for (const attachment of attachments) {
+      const att = attachment.styles?.attachment;
+      if (!att) continue;
+
+      if (att.url) post.marketplace_listing_url = att.url;
+
+      if (att.all_subattachments?.nodes) {
+        for (const subNode of att.all_subattachments.nodes) {
+          if (subNode.media?.viewer_image?.uri)
+            post.images.push(subNode.media.viewer_image.uri);
+        }
+      }
+
+      if (att.title_with_entities?.text)
+        post.marketplace_text = decodeText(att.title_with_entities.text);
+
+      if (att.target) {
+        const target = att.target;
+        if (target.id)
+          post.marketplace_listing_url = `https://www.facebook.com/commerce/listing/${target.id}/`;
+        if (target.formatted_price?.text)
+          post.price = decodeText(target.formatted_price.text);
+        if (target.location_text?.text)
+          post.location = decodeText(target.location_text.text);
+      }
+    }
+  }
+
+  return post;
+}
+
+/**
+ * Extrai dados de um post regular (texto, imagens, vídeos).
+ */
+function parseRegularPost(node) {
+  const post = {
+    group_name: "Unknown",
+    group_id: "Unknown",
+    poster_name: "Unknown",
+    post_text: "",
+    images: [],
+    videos: [],
+    post_url: "",
+    group_url: "",
+    user_profile_url: "",
+    post_id: "Unknown",
+    post_type: "regular_post",
+    posted_unix: 0,
+  };
+
+  // Grupo
+  const groupNode =
+    node?.comet_sections?.context_layout?.story?.comet_sections?.title?.story
+      ?.to;
+  if (groupNode) {
+    post.group_name = decodeText(groupNode.name || "Unknown");
+    post.group_id = groupNode.id || "Unknown";
+    post.group_url = groupNode.url || "";
+  } else {
+    log("[ERROR] No node.to found");
+  }
+
+  // Autor
+  const actorNode = node?.comet_sections?.content?.story?.actors?.[0];
+  if (actorNode) {
+    post.poster_name = decodeText(actorNode.name || "Unknown");
+    post.user_profile_url = actorNode.url || "";
+  } else {
+    log("[ERROR] No ActorsNode found");
+  }
+
+  // Timestamp
+  const timestampStory =
+    node?.comet_sections?.context_layout?.story?.comet_sections?.metadata?.[1]
+      ?.story;
+  if (timestampStory?.creation_time) {
+    post.posted_unix = timestampStory.creation_time;
+  } else if (node?.comet_sections?.timestamp?.story?.creation_time) {
+    post.posted_unix = node.comet_sections.timestamp.story.creation_time;
+  } else {
+    log("No TimeStampNode found");
+  }
+
+  // Conteúdo
+  const contentStory = node?.comet_sections?.content?.story;
+  if (contentStory) {
+    if (contentStory.message?.text)
+      post.post_text = decodeText(contentStory.message.text);
+    if (contentStory.wwwURL) post.post_url = contentStory.wwwURL;
+    if (contentStory.post_id) post.post_id = contentStory.post_id;
+  }
+
+  // Anexos (imagens e vídeos)
+  const attachments = node?.comet_sections?.content?.story?.attachments;
+  if (attachments && Array.isArray(attachments)) {
+    for (const attachment of attachments) {
+      const att = attachment.styles?.attachment;
+      if (!att) continue;
+
+      if (att.all_subattachments?.nodes) {
+        for (const subNode of att.all_subattachments.nodes) {
+          if (
+            subNode.media?.viewer_image?.uri &&
+            subNode.media.__typename === "Photo"
+          ) {
+            post.images.push(subNode.media.viewer_image.uri);
+          }
+          const videoUrl =
+            subNode.media?.video_grid_renderer?.video
+              ?.videoDeliveryResponseFragment?.videoDeliveryResponseResult
+              ?.progressive_urls?.[0]?.progressive_url;
+          if (videoUrl && subNode.media.__typename === "Video") {
+            post.videos.push(videoUrl);
+          }
+        }
+      }
+
+      if (att.media?.photo_image?.uri)
+        post.images.push(att.media.photo_image.uri);
+      if (att.media?.__typename === "Video") {
+        const videoUrl =
+          att.media.videoDeliveryResponseFragment?.videoDeliveryResponseResult
+            ?.progressive_urls?.[0]?.progressive_url;
+        if (videoUrl) post.videos.push(videoUrl);
+      }
+    }
+  }
+
+  if (post.videos.length > 0) post.post_type = "video_post";
+  return post;
+}
+
+// ─────────────────────────────────────────────────────────────
+// LISTENERS DE MENSAGENS (comunicação com popup/content scripts)
+// ─────────────────────────────────────────────────────────────
+
+// Abre a página principal de debug ao clicar no ícone da extensão
+chrome.action.onClicked.addListener(() => {
+  chrome.tabs.create({ url: "index.html" });
+});
+
+// Notifica o front-end sobre atualizações disponíveis
+chrome.runtime.onUpdateAvailable.addListener((details) => {
+  chrome.runtime.sendMessage({
+    type: "updateAvailable",
+    version: details.version,
+  });
+});
+
+chrome.alarms.onAlarm.addListener(async (alarm) => {
+  if (alarm.name !== MONITOR_ALARM_NAME) return;
+
+  const runtime = await loadMonitorRuntime();
+  if (!runtime.running) return;
+
+  isMonitorRunning = true;
+  monitorWarmupDone = runtime.warmupDone;
+  if (runtime.config) monitorConfig = runtime.config;
+
+  void runPostMonitorCycle();
+});
+
+// Handler principal de mensagens
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  // ── resetBackgroundState ──────────────────────────────────
+  if (message.type === "resetBackgroundState") {
+    isFirstRun = true;
+    cutoffTimestamp = 0;
+    console.log(
+      "[INFO] Background state reset - firstrun set to true, cutoffUnix set to 0",
+    );
+    return true;
+  }
+
+  // ── getGroups ─────────────────────────────────────────────
+  if (message.type === "getGroups") {
+    (async () => {
+      try {
+        const authToken = await getAuthToken();
+        if (!authToken) {
+          sendResponse({
+            success: false,
+            error: "Not logged in. Please log in to Facebook and try again.",
+          });
+          return;
+        }
+
+        const result = await fetchFacebookGroups("", authToken);
+
+        if (
+          result &&
+          typeof result === "object" &&
+          !Array.isArray(result) &&
+          "noGroups" in result
+        ) {
+          sendResponse({ success: true, groups: [], noGroups: true });
+        } else {
+          const groups = Array.isArray(result) ? result : result?.groups || [];
+          sendResponse({ success: true, groups });
+        }
+      } catch (err) {
+        sendResponse({
+          success: false,
+          error: err.message || "UNKNOWN ERROR Please contact support",
+        });
+      }
+    })();
+    return true;
+  }
+
+  // ── startGroupsStream ─────────────────────────────────────
+  if (message.type === "startGroupsStream") {
+    if (isGroupsFetchRunning) {
+      sendResponse({
+        success: false,
+        error: "Busca de grupos já está em andamento.",
+      });
+      return true;
+    }
+
+    isGroupsFetchRunning = true;
+    shouldStopGroupsFetch = false;
+
+    (async () => {
+      try {
+        const authToken = await getAuthToken();
+        if (!authToken) {
+          chrome.runtime.sendMessage({
+            type: "groupsStreamDone",
+            success: false,
+            error: "Não foi possível obter token de autenticação.",
+          });
+          return;
+        }
+
+        const result = await fetchFacebookGroups("", authToken, 0, true);
+        const groups = Array.isArray(result) ? result : result?.groups || [];
+
+        chrome.runtime.sendMessage({
+          type: "groupsStreamDone",
+          success: true,
+          stopped: shouldStopGroupsFetch,
+          total: groups.length,
+        });
+      } catch (err) {
+        chrome.runtime.sendMessage({
+          type: "groupsStreamDone",
+          success: false,
+          error: err?.message || "Erro ao buscar grupos.",
+        });
+      } finally {
+        isGroupsFetchRunning = false;
+        shouldStopGroupsFetch = false;
+      }
+    })();
+
+    sendResponse({ success: true, started: true });
+    return true;
+  }
+
+  // ── stopGroupsStream ──────────────────────────────────────
+  if (message.type === "stopGroupsStream") {
+    shouldStopGroupsFetch = true;
+    sendResponse({ success: true, stopping: true });
+    return true;
+  }
+
+  // ── checkLogin ────────────────────────────────────────────
+  if (message.type === "checkLogin") {
+    (async () => {
+      try {
+        const { loggedIn, userId } = await fetchCurrentUserId();
+        sendResponse({ loggedIn, userId });
+      } catch (err) {
+        sendResponse({
+          loggedIn: false,
+          error: err.message || "UNKNOWN ERROR Please contact support",
+        });
+      }
+    })();
+    return true;
+  }
+
+  // ── getCreationDate ───────────────────────────────────────
+  if (message.type === "getCreationDate") {
+    (async () => {
+      try {
+        const result = await fetchProfileCreationDate();
+        if (result?.creationDate) {
+          sendResponse({ success: true, creationDate: result.creationDate });
+        } else {
+          sendResponse({ success: false });
+        }
+      } catch {
+        sendResponse({ success: false });
+      }
+    })();
+    return true;
+  }
+
+  // ── getLatestPosts ────────────────────────────────────────
+  if (message.type === "getLatestPosts") {
+    (async () => {
+      try {
+        const latestPosts = await fetchGroupFeedPosts();
+        chrome.runtime.sendMessage({
+          type: "take_profiles",
+          good: true,
+          latest_posts: latestPosts,
+        });
+      } catch (err) {
+        const errorMessage = await serializeError(err);
+        log(errorMessage);
+        log("Error: 0192019");
+        chrome.runtime.sendMessage({
+          type: "take_profiles",
+          good: false,
+          error_msg: errorMessage,
+        });
+      }
+    })();
+    return true;
+  }
+
+  // ── startPostMonitor ──────────────────────────────────────
+  if (message.type === "startPostMonitor") {
+    if (isMonitorRunning) {
+      sendResponse({
+        success: false,
+        error: "Monitor já está em execução.",
+      });
+      return true;
+    }
+
+    const payload = message.payload || {};
+    monitorConfig = {
+      selectedGroupIds: Array.isArray(payload.selectedGroupIds)
+        ? payload.selectedGroupIds.map((v) => String(v))
+        : [],
+      positiveKeywords: normalizeKeywordList(payload.positiveKeywords),
+      negativeKeywords: normalizeKeywordList(payload.negativeKeywords),
+      profileName: String(payload.profileName || "").trim(),
+      minMinutes: Number(payload.minMinutes) || 3,
+      maxMinutes: Number(payload.maxMinutes) || 7,
+    };
+
+    (async () => {
+      try {
+        isFirstRun = true;
+        cutoffTimestamp = 0;
+        monitorWarmupDone = false;
+        isMonitorRunning = true;
+        await saveMonitorRuntime();
+        chrome.alarms.clear(MONITOR_ALARM_NAME);
+
+        chrome.runtime.sendMessage({
+          type: "monitorState",
+          running: true,
+          profileName: monitorConfig.profileName,
+        });
+
+        void runPostMonitorCycle();
+        sendResponse({ success: true, running: true });
+      } catch (err) {
+        sendResponse({
+          success: false,
+          error: err?.message || "Falha ao iniciar monitor.",
+        });
+      }
+    })();
+    return true;
+  }
+
+  // ── stopPostMonitor ───────────────────────────────────────
+  if (message.type === "stopPostMonitor") {
+    (async () => {
+      await stopPostMonitor(true);
+      sendResponse({ success: true, running: false });
+    })();
+    return true;
+  }
+
+  // ── getPostMonitorState ───────────────────────────────────
+  if (message.type === "getPostMonitorState") {
+    (async () => {
+      const runtime = await loadMonitorRuntime();
+      sendResponse({
+        success: true,
+        running: runtime.running || isMonitorRunning,
+        config: runtime.config || monitorConfig,
+      });
+    })();
+    return true;
+  }
+
+  // ── getLeadHistory ────────────────────────────────────────
+  if (message.type === "getLeadHistory") {
+    (async () => {
+      try {
+        const leads = await getLeadsHistory();
+        sendResponse({ success: true, leads });
+      } catch (err) {
+        sendResponse({
+          success: false,
+          error: err?.message || "Falha ao carregar histórico de leads.",
+        });
+      }
+    })();
+    return true;
+  }
+
+  // ── clearLeadHistory ──────────────────────────────────────
+  if (message.type === "clearLeadHistory") {
+    (async () => {
+      try {
+        await chrome.storage.local.set({ [LEADS_HISTORY_STORAGE_KEY]: [] });
+        sendResponse({ success: true });
+      } catch (err) {
+        sendResponse({
+          success: false,
+          error: err?.message || "Falha ao limpar histórico de leads.",
+        });
+      }
+    })();
+    return true;
+  }
+
+  // ── checkWebhookPermission ────────────────────────────────
+  if (message.type === "checkWebhookPermission") {
+    const webhookUrl = message.webhookUrl;
+
+    const grantPermission = (granted) => sendResponse({ granted });
+
+    chrome.permissions.contains({ origins: [webhookUrl] }, (alreadyGranted) => {
+      if (alreadyGranted) {
+        grantPermission(true);
+        return;
+      }
+
+      log("permission not granted");
+
+      const isValidUrl = (url) => {
+        try {
+          const parsed = new URL(url);
+          return ["http:", "https:"].includes(parsed.protocol);
+        } catch {
+          return false;
+        }
+      };
+
+      if (!isValidUrl(webhookUrl)) {
+        log("Invalid webhook URL");
+        grantPermission(false);
+        return;
+      }
+
+      chrome.permissions.request({ origins: [webhookUrl] }, (granted) => {
+        if (granted) {
+          log(`Permission granted for ${webhookUrl}`);
+          grantPermission(true);
+        } else {
+          log(`Permission denied for ${webhookUrl}`);
+          grantPermission(false);
+        }
+      });
+    });
+
+    return true;
+  }
+});

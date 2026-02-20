@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FB Groups - Selecao</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        font-family: "Segoe UI", Tahoma, sans-serif;
+        background: #0b1220;
+        color: #e5e7eb;
+        min-height: 100vh;
+        padding: 20px;
+      }
+      .wrap { max-width: 1200px; margin: 0 auto; }
+      h1 { font-size: 22px; margin-bottom: 12px; }
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+        margin-bottom: 12px;
+      }
+      .btn {
+        border: 0;
+        border-radius: 8px;
+        padding: 9px 14px;
+        font-size: 13px;
+        cursor: pointer;
+        color: #fff;
+      }
+      .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+      .btn-blue { background: #2563eb; }
+      .btn-red { background: #dc2626; }
+      .btn-green { background: #16a34a; }
+      .btn-gray { background: #374151; }
+      .stat { font-size: 13px; color: #93c5fd; }
+      .stat-ok { color: #86efac; }
+      #groupsGrid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+        gap: 10px;
+        margin-top: 14px;
+      }
+      .card {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        background: #111827;
+        border: 1px solid #1f2937;
+        border-radius: 10px;
+        padding: 10px;
+        cursor: pointer;
+      }
+      .card.selected {
+        border-color: #22c55e;
+        background: #052e16;
+      }
+      .card img {
+        width: 40px;
+        height: 40px;
+        border-radius: 8px;
+        object-fit: cover;
+        flex-shrink: 0;
+      }
+      .name {
+        font-size: 13px;
+        font-weight: 600;
+        color: #f8fafc;
+      }
+      .meta {
+        font-size: 11px;
+        color: #9ca3af;
+        margin-top: 2px;
+      }
+      #log {
+        margin-top: 14px;
+        background: #020617;
+        border: 1px solid #1e293b;
+        border-radius: 8px;
+        padding: 10px;
+        min-height: 80px;
+        max-height: 200px;
+        overflow-y: auto;
+        font-family: monospace;
+        font-size: 12px;
+      }
+      .line { margin-bottom: 4px; }
+      .ok { color: #86efac; }
+      .err { color: #fca5a5; }
+      .info { color: #93c5fd; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>Selecao de Grupos para Notificacao</h1>
+      <div class="toolbar">
+        <button id="btnStart" class="btn btn-blue">Buscar Grupos</button>
+        <button id="btnStop" class="btn btn-red" disabled>Parar Busca</button>
+        <button id="btnSave" class="btn btn-green">Salvar Selecionados</button>
+        <button id="btnClear" class="btn btn-gray">Limpar Selecionados</button>
+        <span id="countTotal" class="stat">0 grupos carregados</span>
+        <span id="countSelected" class="stat stat-ok">0 selecionados</span>
+      </div>
+      <div id="groupsGrid"></div>
+      <div id="log"></div>
+    </div>
+    <script src="./groups.js" type="module"></script>
+  </body>
+</html>

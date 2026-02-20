@@ -1,39 +1,24 @@
 {
   "manifest_version": 3,
-  "name": "GrabClientsNow",
-  "version": "0.3.0",
-  "description": "A Chrome extension to watch Facebook groups and notify about new posts.",
-  "permissions": [
-    "storage",
-    "tabs",
-    "notifications",
-    "alarms",
-    "scripting",
-    "downloads",
-    "windows"
-  ],
+  "name": "FB Group Scraper",
+  "version": "1.0",
+  "description": "Scraper de grupos e posts do Facebook",
+  "permissions": ["storage", "tabs", "scripting", "alarms"],
   "host_permissions": [
     "https://www.facebook.com/*",
-    "https://web.facebook.com/*",
-    "https://m.facebook.com/*",
-    "https://*.supabase.co/*"
+    "https://web.facebook.com/*"
   ],
   "background": {
-    "service_worker": "background.mjs",
-    "type": "module"
+    "service_worker": "background.js"
   },
-  "action": { "default_title": "GrabClientsNow" },
-  "icons": { "128": "assets/icon.png" },
   "content_scripts": [
     {
-      "matches": [
-        "https://www.facebook.com/*",
-        "https://web.facebook.com/*",
-        "https://m.facebook.com/*"
-      ],
-
-      "js": ["content/injectToggleButton.js", "content/scraper.js"],
+      "matches": ["https://www.facebook.com/*", "https://web.facebook.com/*"],
+      "js": ["content_script.js"],
       "run_at": "document_idle"
     }
-  ]
+  ],
+  "action": {
+    "default_title": "FB Groups"
+  }
 }
