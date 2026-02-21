@@ -1,14 +1,20 @@
 {
   "manifest_version": 3,
-  "name": "FB Group Scraper",
-  "version": "1.0",
-  "description": "Scraper de grupos e posts do Facebook",
-  "permissions": ["storage", "tabs", "scripting", "alarms"],
+  "name": "GrabClientsNow",
+  "version": "1.0.0",
+  "description": "Monitor Facebook groups and capture leads in real time.",
+  "permissions": ["storage", "tabs", "scripting", "alarms", "notifications"],
   "host_permissions": [
     "https://www.facebook.com/*",
     "https://web.facebook.com/*",
     "https://*.supabase.co/*"
   ],
+  "icons": {
+    "16": "assets/icon.png",
+    "32": "assets/icon.png",
+    "48": "assets/icon.png",
+    "128": "assets/icon.png"
+  },
   "background": {
     "service_worker": "background.js"
   },
@@ -20,6 +26,12 @@
     }
   ],
   "action": {
-    "default_title": "FB Groups"
+    "default_title": "GrabClientsNow",
+    "default_icon": {
+      "16": "assets/icon.png",
+      "32": "assets/icon.png",
+      "48": "assets/icon.png",
+      "128": "assets/icon.png"
+    }
   }
 }

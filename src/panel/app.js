@@ -1,27 +1,23 @@
-function qs(id) {
-  return document.getElementById(id);
-}
-
-function qsa(selector) {
-  return Array.from(document.querySelectorAll(selector));
-}
-
-const STORAGE_SELECTED_GROUP_IDS_KEY = "selectedGroupIds";
-const STORAGE_MONITOR_CONFIG_KEY = "monitorConfig";
-const STORAGE_PROFILES_KEY = "savedProfiles";
-const STORAGE_LOADED_GROUPS_KEY = "loadedGroups";
-const STORAGE_GLOBAL_FREQUENCY_KEY = "globalMonitorFrequency";
-const STORAGE_LANGUAGE_KEY = "uiLanguage";
-const STORAGE_PLAN_STATE_KEY = "planState";
-const STORAGE_AUTH_SESSION_KEY = "authSession";
-const STORAGE_AUTH_EMAIL_KEY = "authEmail";
-const STORAGE_ONBOARDING_STATE_KEY = "onboardingState";
-const PLAN_CACHE_TTL_MS = 30 * 60 * 1000;
-
-// Fixed Supabase project config
-const SUPABASE_URL = "https://hfnwpzglvbzkvhrcwmet.supabase.co";
-const SUPABASE_ANON_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmbndwemdsdmJ6a3ZocmN3bWV0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MDY0NTMzOTAsImV4cCI6MjAyMjAyOTM5MH0.JeVIhCebEoMB81D43Yd0zS3yN-XF88Zkr4nVjEhpVSM";
+import { qs, qsa } from "./dom.js";
+import {
+  STORAGE_SELECTED_GROUP_IDS_KEY,
+  STORAGE_MONITOR_CONFIG_KEY,
+  STORAGE_PROFILES_KEY,
+  STORAGE_LOADED_GROUPS_KEY,
+  STORAGE_GLOBAL_FREQUENCY_KEY,
+  STORAGE_LANGUAGE_KEY,
+  STORAGE_PLAN_STATE_KEY,
+  STORAGE_AUTH_SESSION_KEY,
+  STORAGE_AUTH_EMAIL_KEY,
+  STORAGE_ONBOARDING_STATE_KEY,
+  STORAGE_NOTIFICATION_SETTINGS_KEY,
+  PLAN_CACHE_TTL_MS,
+  SUPABASE_URL,
+  SUPABASE_ANON_KEY,
+  PROFILE_WIZARD_STEPS,
+  ORB_STATES,
+} from "./constants.js";
+import { I18N } from "./i18n-dict.js";
 
 let selectedGroupIds = new Set();
 const lastLoadedGroups = new Map();
@@ -33,7 +29,7 @@ let leadsHistory = [];
 let orbStateTimeout = null;
 let currentLanguage = "en";
 let technicalLogEntries = [];
-let authPollingTimer = null;
+let postCheckoutPlanTimer = null;
 let sleepScheduleState = null;
 let onboardingState = "welcome";
 let fbConnectFailures = 0;
@@ -43,6 +39,9 @@ let onboardAlertFrequency = { min: 5, max: 10 };
 let globalMonitorFrequency = { min: 5, max: 10 };
 let onboardWatchKeywords = [];
 let onboardExcludeKeywords = [];
+let profileWatchKeywords = [];
+let profileExcludeKeywords = [];
+let isProfileBuilderOpen = true;
 let currentGuidedActions = [];
 let guidedCommandHistory = [];
 let guidedHistoryCursor = -1;
@@ -53,674 +52,19 @@ let onboardingGroupsProgress = {
   lastAnnouncedAt: 0,
 };
 let isCheckingFacebookLogin = false;
-const PROFILE_WIZARD_STEPS = [
-  "name",
-  "watch",
-  "exclude",
-  "summary",
-];
-let currentProfileWizardStep = "name";
-
-const ORB_STATES = [
-  "idle",
-  "connecting",
-  "monitoring",
-  "lead",
-  "error",
-  "fb-disconnected",
-  "paused",
-];
-
-const I18N = {
-  en: {
-    "brand.tagline": "Catch clients before your competitors do.",
-    "footer.fb_status": "FB status",
-    "footer.log": "</> Log",
-    "status.checking_fb": "checking Facebook session...",
-    "btn.upgrade": "Upgrade",
-    "btn.maybe_later": "Maybe later",
-    "btn.new": "New",
-    "btn.delete": "Delete",
-    "btn.check_login": "Check Login",
-    "btn.fetch_token": "Fetch Token",
-    "btn.all_tokens": "All Tokens",
-    "btn.profile_age": "Profile Age",
-    "common.checking": "Checking...",
-    "common.none": "None",
-    "tab.home": "🏠 Home",
-    "tab.groups": "👥 Groups",
-    "tab.alerts": "🎯 Alerts",
-    "tab.leads": "📌 Leads",
-    "tab.settings": "⚙️ Settings",
-    "tab.help": "❓ Help",
-    "hero.title": "Monitoring command center",
-    "hero.subtitle":
-      "Direct leads from Facebook groups. Zero fluff. Fast execution.",
-    "home.guided_setup": "Guided Setup",
-    "home.live_monitoring": "Live Monitoring",
-    "home.activity_log": "Activity Log",
-    "home.performance": "Performance Overview",
-    "home.system_idle": "System idle",
-    "home.system_running": "System running",
-    "home.top_groups": "Top groups by leads",
-    "home.weekly_trend": "Weekly trend",
-    "home.no_group_data": "No lead data yet.",
-    "home.leads_7d": "{count} leads in last 7 days",
-    "settings.diagnostics": "Diagnostics",
-    "groups.search": "Search groups...",
-    "groups.load": "Load groups",
-    "groups.load_title": "Load Groups",
-    "groups.stop": "Stop",
-    "groups.select_visible": "Select visible",
-    "groups.clear": "Clear",
-    "groups.title": "Groups",
-    "groups.show_selected_only": "show selected only",
-    "groups.no_match": "No groups match \"{term}\".",
-    "groups.no_loaded_auto": "No groups loaded yet. Loading will start automatically.",
-    "groups.loaded_count": "Loaded: {count}",
-    "groups.selected_count": "Selected: {count}",
-    "groups.visible_count": "{count} visible",
-    "groups.visible_for_count": "{count} visible for \"{term}\"",
-    "groups.no_groups_hint": "Looks like you're not in any groups, or Facebook didn't load them yet.",
-    "groups.no_visible_filters": "No groups visible with current filters.",
-    "groups.none_selected_yet": "No groups selected yet.",
-    "groups.select_at_least_one": "Select at least one group.",
-    "groups.selected_summary": "{count} selected: {names}",
-    "groups.count": "{count} group(s)",
-    "groups.select_group": "Select group",
-    "groups.fetching": "loading...",
-    "groups.error_short": "error",
-    "onboard.alert_title": "Configure your first alert",
-    "onboard.alert_subtitle": "One simple form. No tab switching.",
-    "onboard.alert_name_ph": "e.g. Photography clients",
-    "onboard.watch_title": "Watch for (positive keywords)",
-    "onboard.exclude_title": "Exclude words (negative keywords)",
-    "onboard.keyword_input_ph": "Type and press Enter or comma",
-    "onboard.after_setup_title": "After setup",
-    "onboard.after_setup_body":
-      "Check frequency, sleep schedule and notifications are configured in Settings.",
-    "onboard.groups_auto_hint": "Groups are loaded automatically when this step opens.",
-    "onboard.groups_loaded": "Loaded: {count}",
-    "onboard.groups_selected": "Selected: {count}",
-    "onboard.auto_loading": "Loading groups automatically...",
-    "onboard.keyword_min": "Keyword must have at least 2 characters.",
-    "onboard.keyword_max": "Maximum 20 keywords reached.",
-    "onboard.create_save_first": "Create and save one alert first.",
-    "onboard.monitoring_active_now": "Monitoring is active now.",
-    "onboard.ready_to_monitor": "Ready to monitor.",
-    "onboard.monitoring_control": "Monitoring Control",
-    "onboard.fb_prompt":
-      "Let's pull your groups, but first confirm: are you logged into Facebook on this device?",
-    "onboard.fb_checking": "Checking your Facebook login...",
-    "onboard.fb_not_connected":
-      "Facebook not connected yet. Please log in and try again.",
-    "onboard.fb_no_problem":
-      "No problem. Open Facebook, log in, then click 'Yes, I'm logged in'.",
-    "onboard.groups_pick":
-      "Perfect. Choose one or more groups below to monitor.",
-    "onboard.continue_bg_loading":
-      "Continuing with selected groups. Remaining groups keep loading in background.",
-    "onboard.select_group_first": "Select at least one group first.",
-    "onboard.alert_ready": "Great. You already have an active alert draft.",
-    "onboard.alert_create_first": "Create at least one alert to continue.",
-    "onboard.welcome1": "Hello! Welcome to GrabClientsNow.",
-    "onboard.welcome2": "I will help you set everything up in a few quick steps.",
-    "onboard.welcome_nudge": "Whenever you're ready — just click Get started.",
-    "onboard.connect1":
-      "First, I need Facebook open in another Chrome tab. That's how I access your groups — no password needed.",
-    "onboard.connect2":
-      "Done. Log in if needed, then come back here.",
-    "onboard.connect_fail":
-      "Still having trouble. Tab may be closed or session expired.",
-    "onboard.groups1":
-      "Which groups do you want to monitor? Select as many as you'd like.",
-    "onboard.alert1": "Now configure your first alert.",
-    "onboard.alert2":
-      "After this, you configure frequency, sleep schedule and notifications in Settings.",
-    "onboard.ready1": "You're live. I'll notify you the moment I find a match.",
-    "onboard.turn_on_monitoring": "Turn ON monitoring",
-    "onboard.turn_off_monitoring": "Turn OFF monitoring",
-    "onboard.watch_ph": "Watch for words (comma/new line)",
-    "onboard.exclude_ph": "Exclude words (comma/new line)",
-    "onboard.freq_default": "Frequency: every 5-10 min",
-    "profiles.builder": "Alert Builder",
-    "profiles.saved": "Saved Alerts",
-    "profiles.none_selected": "none selected",
-    "profiles.question_name": "What do you want to call this alert?",
-    "profiles.watch_ph":
-      "looking for, anyone recommend, need help with",
-    "profiles.exclude_ph": "Exclude words",
-    "profiles.skip_watch": "Skip - notify me about all posts",
-    "profiles.skip": "Skip",
-    "profiles.all_posts": "all posts",
-    "profiles.configured_in_settings": "configured in Settings",
-    "profiles.name_required": "Give this alert a name.",
-    "profiles.name_max_40": "Alert name max length is 40 characters.",
-    "profiles.hint_descriptive":
-      "Hint: use a descriptive name to find this alert faster.",
-    "profiles.duplicate_overwrite":
-      "Duplicate name detected. Overwriting alert \"{name}\".",
-    "profiles.saved_ok": "✅ Alert saved successfully.",
-    "profiles.select_to_delete": "Select an alert to delete.",
-    "profiles.removed": "🗑️ Alert removed.",
-    "profiles.none_saved": "No saved alerts.",
-    "profiles.active_label": "active",
-    "profiles.name_label": "Alert name",
-    "profiles.watch_label": "Watch for words",
-    "profiles.exclude_label": "Exclude words",
-    "profiles.frequency_label": "Check frequency",
-    "profiles.notify_label": "Notifications",
-    "monitor.select_alert": "Select an alert",
-    "monitor.start": "Start Monitoring",
-    "monitor.stop": "Stop Monitoring",
-    "monitor.idle": "idle",
-    "monitor.waiting": "waiting...",
-    "settings.language": "Language",
-    "settings.language_hint": "Applies instantly across the extension UI.",
-    "settings.account": "Account",
-    "settings.data": "Data",
-    "settings.debug": "Debug",
-    "help.title": "Help & Support",
-    "help.support_title": "Support Chat",
-    "help.support_body":
-      "Open live chat and include your technical log for faster support.",
-    "help.feature_title": "Suggest a Feature",
-    "help.feature_body": "Share your feature request directly by email.",
-    "help.partner_title": "Partnerships & Affiliates",
-    "help.partner_body":
-      "Business integrations, white-label or affiliate program inquiries.",
-    "help.support_cta": "Open live chat",
-    "help.feature_cta": "Send suggestion",
-    "help.partner_cta": "Contact team",
-    "help.aff_title": "Affiliate Program",
-    "help.aff_body": "Earn 50% commission per sale, no earnings cap.",
-    "help.aff_cta": "Join affiliate program",
-    "msg.log_copied": "Technical log copied to clipboard.",
-    "msg.log_copy_failed": "Failed to copy technical log: {error}",
-    "msg.history_cleared": "Lead history cleared.",
-    "msg.history_clear_failed": "Failed to clear lead history: {error}",
-    "msg.csv_soon": "CSV export will be enabled in a next phase.",
-    "msg.csv_empty": "No leads to export with current filters.",
-    "msg.csv_ok": "CSV exported with {count} lead(s).",
-    "msg.signed_out": "Signed out.",
-    "msg.sleep_saved": "Sleep schedule saved.",
-    "msg.sleep_save_failed": "Failed to save sleep schedule: {error}",
-    "msg.session_not_active":
-      "Session not active yet. Click the magic link and try again.",
-    "msg.upgrade_soon":
-      "Stripe upgrade flow integration will be enabled in a next phase.",
-    "status.monitoring": "monitoring...",
-    "status.stopped": "stopped",
-    "status.starting": "starting...",
-    "status.sleep_mode": "sleep mode",
-    "status.checking_now": "checking now...",
-    "status.next_check": "next check: ~{mins} min",
-    "status.waiting": "waiting...",
-    "status.logged": "Logged",
-    "status.not_logged": "Not logged",
-    "log.groups_loaded_so_far": "groups loaded so far: {count}",
-    "log.groups_stream_done":
-      "✅ Group fetch finished{stopped}. Total: {total}",
-    "log.stopped_suffix": " (stopped)",
-    "log.groups_stream_failed": "❌ groupsStream failed: {error}",
-    "log.monitor_stopped": "🛑 Monitoring stopped.",
-    "log.warmup_done": "⏱️ Warmup complete. Next check in ~{mins} min",
-    "log.checked_posts":
-      "⏱️ Checked {polled} posts, {matched} matches. Next in ~{mins} min",
-    "log.debug_cycle":
-      "📥 Debug cycle: {posts} post(s) in selected groups / {feed} total feed{profile}",
-    "log.monitor_error": "❌ Monitor error: {error}",
-    "log.posts_received":
-      "✅ {total} posts received ({selected} in selected groups)",
-    "log.new_matches": "🔔 {count} new match(es){profile}",
-    "log.no_new_posts_selected": "No new posts from selected groups.",
-    "log.logged_as_user": "✅ Logged in as userId={userId}",
-    "log.not_logged_facebook": "❌ Not logged in to Facebook",
-    "log.not_logged": "❌ Not logged in",
-    "log.fetching_token": "Fetching fb_dtsg...",
-    "log.token_not_found": "❌ token not found — are you logged into Facebook?",
-    "log.fetching_all_tokens": "Fetching all tokens...",
-    "log.token_missing": "❌ {key}: not found",
-    "log.error_generic": "❌ Error: {error}",
-    "log.user_id_short": "✅ userId={userId}",
-    "log.cycle_started": "Cycle started.",
-    "log.creation_date": "✅ Creation date: {date}",
-    "log.creation_date_failed": "❌ Could not fetch creation date",
-    "log.stop_groups_requested": "⏹️ Stop group fetch requested...",
-    "log.load_groups_first": "Load groups before selecting.",
-    "log.selection_saved": "Selection saved: visible groups marked.",
-    "log.selection_cleared": "Selection cleared.",
-    "log.select_alert_first": "Select an alert before starting monitoring.",
-    "log.alert_not_found": "Selected alert no longer exists. Choose another.",
-    "log.select_one_group_before_monitor":
-      "Select at least 1 group before starting monitoring.",
-    "log.start_monitor_failed": "❌ Failed to start monitoring: {error}",
-    "log.sleep_mode_active":
-      "🌙 Sleep mode active. Monitoring will resume automatically at the configured time.",
-    "log.sleep_mode_ended": "☀️ Sleep mode ended.",
-    "log.monitor_started": "✅ Monitoring started.",
-    "btn.back": "Back",
-    "btn.next": "Next",
-    "btn.save_alert": "Save Alert",
-    "btn.start_monitoring": "Start monitoring",
-    "kw.watch_for": "Watch for",
-    "kw.exclude_words": "Exclude words",
-    "leads.title": "Leads",
-    "leads.all_alerts": "All alerts",
-    "leads.filter_ph": "Filter by text/person/group",
-    "leads.selected_groups_only": "selected groups only",
-    "leads.count_7d": "{count} lead(s) in 7 days",
-    "leads.empty_7d": "No lead history (last 7 days).",
-    "leads.meta_profile": " • alert: {profile}",
-    "leads.link_post": "Post link",
-    "leads.link_person": "Person profile",
-    "leads.link_group": "Group link",
-    "leads.no_text": "(no text)",
-    "data.export_csv_soon": "Export CSV (soon)",
-    "data.clear_lead_history": "Clear Lead History",
-    "debug.view_technical_log": "View Technical Log",
-    "overlay.technical_log": "Technical Log",
-    "overlay.copy_all": "Copy all",
-    "overlay.clear": "Clear",
-    "overlay.close": "Close",
-    "overlay.empty": "[empty]",
-    "account.not_signed_in": "Not signed in",
-    "account.sign_out": "Sign out",
-    "settings.sleep_title": "Monitor Sleep Schedule",
-    "settings.sleep_note":
-      "Sleep schedule pauses monitoring during rest hours to reduce detection risk. Keep this ON for safer account behavior.",
-    "settings.sleep_enable": "Enable sleep schedule",
-    "settings.timezone_auto": "Timezone: auto",
-    "settings.timezone_label": "Timezone: {timezone}",
-    "settings.active_from": "Active from",
-    "settings.to": "to",
-    "settings.sleep_save": "Save Sleep Schedule",
-    "settings.frequency_title": "Check frequency (global)",
-    "settings.frequency_note":
-      "One global setting for all alerts. Lower intervals are faster but increase detection risk.",
-    "settings.freq_15_20_title": "🕐 Every 15-20 min",
-    "settings.freq_15_20_desc": "Most discreet · Safest option",
-    "settings.freq_5_10_title": "✅ Every 5-10 min",
-    "settings.freq_5_10_desc": "Recommended balance · Pro",
-    "settings.freq_3_5_title": "🔄 Every 3-5 min",
-    "settings.freq_3_5_desc": "Elevated risk · Pro",
-    "settings.freq_1_3_title": "⚡ Every 1-3 min",
-    "settings.freq_1_3_desc": "Highest risk · Pro",
-    "settings.frequency_current": "Current: every {min}-{max} min",
-    "settings.notifications_title": "Notifications (global)",
-    "settings.notifications_note":
-      "Applies to all alerts. You can combine multiple channels.",
-    "settings.notify_browser": "🔔 Browser notifications",
-    "settings.notify_webhook": "🔗 Webhook (Pro)",
-    "settings.notify_slack": "💬 Slack (Pro)",
-    "settings.notify_in_app": "🔕 In-app only",
-    "sugg.looking_for": "looking for",
-    "sugg.anyone_recommend": "anyone recommend",
-    "sugg.need_help_with": "need help with",
-    "sugg.best_blank": "best ___",
-    "sugg.looking_to_hire": "looking to hire",
-    "sugg.recommendations_for": "recommendations for",
-    "sugg.alternatives_to": "alternatives to",
-    "sugg.review": "review",
-    "sugg.selling": "selling",
-    "sugg.for_sale": "for sale",
-    "sugg.hiring": "hiring",
-    "sugg.job_post": "job post",
-    "sugg.spam": "spam",
-    "sugg.partnership": "partnership",
-    "plan.pro": "Pro active. Lifetime access unlocked.",
-    "plan.free": "Free plan active. Upgrade to unlock all features.",
-    "plan.trial": "Trial active. Ends in {time}.",
-    "plan.expired": "Trial expired. You're on free plan now.",
-    "auth.missing_config":
-      "Supabase config missing. Set SUPABASE_URL and SUPABASE_ANON_KEY in panel.js.",
-    "auth.title": "Welcome to GrabClientsNow",
-    "auth.copy": "Enter your email to get started.",
-    "auth.email_ph": "you@email.com",
-    "auth.continue": "Continue",
-    "auth.clicked_link": "I clicked the link",
-    "auth.resend": "Resend email",
-    "auth.change_email": "Use a different email",
-    "auth.magic_sent":
-      "Magic link sent. Check your email and click the sign-in link.",
-    "auth.checking": "Checking session...",
-    "auth.connected": "Signed in as {email}.",
-    "auth.invalid_email": "Enter a valid email address.",
-    "auth.new_user_local": "New email detected. Trial started locally, proceeding to onboarding.",
-    "plan.block_alerts": "Free plan allows only 1 alert.",
-    "plan.block_groups": "Free plan allows up to 3 groups per alert.",
-    "plan.block_keywords":
-      "Free plan limits: 5 watch words and 3 exclude words.",
-    "plan.block_frequency": "Free plan only allows 15–20 minute frequency.",
-  },
-  "pt-br": {
-    "brand.tagline": "Capture clientes antes dos seus concorrentes.",
-    "footer.fb_status": "Status FB",
-    "footer.log": "</> Log",
-    "status.checking_fb": "checando sessão do Facebook...",
-    "btn.upgrade": "Upgrade",
-    "btn.maybe_later": "Depois",
-    "btn.new": "Novo",
-    "btn.delete": "Excluir",
-    "btn.check_login": "Verificar Login",
-    "btn.fetch_token": "Buscar Token",
-    "btn.all_tokens": "Todos Tokens",
-    "btn.profile_age": "Idade do Perfil",
-    "common.checking": "Verificando...",
-    "common.none": "Nenhum",
-    "tab.home": "🏠 Início",
-    "tab.groups": "👥 Grupos",
-    "tab.alerts": "🎯 Alertas",
-    "tab.leads": "📌 Leads",
-    "tab.settings": "⚙️ Configurações",
-    "tab.help": "❓ Ajuda",
-    "hero.title": "Central de monitoramento",
-    "hero.subtitle": "Leads diretos de grupos do Facebook. Sem enrolação.",
-    "home.guided_setup": "Setup Guiado",
-    "home.live_monitoring": "Monitoramento Ao Vivo",
-    "home.activity_log": "Log de Atividade",
-    "home.performance": "Visão de Performance",
-    "home.system_idle": "Sistema parado",
-    "home.system_running": "Sistema rodando",
-    "home.top_groups": "Top grupos por leads",
-    "home.weekly_trend": "Tendência semanal",
-    "home.no_group_data": "Sem dados de leads ainda.",
-    "home.leads_7d": "{count} leads nos últimos 7 dias",
-    "settings.diagnostics": "Diagnóstico",
-    "groups.search": "Buscar grupos...",
-    "groups.load": "Carregar grupos",
-    "groups.select_visible": "Selecionar visíveis",
-    "groups.clear": "Limpar",
-    "onboard.alert_title": "Configure seu primeiro alerta",
-    "onboard.alert_name_ph": "ex.: Clientes de fotografia",
-    "onboard.watch_ph": "Include words (vírgula ou linha)",
-    "onboard.exclude_ph": "Exclude words (vírgula ou linha)",
-    "onboard.freq_default": "Frequência: a cada 5-10 min",
-    "profiles.builder": "Construtor de Alertas",
-    "profiles.saved": "Alertas Salvos",
-    "profiles.name_label": "Nome do alerta",
-    "profiles.watch_label": "Include words",
-    "profiles.exclude_label": "Exclude words",
-    "profiles.frequency_label": "Frequência de checagem",
-    "profiles.notify_label": "Notificações",
-    "monitor.select_alert": "Selecione um alerta",
-    "monitor.start": "Iniciar Monitoramento",
-    "monitor.stop": "Parar Monitoramento",
-    "settings.language": "Idioma",
-    "settings.language_hint":
-      "Aplicação instantânea em toda a interface da extensão.",
-    "settings.data": "Dados",
-    "settings.debug": "Debug",
-    "help.title": "Ajuda e Suporte",
-    "help.support_title": "Chat de Suporte",
-    "help.support_body":
-      "Abra o chat ao vivo e envie o log técnico para acelerar o suporte.",
-    "help.feature_title": "Sugerir Funcionalidade",
-    "help.feature_body":
-      "Envie sua sugestão de melhoria diretamente por e-mail.",
-    "help.partner_title": "Parcerias e Afiliados",
-    "help.partner_body":
-      "Integrações, white-label e dúvidas sobre o programa de afiliados.",
-    "help.support_cta": "Abrir chat ao vivo",
-    "help.feature_cta": "Enviar sugestão",
-    "help.partner_cta": "Falar com time",
-    "help.aff_title": "Programa de Afiliados",
-    "help.aff_body": "Ganhe 50% de comissão por venda, sem teto.",
-    "help.aff_cta": "Entrar no programa",
-    "msg.log_copied": "Log técnico copiado para a área de transferência.",
-    "msg.log_copy_failed": "Falha ao copiar log técnico: {error}",
-    "msg.history_cleared": "Histórico de leads limpo.",
-    "msg.history_clear_failed": "Falha ao limpar histórico de leads: {error}",
-    "msg.csv_soon": "Exportação CSV será ampliada na próxima fase.",
-    "msg.csv_empty": "Não há leads para exportar com os filtros atuais.",
-    "msg.csv_ok": "CSV exportado com {count} lead(s).",
-    "plan.pro": "Pro ativo. Acesso vitalício liberado.",
-    "plan.free": "Plano Free ativo. Faça upgrade para desbloquear tudo.",
-    "plan.trial": "Trial ativo. Termina em {time}.",
-    "plan.expired": "Trial expirado. Você está no plano Free.",
-    "auth.missing_config":
-      "Config do Supabase ausente. Defina SUPABASE_URL e SUPABASE_ANON_KEY no panel.js.",
-    "auth.title": "Bem-vindo ao GrabClientsNow",
-    "auth.copy": "Digite seu e-mail para começar.",
-    "auth.email_ph": "voce@email.com",
-    "auth.continue": "Continuar",
-    "auth.clicked_link": "Já cliquei no link",
-    "auth.resend": "Reenviar e-mail",
-    "auth.change_email": "Usar outro e-mail",
-    "auth.magic_sent":
-      "Link mágico enviado. Confira seu e-mail e clique para entrar.",
-    "auth.checking": "Verificando sessão...",
-    "auth.connected": "Conectado como {email}.",
-    "auth.invalid_email": "Informe um e-mail válido.",
-    "auth.new_user_local": "E-mail novo detectado. Trial iniciado localmente, seguindo para onboarding.",
-    "plan.block_alerts": "Plano Free permite apenas 1 alerta.",
-    "plan.block_groups": "Plano Free permite até 3 grupos por alerta.",
-    "plan.block_keywords": "Limites Free: 5 palavras include e 3 exclude.",
-    "plan.block_frequency":
-      "Plano Free permite apenas frequência de 15–20 min.",
-    "groups.load_title": "Carregar Grupos",
-    "groups.stop": "Parar",
-    "groups.title": "Grupos",
-    "groups.show_selected_only": "mostrar apenas selecionados",
-    "groups.no_match": "Nenhum grupo corresponde a \"{term}\".",
-    "groups.no_loaded_auto":
-      "Nenhum grupo carregado ainda. O carregamento começa automaticamente.",
-    "groups.loaded_count": "Carregados: {count}",
-    "groups.selected_count": "Selecionados: {count}",
-    "groups.visible_count": "{count} visível(is)",
-    "groups.visible_for_count": "{count} visível(is) para \"{term}\"",
-    "groups.no_groups_hint":
-      "Parece que você não está em grupos, ou o Facebook ainda não carregou.",
-    "groups.no_visible_filters": "Nenhum grupo visível com os filtros atuais.",
-    "groups.none_selected_yet": "Nenhum grupo selecionado ainda.",
-    "groups.select_at_least_one": "Selecione ao menos um grupo.",
-    "groups.selected_summary": "{count} selecionado(s): {names}",
-    "groups.count": "{count} grupo(s)",
-    "groups.select_group": "Selecionar grupo",
-    "groups.fetching": "carregando...",
-    "groups.error_short": "erro",
-    "onboard.alert_subtitle": "Um formulário simples. Sem trocar de aba.",
-    "onboard.watch_title": "Include words (palavras positivas)",
-    "onboard.exclude_title": "Exclude words (palavras negativas)",
-    "onboard.keyword_input_ph": "Digite e pressione Enter ou vírgula",
-    "onboard.after_setup_title": "Depois do setup",
-    "onboard.after_setup_body":
-      "Frequência, sleep schedule e notificações ficam em Configurações.",
-    "onboard.groups_auto_hint":
-      "Os grupos são carregados automaticamente quando esta etapa abre.",
-    "onboard.groups_loaded": "Carregados: {count}",
-    "onboard.groups_selected": "Selecionados: {count}",
-    "onboard.auto_loading": "Carregando grupos automaticamente...",
-    "onboard.keyword_min": "A palavra deve ter no mínimo 2 caracteres.",
-    "onboard.keyword_max": "Máximo de 20 palavras atingido.",
-    "onboard.create_save_first": "Crie e salve um alerta primeiro.",
-    "onboard.monitoring_active_now": "Monitoramento ativo agora.",
-    "onboard.ready_to_monitor": "Pronto para monitorar.",
-    "onboard.monitoring_control": "Controle de Monitoramento",
-    "onboard.fb_prompt":
-      "Vamos puxar seus grupos, mas antes confirme: você está logado no Facebook neste dispositivo?",
-    "onboard.fb_checking": "Verificando seu login no Facebook...",
-    "onboard.fb_not_connected":
-      "Facebook ainda não conectado. Faça login e tente novamente.",
-    "onboard.fb_no_problem":
-      "Sem problemas. Abra o Facebook, faça login e depois clique em 'Sim, estou logado'.",
-    "onboard.groups_pick":
-      "Perfeito. Escolha 1 ou mais grupos abaixo para monitorar.",
-    "onboard.continue_bg_loading":
-      "Continuando com os grupos já selecionados. O restante segue carregando em background.",
-    "onboard.select_group_first": "Selecione ao menos um grupo primeiro.",
-    "onboard.alert_ready": "Perfeito. Você já tem um rascunho de alerta ativo.",
-    "onboard.alert_create_first": "Crie pelo menos um alerta para continuar.",
-    "onboard.welcome1": "Hello! Bem-vindo ao GrabClientsNow.",
-    "onboard.welcome2": "Eu vou te ajudar no setup em poucos passos.",
-    "onboard.welcome_nudge": "Quando quiser, é só clicar em Começar.",
-    "onboard.connect1":
-      "Primeiro, preciso do Facebook aberto em outra aba do Chrome. Assim acesso seus grupos sem senha.",
-    "onboard.connect2":
-      "Feito. Faça login se precisar e volte aqui para continuar.",
-    "onboard.connect_fail":
-      "Ainda com problema. A aba pode estar fechada ou a sessão expirada.",
-    "onboard.groups1":
-      "Quais grupos você quer monitorar? Selecione quantos quiser.",
-    "onboard.alert1": "Agora configure seu primeiro alerta.",
-    "onboard.alert2":
-      "Depois você ajusta frequência, sleep schedule e notificações em Configurações.",
-    "onboard.ready1":
-      "Tudo certo, estou monitorando! Vou te avisar no momento em que eu encontrar um match.",
-    "onboard.turn_on_monitoring": "Ligar monitoramento",
-    "onboard.turn_off_monitoring": "Parar monitoramento",
-    "profiles.none_selected": "nenhum selecionado",
-    "profiles.question_name": "Como você quer chamar este alerta?",
-    "profiles.watch_ph":
-      "looking for, anyone recommend, need help with",
-    "profiles.exclude_ph": "Exclude words",
-    "profiles.skip_watch": "Pular - me notifique sobre todos os posts",
-    "profiles.skip": "Pular",
-    "profiles.all_posts": "todos os posts",
-    "profiles.configured_in_settings": "configurado em Configurações",
-    "profiles.name_required": "Dê um nome para este alerta.",
-    "profiles.name_max_40": "O nome do alerta deve ter no máximo 40 caracteres.",
-    "profiles.hint_descriptive":
-      "Dica: use um nome descritivo para achar esse alerta mais rápido.",
-    "profiles.duplicate_overwrite":
-      "Nome duplicado detectado. Sobrescrevendo alerta \"{name}\".",
-    "profiles.saved_ok": "✅ Alerta salvo com sucesso.",
-    "profiles.select_to_delete": "Selecione um alerta para excluir.",
-    "profiles.removed": "🗑️ Alerta removido.",
-    "profiles.none_saved": "Nenhum alerta salvo.",
-    "profiles.active_label": "ativo",
-    "monitor.idle": "parado",
-    "monitor.waiting": "aguardando...",
-    "settings.account": "Conta",
-    "msg.signed_out": "Sessão encerrada.",
-    "msg.sleep_saved": "Sleep schedule salvo.",
-    "msg.sleep_save_failed": "Falha ao salvar sleep schedule: {error}",
-    "msg.session_not_active":
-      "Sessão ainda não está ativa. Clique no link mágico e tente novamente.",
-    "msg.upgrade_soon":
-      "Integração de upgrade com Stripe será ligada na próxima fase.",
-    "status.monitoring": "monitorando...",
-    "status.stopped": "parado",
-    "status.starting": "iniciando...",
-    "status.sleep_mode": "modo repouso",
-    "status.checking_now": "checando agora...",
-    "status.next_check": "próxima checagem: ~{mins} min",
-    "status.waiting": "aguardando...",
-    "status.logged": "Logado",
-    "status.not_logged": "Não logado",
-    "log.groups_loaded_so_far": "grupos carregados até agora: {count}",
-    "log.groups_stream_done":
-      "✅ Busca de grupos finalizada{stopped}. Total: {total}",
-    "log.stopped_suffix": " (interrompida)",
-    "log.groups_stream_failed": "❌ groupsStream falhou: {error}",
-    "log.monitor_stopped": "🛑 Monitoramento parado.",
-    "log.warmup_done": "⏱️ Warmup concluído. Próxima checagem em ~{mins} min",
-    "log.checked_posts":
-      "⏱️ Checados {polled} posts, {matched} matches. Próxima em ~{mins} min",
-    "log.debug_cycle":
-      "📥 Debug ciclo: {posts} post(s) em grupos selecionados / {feed} total feed{profile}",
-    "log.monitor_error": "❌ Erro no monitor: {error}",
-    "log.posts_received":
-      "✅ {total} posts recebidos ({selected} em grupos selecionados)",
-    "log.new_matches": "🔔 {count} novo(s) match(es){profile}",
-    "log.no_new_posts_selected": "Nenhum post novo dos grupos selecionados.",
-    "log.logged_as_user": "✅ Logado como userId={userId}",
-    "log.not_logged_facebook": "❌ Não logado no Facebook",
-    "log.not_logged": "❌ Não logado",
-    "log.fetching_token": "Buscando fb_dtsg...",
-    "log.token_not_found": "❌ token não encontrado — está logado no Facebook?",
-    "log.fetching_all_tokens": "Buscando todos os tokens...",
-    "log.token_missing": "❌ {key}: não encontrado",
-    "log.error_generic": "❌ Erro: {error}",
-    "log.user_id_short": "✅ userId={userId}",
-    "log.cycle_started": "Ciclo iniciado.",
-    "log.creation_date": "✅ Data de criação: {date}",
-    "log.creation_date_failed": "❌ Não foi possível obter data de criação",
-    "log.stop_groups_requested": "⏹️ Parada da busca solicitada...",
-    "log.load_groups_first": "Busque os grupos antes de selecionar.",
-    "log.selection_saved": "Seleção salva: grupos visíveis marcados.",
-    "log.selection_cleared": "Seleção limpa.",
-    "log.select_alert_first": "Selecione um alerta antes de iniciar monitoramento.",
-    "log.alert_not_found":
-      "Alerta selecionado não existe mais. Escolha outro.",
-    "log.select_one_group_before_monitor":
-      "Selecione ao menos 1 grupo antes de iniciar monitoramento.",
-    "log.start_monitor_failed": "❌ Falha ao iniciar monitoramento: {error}",
-    "log.sleep_mode_active":
-      "🌙 Sleep mode ativo. Monitor será retomado automaticamente no horário configurado.",
-    "log.sleep_mode_ended": "☀️ Sleep mode finalizado.",
-    "log.monitor_started": "✅ Monitoramento iniciado.",
-    "btn.back": "Voltar",
-    "btn.next": "Próximo",
-    "btn.save_alert": "Salvar alerta",
-    "btn.start_monitoring": "Iniciar monitoramento",
-    "kw.watch_for": "Include words",
-    "kw.exclude_words": "Exclude words",
-    "leads.title": "Leads",
-    "leads.all_alerts": "Todos os alertas",
-    "leads.filter_ph": "Filtrar por texto/pessoa/grupo",
-    "leads.selected_groups_only": "somente grupos selecionados",
-    "leads.count_7d": "{count} lead(s) em 7 dias",
-    "leads.empty_7d": "Nenhum lead no histórico (últimos 7 dias).",
-    "leads.meta_profile": " • alerta: {profile}",
-    "leads.link_post": "Link do Post",
-    "leads.link_person": "Perfil da Pessoa",
-    "leads.link_group": "Link do Grupo",
-    "leads.no_text": "(sem texto)",
-    "data.export_csv_soon": "Exportar CSV (em breve)",
-    "data.clear_lead_history": "Limpar Histórico de Leads",
-    "debug.view_technical_log": "Ver Log Técnico",
-    "overlay.technical_log": "Log Técnico",
-    "overlay.copy_all": "Copiar tudo",
-    "overlay.clear": "Limpar",
-    "overlay.close": "Fechar",
-    "overlay.empty": "[vazio]",
-    "account.not_signed_in": "Não conectado",
-    "account.sign_out": "Sair",
-    "settings.sleep_title": "Monitor Sleep Schedule",
-    "settings.sleep_note":
-      "O sleep schedule pausa o monitoramento nas horas de descanso para reduzir risco de detecção. Deixe ligado para mais segurança.",
-    "settings.sleep_enable": "Ativar sleep schedule",
-    "settings.timezone_auto": "Timezone: automático",
-    "settings.timezone_label": "Timezone: {timezone}",
-    "settings.active_from": "Ativo de",
-    "settings.to": "até",
-    "settings.sleep_save": "Salvar Sleep Schedule",
-    "settings.frequency_title": "Frequência de checagem (global)",
-    "settings.frequency_note":
-      "Uma configuração global para todos os alertas. Intervalos menores são mais rápidos, mas aumentam o risco.",
-    "settings.freq_15_20_title": "🕐 A cada 15-20 min",
-    "settings.freq_15_20_desc": "Mais discreto · Mais seguro",
-    "settings.freq_5_10_title": "✅ A cada 5-10 min",
-    "settings.freq_5_10_desc": "Equilíbrio recomendado · Pro",
-    "settings.freq_3_5_title": "🔄 A cada 3-5 min",
-    "settings.freq_3_5_desc": "Risco elevado · Pro",
-    "settings.freq_1_3_title": "⚡ A cada 1-3 min",
-    "settings.freq_1_3_desc": "Maior risco · Pro",
-    "settings.frequency_current": "Atual: a cada {min}-{max} min",
-    "settings.notifications_title": "Notificações (global)",
-    "settings.notifications_note":
-      "Vale para todos os alertas. Você pode combinar múltiplos canais.",
-    "settings.notify_browser": "🔔 Notificações do navegador",
-    "settings.notify_webhook": "🔗 Webhook (Pro)",
-    "settings.notify_slack": "💬 Slack (Pro)",
-    "settings.notify_in_app": "🔕 Somente no app",
-    "sugg.looking_for": "procurando",
-    "sugg.anyone_recommend": "alguém recomenda",
-    "sugg.need_help_with": "preciso de ajuda com",
-    "sugg.best_blank": "melhor ___",
-    "sugg.looking_to_hire": "procurando contratar",
-    "sugg.recommendations_for": "recomendações para",
-    "sugg.alternatives_to": "alternativas para",
-    "sugg.review": "review",
-    "sugg.selling": "vendendo",
-    "sugg.for_sale": "à venda",
-    "sugg.hiring": "contratando",
-    "sugg.job_post": "vaga",
-    "sugg.spam": "spam",
-    "sugg.partnership": "parceria",
-  },
+let notificationSettings = {
+  notifyBrowser: true,
+  notifyWebhook: false,
+  notifyTelegram: false,
+  webhookUrl: "",
+  telegramChatId: "",
 };
+let currentProfileWizardStep = "name";
+const PLAN_SYNC_INTERVAL_MS = 60000;
+const PLAN_SYNC_FAILURE_BACKOFF_MS = 5 * 60 * 1000;
+const POST_CHECKOUT_PLAN_INTERVAL_MS = 30000;
+const POST_CHECKOUT_PLAN_WINDOW_MS = 5 * 60 * 1000;
+let nextPlanSyncAt = 0;
 
 function appendLog(logId, text, type = "") {
   const log = qs(logId);
@@ -813,12 +157,19 @@ function activateTab(tabName) {
     p.classList.toggle("active", p.dataset.panel === tabName);
   });
   if (tabName === "profiles") {
-    selectedProfileId = "";
-    qs("profileEditorName").value = "";
-    qs("profileEditorPositive").value = "";
-    qs("profileEditorNegative").value = "";
-    qs("profileEditorMin").value = String(globalMonitorFrequency.min);
-    qs("profileEditorMax").value = String(globalMonitorFrequency.max);
+    if (!selectedProfileId && savedProfiles.length) {
+      selectedProfileId = String(savedProfiles[0]?.id || "");
+    }
+    if (isProfileBuilderOpen && selectedProfileId && getProfileById(selectedProfileId)) {
+      selectProfile(selectedProfileId, false);
+    } else {
+      qs("profileEditorName").value = "";
+      qs("profileEditorPositive").value = "";
+      qs("profileEditorNegative").value = "";
+      qs("profileEditorMin").value = String(globalMonitorFrequency.min);
+      qs("profileEditorMax").value = String(globalMonitorFrequency.max);
+      syncProfileEditorChipsFromFields();
+    }
     currentProfileWizardStep = "name";
     renderProfiles();
     updateMonitorProfilePreview();
@@ -852,7 +203,6 @@ function deriveOnboardingStateFromContext() {
   if (isMonitorRunning) return "ready";
   if (savedProfiles.length > 0) return "ready";
   if (selectedGroupIds.size > 0) return "alert";
-  if (isFacebookConnected) return "groups";
   return "welcome";
 }
 
@@ -887,7 +237,7 @@ async function refreshOnboardingStateFromContext() {
 }
 
 function setHomeOperationalVisibility(show) {
-  ["cardMonitoring", "cardInsights"].forEach((id) => {
+  ["cardSystemState"].forEach((id) => {
     const el = qs(id);
     if (!el) return;
     el.classList.toggle("hidden", !show);
@@ -1128,6 +478,59 @@ function addOnboardKeyword(kind, rawValue) {
   return true;
 }
 
+function normalizeProfileKeyword(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function renderProfileKeywordChips(kind) {
+  const isWatch = kind === "watch";
+  const list = isWatch ? profileWatchKeywords : profileExcludeKeywords;
+  const container = qs(isWatch ? "profileWatchChips" : "profileExcludeChips");
+  const hidden = qs(isWatch ? "profileEditorPositive" : "profileEditorNegative");
+  if (!container || !hidden) return;
+
+  hidden.value = list.join(", ");
+  container.innerHTML = "";
+
+  list.forEach((kw, idx) => {
+    const chip = document.createElement("span");
+    chip.className = `tag-chip ${isWatch ? "pos" : "neg"}`;
+    chip.textContent = kw;
+    const close = document.createElement("button");
+    close.textContent = "×";
+    close.addEventListener("click", () => {
+      list.splice(idx, 1);
+      renderProfileKeywordChips(kind);
+      updateProfileKeywordPreview();
+    });
+    chip.appendChild(close);
+    container.appendChild(chip);
+  });
+}
+
+function syncProfileEditorChipsFromFields() {
+  profileWatchKeywords = parseKeywordsInput(qs("profileEditorPositive")?.value || "");
+  profileExcludeKeywords = parseKeywordsInput(qs("profileEditorNegative")?.value || "");
+  renderProfileKeywordChips("watch");
+  renderProfileKeywordChips("exclude");
+}
+
+function addProfileKeyword(kind, rawValue) {
+  const value = normalizeProfileKeyword(rawValue);
+  if (!value) return false;
+  if (value.length < 2) return false;
+
+  const isWatch = kind === "watch";
+  const list = isWatch ? profileWatchKeywords : profileExcludeKeywords;
+  const existing = list.findIndex((item) => normalizeProfileKeyword(item) === value);
+  if (existing >= 0) return false;
+
+  list.push(value);
+  renderProfileKeywordChips(kind);
+  updateProfileKeywordPreview();
+  return true;
+}
+
 function normalizeGuidedText(value) {
   return String(value || "")
     .toLowerCase()
@@ -1224,9 +627,7 @@ function renderOnboardingChat() {
   updateOnboardingWorkspaceVisibility();
   if (guidedCard) guidedCard.classList.toggle("guided-ready", showOperational);
   if (guidedTitle) {
-    guidedTitle.textContent = showOperational
-      ? translate("onboard.monitoring_control")
-      : translate("home.guided_setup");
+    guidedTitle.textContent = translate("home.guided_setup");
   }
   const guidedInput = qs("guidedPromptInput");
   if (guidedInput) {
@@ -1414,33 +815,6 @@ function renderOnboardingChat() {
           await setOnboardingState("ready");
         },
       },
-      {
-        label: currentLanguage === "pt-br" ? "Pular esta parte" : "Skip this part",
-        kind: "btn-gray",
-        icon: "⏭",
-        keywords: currentLanguage === "pt-br"
-          ? ["pular", "skip", "depois"]
-          : ["skip", "later", "continue"],
-        onClick: async () => {
-          const fallbackName =
-            currentLanguage === "pt-br"
-              ? `Alerta ${savedProfiles.length + 1}`
-              : `Alert ${savedProfiles.length + 1}`;
-          qs("onboardAlertName").value = String(qs("onboardAlertName")?.value || "").trim() || fallbackName;
-          onboardWatchKeywords = [];
-          onboardExcludeKeywords = [];
-          renderOnboardKeywordChips("watch");
-          renderOnboardKeywordChips("exclude");
-          qs("profileEditorName").value = qs("onboardAlertName").value;
-          qs("profileEditorPositive").value = "";
-          qs("profileEditorNegative").value = "";
-          qs("profileEditorMin").value = String(globalMonitorFrequency.min);
-          qs("profileEditorMax").value = String(globalMonitorFrequency.max);
-          const ok = await saveProfileFromEditor();
-          if (!ok) return;
-          await setOnboardingState("ready");
-        },
-      },
     ]);
     return;
   }
@@ -1449,22 +823,7 @@ function renderOnboardingChat() {
     ? translate("onboard.monitoring_active_now")
     : translate("onboard.ready_to_monitor"),
   );
-  setAgentActions([
-    {
-      label: isMonitorRunning
-        ? translate("onboard.turn_off_monitoring")
-        : translate("onboard.turn_on_monitoring"),
-      kind: `btn-green btn-monitor-main`,
-      icon: isMonitorRunning ? "⏹" : "▶",
-      keywords: currentLanguage === "pt-br"
-        ? ["monitorar", "ligar", "desligar", "iniciar", "parar"]
-        : ["monitoring", "turn on", "turn off", "start", "stop"],
-      onClick: () => {
-        if (isMonitorRunning) qs("btnStopMonitor").click();
-        else qs("btnStartMonitor").click();
-      },
-    },
-  ]);
+  setAgentActions([]);
 }
 
 async function loadLanguage() {
@@ -1486,6 +845,11 @@ async function setLanguage(nextLanguage) {
   updateSelectedGroupCount();
   renderProfileWizard();
   renderHomeInsights();
+  setMonitorState(
+    isMonitorRunning,
+    qs("monitorStatus")?.textContent ||
+      (isMonitorRunning ? translate("status.monitoring") : translate("status.stopped")),
+  );
 }
 
 function formatRemainingTime(ms) {
@@ -1514,6 +878,8 @@ function renderPlanBanner() {
   const banner = qs("planBanner");
   const text = qs("planBannerText");
   if (!banner || !text || !cachedPlanState) return;
+  const maybeLater = qs("btnPlanMaybeLater");
+  if (maybeLater) maybeLater.style.display = "";
 
   banner.classList.remove("show", "warn", "pro", "free");
   const now = Date.now();
@@ -1523,6 +889,7 @@ function renderPlanBanner() {
   if (plan === "pro") {
     banner.classList.add("show", "pro");
     text.textContent = translate("plan.pro");
+    setPlanLockVisible(false);
     return;
   }
 
@@ -1532,6 +899,7 @@ function renderPlanBanner() {
       text.textContent = translate("plan.trial", {
         time: formatRemainingTime(trialEnd - now),
       });
+      setPlanLockVisible(false);
       return;
     }
     banner.classList.add("show", "free");
@@ -1540,7 +908,15 @@ function renderPlanBanner() {
   }
 
   banner.classList.add("show", "free");
-  text.textContent = translate("plan.free");
+  text.textContent = translate("plan.expired");
+
+  if (maybeLater) {
+    maybeLater.style.display = "none";
+  }
+
+  if (!qs("authGate")?.classList.contains("show")) {
+    setPlanLockVisible(true);
+  }
 }
 
 function getSupabaseConfig() {
@@ -1570,6 +946,13 @@ function setAuthGateVisible(show) {
   const gate = qs("authGate");
   if (!gate) return;
   gate.classList.toggle("show", !!show);
+  if (show) setPlanLockVisible(false);
+}
+
+function setPlanLockVisible(show) {
+  const gate = qs("planLockGate");
+  if (!gate) return;
+  gate.classList.toggle("show", !!show);
 }
 
 function appendAuthGateLog(message, type = "info") {
@@ -1585,12 +968,11 @@ function authHeaders(config, bearer = "") {
   return headers;
 }
 
-async function sendMagicLink(email, createUser = true) {
+async function sendEmailOtpCode(email, createUser = true) {
   const config = getSupabaseConfig();
   if (!config.url || !config.anonKey) {
     throw new Error(translate("auth.missing_config"));
   }
-  const redirectTo = chrome.identity?.getRedirectURL?.("auth") || undefined;
   const response = await fetch(`${config.url}/auth/v1/otp`, {
     method: "POST",
     headers: authHeaders(config),
@@ -1598,13 +980,34 @@ async function sendMagicLink(email, createUser = true) {
       email,
       create_user: createUser,
       should_create_user: createUser,
-      options: redirectTo ? { email_redirect_to: redirectTo } : {},
+      options: {},
     }),
   });
   if (!response.ok) {
     const text = await response.text();
     throw new Error(text || `OTP request failed (${response.status})`);
   }
+}
+
+async function verifyEmailOtpCode(email, code) {
+  const config = getSupabaseConfig();
+  if (!config.url || !config.anonKey) {
+    throw new Error(translate("auth.missing_config"));
+  }
+  const response = await fetch(`${config.url}/auth/v1/verify`, {
+    method: "POST",
+    headers: authHeaders(config),
+    body: JSON.stringify({
+      email,
+      token: code,
+      type: "email",
+    }),
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || `OTP verify failed (${response.status})`);
+  }
+  return await response.json();
 }
 
 async function fetchAuthUser(accessToken) {
@@ -1616,6 +1019,55 @@ async function fetchAuthUser(accessToken) {
   });
   if (!response.ok) return null;
   return await response.json();
+}
+
+async function refreshAuthSessionToken(session) {
+  const config = getSupabaseConfig();
+  const refreshToken = String(session?.refreshToken || "").trim();
+  if (!config.url || !config.anonKey || !refreshToken) return null;
+
+  const response = await fetch(`${config.url}/auth/v1/token?grant_type=refresh_token`, {
+    method: "POST",
+    headers: authHeaders(config),
+    body: JSON.stringify({ refresh_token: refreshToken }),
+  });
+  if (!response.ok) return null;
+
+  const data = await response.json().catch(() => ({}));
+  const accessToken = String(data?.access_token || "").trim();
+  if (!accessToken) return null;
+
+  const next = {
+    ...session,
+    accessToken,
+    refreshToken: String(data?.refresh_token || refreshToken).trim(),
+    expiresAt: Number(data?.expires_in || 0)
+      ? Date.now() + Number(data.expires_in) * 1000
+      : Number(session?.expiresAt) || 0,
+    userId: String(data?.user?.id || session?.userId || "").trim(),
+    email: String(data?.user?.email || session?.email || "").trim(),
+    checkedAt: Date.now(),
+  };
+  await setAuthSession(next);
+  return next;
+}
+
+async function ensureActiveAuthSession() {
+  let session = await getAuthSession();
+  if (!session?.accessToken) return null;
+
+  const expiresAt = Number(session?.expiresAt) || 0;
+  const expiresSoon = expiresAt > 0 && expiresAt - Date.now() < 60 * 1000;
+  if (expiresSoon || !session?.userId) {
+    const refreshed = await refreshAuthSessionToken(session);
+    if (refreshed?.accessToken) session = refreshed;
+  }
+  if (!session?.userId) {
+    const ok = await checkAuthSessionFromSupabase();
+    if (!ok) return null;
+    session = await getAuthSession();
+  }
+  return session?.accessToken ? session : null;
 }
 
 async function fetchPlanFromCloud(userId, accessToken) {
@@ -1658,152 +1110,19 @@ function resolvePlanLevel() {
   const trialEnd = Number(cachedPlanState?.trialEnd) || 0;
   if (plan === "pro") return "pro";
   if (plan === "trial" && trialEnd > now) return "trial";
-  return "free";
+  return "blocked";
 }
 
 function enforcePlanForAlertSave(payload) {
   const level = resolvePlanLevel();
   if (level === "pro" || level === "trial") return { ok: true };
-  if (!selectedProfileId && savedProfiles.length >= 1) {
-    return { ok: false, error: translate("plan.block_alerts") };
-  }
-  if (
-    (payload.positiveKeywords || []).length > 5 ||
-    (payload.negativeKeywords || []).length > 3
-  ) {
-    return { ok: false, error: translate("plan.block_keywords") };
-  }
-  return { ok: true };
+  return { ok: false, error: translate("plan.locked_action") };
 }
 
 function enforcePlanForMonitorStart(payload) {
   const level = resolvePlanLevel();
   if (level === "pro" || level === "trial") return { ok: true };
-  if (
-    Array.isArray(payload.selectedGroupIds) &&
-    payload.selectedGroupIds.length > 3
-  ) {
-    return { ok: false, error: translate("plan.block_groups") };
-  }
-  if (Number(payload.minMinutes) < 15 || Number(payload.maxMinutes) < 15) {
-    return { ok: false, error: translate("plan.block_frequency") };
-  }
-  return { ok: true };
-}
-
-async function syncAlertsFromCloud() {
-  const session = await getAuthSession();
-  if (!session?.accessToken || !session?.userId) return;
-  const config = getSupabaseConfig();
-  if (!config.url || !config.anonKey) return;
-
-  const url = new URL(`${config.url}/rest/v1/alerts`);
-  url.searchParams.set("user_id", `eq.${session.userId}`);
-  url.searchParams.set(
-    "select",
-    "id,name,group_ids,watch_keywords,exclude_keywords,frequency_min,frequency_max,is_active",
-  );
-  const response = await fetch(url.toString(), {
-    method: "GET",
-    headers: authHeaders(config, session.accessToken),
-  });
-  if (!response.ok) return;
-  const rows = await response.json();
-  if (!Array.isArray(rows)) return;
-
-  const cloudProfiles = rows
-    .filter((r) => r.is_active !== false)
-    .map((r) => ({
-      id: String(r.id),
-      name: String(r.name || "Alert"),
-      positiveKeywords: Array.isArray(r.watch_keywords) ? r.watch_keywords : [],
-      negativeKeywords: Array.isArray(r.exclude_keywords)
-        ? r.exclude_keywords
-        : [],
-      minMinutes: Number(r.frequency_min) || 15,
-      maxMinutes: Number(r.frequency_max) || 20,
-      groupIds: Array.isArray(r.group_ids)
-        ? r.group_ids.map((v) => String(v))
-        : [],
-      updatedAt: String(r.updated_at || ""),
-    }));
-  const localMap = new Map(
-    savedProfiles.map((p) => [
-      String(p.id),
-      { ...p, updatedAt: String(p.updatedAt || "") },
-    ]),
-  );
-  const merged = new Map();
-  const localToPush = [];
-
-  for (const cloud of cloudProfiles) {
-    const local = localMap.get(cloud.id);
-    if (!local) {
-      merged.set(cloud.id, cloud);
-      continue;
-    }
-    const localTs = local.updatedAt ? new Date(local.updatedAt).getTime() : 0;
-    const cloudTs = cloud.updatedAt ? new Date(cloud.updatedAt).getTime() : 0;
-    if (localTs > cloudTs) {
-      merged.set(local.id, local);
-      localToPush.push(local);
-    } else {
-      merged.set(cloud.id, cloud);
-    }
-    localMap.delete(cloud.id);
-  }
-
-  for (const remainingLocal of localMap.values()) {
-    merged.set(remainingLocal.id, remainingLocal);
-    localToPush.push(remainingLocal);
-  }
-
-  savedProfiles = Array.from(merged.values());
-  await persistProfiles();
-  renderProfiles();
-  appendLog(
-    "logGeneral",
-    `Cloud sync: ${cloudProfiles.length} cloud / ${savedProfiles.length} merged alert(s).`,
-    "ok",
-  );
-
-  for (const profile of localToPush) {
-    await upsertAlertToCloud(profile);
-  }
-}
-
-async function upsertAlertToCloud(profile) {
-  const session = await getAuthSession();
-  const config = getSupabaseConfig();
-  if (
-    !session?.accessToken ||
-    !session?.userId ||
-    !config.url ||
-    !config.anonKey
-  )
-    return;
-
-  const payload = {
-    id: profile.id,
-    user_id: session.userId,
-    name: profile.name,
-    group_ids: Array.from(selectedGroupIds),
-    watch_keywords: profile.positiveKeywords || [],
-    exclude_keywords: profile.negativeKeywords || [],
-    frequency_min: Number(profile.minMinutes) || 15,
-    frequency_max: Number(profile.maxMinutes) || 20,
-    is_active: true,
-    updated_at: profile.updatedAt || new Date().toISOString(),
-  };
-
-  await fetch(`${config.url}/rest/v1/alerts`, {
-    method: "POST",
-    headers: {
-      ...authHeaders(config, session.accessToken),
-      Prefer: "resolution=merge-duplicates,return=representation",
-    },
-    body: JSON.stringify(payload),
-  });
+  return { ok: false, error: translate("plan.locked_action") };
 }
 
 function renderSleepDaysSelector(days = []) {
@@ -1821,18 +1140,34 @@ function renderSleepDaysSelector(days = []) {
   ];
   labels.forEach(({ day, label }) => {
     const wrap = document.createElement("label");
-    wrap.className = "muted";
-    wrap.style.display = "inline-flex";
-    wrap.style.alignItems = "center";
-    wrap.style.gap = "4px";
+    wrap.className = "sleep-day-chip";
     const input = document.createElement("input");
     input.type = "checkbox";
     input.className = "sleep-day";
     input.value = String(day);
     input.checked = days.includes(day);
+    const text = document.createElement("span");
+    text.className = "sleep-day-label";
+    text.textContent = label;
     wrap.appendChild(input);
-    wrap.appendChild(document.createTextNode(label));
+    wrap.appendChild(text);
     row.appendChild(wrap);
+  });
+}
+
+function syncSleepControlsUiState() {
+  const enabled = !!qs("sleepEnabled")?.checked;
+  const controls = qs("sleepControls");
+  if (controls) controls.classList.toggle("disabled", !enabled);
+
+  const ids = ["sleepStartTime", "sleepEndTime"];
+  ids.forEach((id) => {
+    const el = qs(id);
+    if (el) el.disabled = !enabled;
+  });
+
+  qsa(".sleep-day").forEach((el) => {
+    el.disabled = !enabled;
   });
 }
 
@@ -1872,30 +1207,7 @@ async function loadSleepScheduleUi() {
     renderSleepDaysSelector(
       Array.isArray(schedule.days) ? schedule.days : [1, 2, 3, 4, 5, 6, 0],
     );
-  });
-}
-
-async function deactivateAlertInCloud(alertId) {
-  const session = await getAuthSession();
-  const config = getSupabaseConfig();
-  if (
-    !session?.accessToken ||
-    !session?.userId ||
-    !config.url ||
-    !config.anonKey ||
-    !alertId
-  )
-    return;
-  const url = new URL(`${config.url}/rest/v1/alerts`);
-  url.searchParams.set("id", `eq.${alertId}`);
-  url.searchParams.set("user_id", `eq.${session.userId}`);
-  await fetch(url.toString(), {
-    method: "PATCH",
-    headers: authHeaders(config, session.accessToken),
-    body: JSON.stringify({
-      is_active: false,
-      updated_at: new Date().toISOString(),
-    }),
+    syncSleepControlsUiState();
   });
 }
 
@@ -1974,6 +1286,75 @@ function setButtonLoading(id, loading) {
   btn.textContent = loading ? `⏳ ${translate("status.waiting")}` : btn.dataset.label;
 }
 
+function syncHomeNextScanLabel() {
+  const nextScan = qs("homeNextScanStatus");
+  if (!nextScan) return;
+  nextScan.textContent = translate("home.next_scan_label", {
+    value: qs("monitorNextRun")?.textContent || translate("monitor.waiting"),
+  });
+}
+
+const runningUiActions = new Set();
+
+function extractUiErrorMessage(error) {
+  const raw = String(error?.message || error || "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!raw) return translate("common.none");
+  if (/failed to fetch|networkerror|network request failed/i.test(raw)) {
+    return currentLanguage === "pt-br"
+      ? "Falha de conexão. Verifique a internet e tente novamente."
+      : "Connection failed. Check your internet and try again.";
+  }
+  return raw.length > 180 ? `${raw.slice(0, 177)}...` : raw;
+}
+
+function logActionError(logId, error, key = "msg.action_failed") {
+  appendLog(logId, translate(key, { error: extractUiErrorMessage(error) }), "err");
+}
+
+async function runExclusiveAction(actionKey, handler) {
+  const key = String(actionKey || "").trim() || "action";
+  if (runningUiActions.has(key)) return false;
+  runningUiActions.add(key);
+  try {
+    await handler();
+    return true;
+  } finally {
+    runningUiActions.delete(key);
+  }
+}
+
+async function runButtonTask(options, handler) {
+  const {
+    buttonId = "",
+    actionKey = buttonId || "action",
+    busyText = `⏳ ${translate("common.checking")}`,
+    logId = "logGeneral",
+    errorKey = "msg.action_failed",
+    keepDisabledAfter = false,
+  } = options || {};
+
+  return runExclusiveAction(actionKey, async () => {
+    const btn = buttonId ? qs(buttonId) : null;
+    if (btn) {
+      if (!btn.dataset.label) btn.dataset.label = btn.textContent || "";
+      btn.disabled = true;
+      btn.textContent = busyText;
+    }
+    try {
+      await handler();
+    } catch (error) {
+      logActionError(logId, error, errorKey);
+    } finally {
+      if (btn && !keepDisabledAfter) {
+        btn.disabled = false;
+        btn.textContent = btn.dataset.label || btn.textContent;
+      }
+    }
+  });
+}
+
 function setGroupFetchState(running) {
   isGroupFetchRunning = running;
   qs("btnGetGroups").disabled = running;
@@ -1994,12 +1375,69 @@ function setMonitorState(running, label) {
   if (!running) {
     qs("monitorNextRun").textContent = translate("monitor.waiting");
   }
+  syncHomeNextScanLabel();
+  const headline = qs("systemStateHeadline");
+  if (headline) {
+    headline.textContent = running
+      ? translate("home.machine_on")
+      : translate("home.machine_off");
+    headline.classList.toggle("on", running);
+  }
+  const toggleBtn = qs("btnMainMonitorToggle");
+  if (toggleBtn) {
+    toggleBtn.textContent = running
+      ? translate("home.pause_monitoring")
+      : translate("home.start_monitoring_main");
+    toggleBtn.classList.toggle("btn-red", running);
+    toggleBtn.classList.toggle("btn-green", !running);
+  }
+  syncHomeNextScanLabel();
   renderHomeInsights();
 }
 
+function classifyMonitorError(rawError) {
+  const text = String(rawError || "").toLowerCase();
+
+  if (
+    text.includes("nenhuma aba do facebook aberta") ||
+    text.includes("sem resposta da aba do facebook") ||
+    text.includes("abra uma aba em facebook.com") ||
+    text.includes("facebook tab was closed")
+  ) {
+    return "fb_tab_missing";
+  }
+
+  if (
+    text.includes("não foi possível extrair os tokens") ||
+    text.includes("not logged in") ||
+    text.includes("session expired") ||
+    text.includes("sessão expir") ||
+    text.includes("please log in")
+  ) {
+    return "fb_login_required";
+  }
+
+  return "generic";
+}
+
 function updateSelectedGroupCount() {
-  qs("selectedGroupCount").textContent =
-    translate("groups.selected_count", { count: selectedGroupIds.size });
+  const selectedCount = qs("selectedGroupCount");
+  if (selectedCount) {
+    selectedCount.textContent =
+      translate("groups.selected_count", { count: selectedGroupIds.size });
+  }
+  const groupCount = qs("groupCount");
+  if (groupCount) {
+    groupCount.textContent = translate("groups.monitored_count", {
+      count: selectedGroupIds.size,
+    });
+  }
+  const homeGroups = qs("homeGroupsMonitored");
+  if (homeGroups) {
+    homeGroups.textContent = translate("home.checking_groups", {
+      count: selectedGroupIds.size,
+    });
+  }
   const summary = qs("groupsSelectionSummary");
   if (summary) {
     summary.textContent = selectedGroupIds.size
@@ -2031,6 +1469,24 @@ function renderHomeInsights() {
 
   const recent = Array.isArray(leadsHistory) ? leadsHistory : [];
   summary.textContent = translate("home.leads_7d", { count: recent.length });
+  const lastLead = qs("homeLastLead");
+  if (lastLead) {
+    const lastTs = recent
+      .map((lead) => Number(lead?.detectedAt) || 0)
+      .filter((v) => v > 0)
+      .sort((a, b) => b - a)[0];
+    if (!lastTs) {
+      lastLead.textContent = translate("home.last_lead_none");
+    } else {
+      const diffMin = Math.max(1, Math.floor((Date.now() - lastTs) / 60000));
+      const value = diffMin < 60
+        ? `${diffMin}m`
+        : diffMin < 1440
+          ? `${Math.floor(diffMin / 60)}h`
+          : `${Math.floor(diffMin / 1440)}d`;
+      lastLead.textContent = translate("home.last_lead_time", { time: value });
+    }
+  }
 
   const byGroup = new Map();
   recent.forEach((lead) => {
@@ -2160,6 +1616,7 @@ async function persistSelectedGroupIds() {
   });
   updateSelectedGroupCount();
   applyGroupsVisibilityFilter();
+  if (onboardingState === "groups") return;
   void refreshOnboardingStateFromContext();
 }
 
@@ -2181,7 +1638,12 @@ async function loadPersistedGroups() {
     lastLoadedGroups.set(key, g);
     upsertGroupCard(g);
   });
-  qs("groupCount").textContent = translate("groups.count", { count: groups.length });
+  const groupCount = qs("groupCount");
+  if (groupCount) {
+    groupCount.textContent = translate("groups.monitored_count", {
+      count: selectedGroupIds.size,
+    });
+  }
 }
 
 function fallbackAvatarDataUri() {
@@ -2297,13 +1759,50 @@ function firstNonEmpty(...values) {
   return "";
 }
 
-function buildLink(label, href) {
+const LEAD_TEXT_TRUNCATE_AT = 420;
+
+function buildLink(label, href, variant = "neutral") {
   const a = document.createElement("a");
   a.textContent = label;
   a.href = href;
   a.target = "_blank";
   a.rel = "noopener noreferrer";
+  a.className = `lead-link-btn ${variant}`;
   return a;
+}
+
+function buildLeadTextBlock(fullText) {
+  const wrap = document.createElement("div");
+  wrap.className = "lead-text-wrap";
+
+  const text = document.createElement("div");
+  text.className = "lead-text";
+  wrap.appendChild(text);
+
+  const normalizedText = String(fullText || "").trim();
+  const shouldTruncate = normalizedText.length > LEAD_TEXT_TRUNCATE_AT;
+  if (!shouldTruncate) {
+    text.textContent = normalizedText;
+    return wrap;
+  }
+
+  const truncated = `${normalizedText.slice(0, LEAD_TEXT_TRUNCATE_AT).trimEnd()}...`;
+  let expanded = false;
+  text.textContent = truncated;
+
+  const toggle = document.createElement("button");
+  toggle.type = "button";
+  toggle.className = "linklike lead-toggle";
+  toggle.textContent = translate("leads.show_more");
+  toggle.addEventListener("click", () => {
+    expanded = !expanded;
+    text.textContent = expanded ? normalizedText : truncated;
+    toggle.textContent = expanded
+      ? translate("leads.show_less")
+      : translate("leads.show_more");
+  });
+  wrap.appendChild(toggle);
+  return wrap;
 }
 
 function renderLeads() {
@@ -2351,28 +1850,31 @@ function renderLeads() {
     head.appendChild(left);
     head.appendChild(right);
 
-    const text = document.createElement("div");
-    text.className = "lead-text";
-    text.textContent = firstNonEmpty(
+    const leadText = firstNonEmpty(
       lead.post_text,
       lead.marketplace_text,
       translate("leads.no_text"),
     );
+    const textBlock = buildLeadTextBlock(leadText);
 
     const links = document.createElement("div");
     links.className = "lead-links";
     if (lead.post_url)
-      links.appendChild(buildLink(translate("leads.link_post"), lead.post_url));
+      links.appendChild(
+        buildLink(translate("leads.link_post"), lead.post_url, "post"),
+      );
     if (lead.user_profile_url) {
       links.appendChild(
-        buildLink(translate("leads.link_person"), lead.user_profile_url),
+        buildLink(translate("leads.link_person"), lead.user_profile_url, "person"),
       );
     }
     if (lead.group_url)
-      links.appendChild(buildLink(translate("leads.link_group"), lead.group_url));
+      links.appendChild(
+        buildLink(translate("leads.link_group"), lead.group_url, "group"),
+      );
 
     card.appendChild(head);
-    card.appendChild(text);
+    card.appendChild(textBlock);
     card.appendChild(links);
     list.appendChild(card);
   });
@@ -2422,6 +1924,7 @@ function parseKeywordsInput(value) {
 
 function renderKeywordPreview(targetId, keywords, kind) {
   const container = qs(targetId);
+  if (!container) return;
   container.innerHTML = "";
   if (!keywords.length) {
     const empty = document.createElement("div");
@@ -2546,24 +2049,34 @@ function setupOnboardingWorkspaceActions() {
     });
   }
   if (selectBtn) {
-    selectBtn.addEventListener("click", async () => {
-      const search = String(searchInput?.value || "")
-        .trim()
-        .toLowerCase();
-      for (const g of lastLoadedGroups.values()) {
-        const matches =
-          !search || String(g?.name || "").toLowerCase().includes(search);
-        if (matches) selectedGroupIds.add(String(g.id));
-      }
-      await persistSelectedGroupIds();
-      renderOnboardingGroupsList();
+    selectBtn.addEventListener("click", () => {
+      void runButtonTask(
+        { buttonId: "btnOnboardSelectVisible", actionKey: "onboardSelectVisible" },
+        async () => {
+          const search = String(searchInput?.value || "")
+            .trim()
+            .toLowerCase();
+          for (const g of lastLoadedGroups.values()) {
+            const matches =
+              !search || String(g?.name || "").toLowerCase().includes(search);
+            if (matches) selectedGroupIds.add(String(g.id));
+          }
+          await persistSelectedGroupIds();
+          renderOnboardingGroupsList();
+        },
+      );
     });
   }
   if (clearBtn) {
-    clearBtn.addEventListener("click", async () => {
-      selectedGroupIds.clear();
-      await persistSelectedGroupIds();
-      renderOnboardingGroupsList();
+    clearBtn.addEventListener("click", () => {
+      void runButtonTask(
+        { buttonId: "btnOnboardClearGroups", actionKey: "onboardClearGroups" },
+        async () => {
+          selectedGroupIds.clear();
+          await persistSelectedGroupIds();
+          renderOnboardingGroupsList();
+        },
+      );
     });
   }
   if (searchInput) {
@@ -2665,7 +2178,22 @@ function profileKeywordsSummary(profile) {
   return `${pos} ${translate("kw.watch_for").toLowerCase()} · ${neg} ${translate("kw.exclude_words").toLowerCase()}`;
 }
 
+function setProfileBuilderOpen(open) {
+  isProfileBuilderOpen = !!open;
+  const card = qs("profileBuilderCard");
+  if (!card) return;
+  card.style.display = isProfileBuilderOpen ? "" : "none";
+}
+
 function appendKeywordToEditor(targetId, value) {
+  if (targetId === "profileEditorPositive") {
+    addProfileKeyword("watch", value);
+    return;
+  }
+  if (targetId === "profileEditorNegative") {
+    addProfileKeyword("exclude", value);
+    return;
+  }
   const el = qs(targetId);
   if (!el) return;
   const current = String(el.value || "").trim();
@@ -2716,8 +2244,8 @@ function getWizardLocaleCopy() {
         ? "Máximo 40 caracteres."
         : "Maximum 40 characters.",
       watch: pt
-        ? "Dica: [Skip] aumenta bastante o volume."
-        : "Tip: [Skip] can generate high volume.",
+        ? "Inclua palavras que definem a intenção do lead."
+        : "Add words that represent real buyer intent.",
       exclude: pt
         ? "Use exclusões para reduzir ruído."
         : "Use exclude words to reduce noise.",
@@ -2727,34 +2255,27 @@ function getWizardLocaleCopy() {
     },
     btnBack: pt ? "Voltar" : "Back",
     btnNext: pt ? "Próximo" : "Next",
-    btnSave: pt ? "Salvar alerta" : "Save alert",
+    btnSave: translate("btn.create_alert"),
+    btnUpdate: translate("btn.save_changes"),
     btnStart: pt ? "Iniciar monitoramento" : "Start monitoring",
-    skipWatch: pt ? "Pular - me notifique sobre todos os posts" : "Skip - notify me about all posts",
-    skipExclude: pt ? "Pular" : "Skip",
     freeFrequencyLock: pt
       ? "Plano Free permite apenas 15-20 min."
       : "Free plan only allows 15-20 min.",
-    freeNotifyLock: pt
-      ? "Webhook e Slack são recursos Pro. Upgrade único, uso vitalício."
-      : "Webhook and Slack are Pro features. Upgrade once, use forever.",
-    skipWatchWarn: pt
-      ? "Você escolheu monitorar sem palavras include. Volume pode ficar alto."
-      : "You chose to monitor without watch words. Volume can be high.",
   };
 }
 
 function applyWizardPlanLocks() {
   const level = resolvePlanLevel();
-  const isFree = level === "free";
+  const isBlocked = level === "blocked";
 
   qsa(".freq-card").forEach((card) => {
     const proOnly = card.dataset.proOnly === "1";
-    card.classList.toggle("locked", isFree && proOnly);
+    card.classList.toggle("locked", isBlocked && proOnly);
     const title = card.querySelector(".title");
     if (!title) return;
     const existing = title.querySelector(".lock-badge");
     if (existing) existing.remove();
-    if (isFree && proOnly) {
+    if (isBlocked && proOnly) {
       const badge = document.createElement("span");
       badge.className = "lock-badge";
       badge.textContent = "Pro";
@@ -2762,22 +2283,10 @@ function applyWizardPlanLocks() {
     }
   });
 
-  ["notifyWebhookWrap", "notifySlackWrap"].forEach((id) => {
-    const wrap = qs(id);
-    if (!wrap) return;
-    wrap.classList.toggle("locked", isFree);
-  });
-
-  const notifyWebhook = qs("notifyWebhook");
-  const notifySlack = qs("notifySlack");
-  if (notifyWebhook) {
-    notifyWebhook.disabled = isFree;
-    if (isFree) notifyWebhook.checked = false;
-  }
-  if (notifySlack) {
-    notifySlack.disabled = isFree;
-    if (isFree) notifySlack.checked = false;
-  }
+  const notifyWebhookWrap = qs("notifyWebhookWrap");
+  const notifyTelegramWrap = qs("notifyTelegramWrap");
+  if (notifyWebhookWrap) notifyWebhookWrap.classList.remove("locked");
+  if (notifyTelegramWrap) notifyTelegramWrap.classList.remove("locked");
 }
 
 function updateProfileSummaryCard() {
@@ -2797,7 +2306,7 @@ function updateProfileSummaryCard() {
 
 function getDefaultFrequencyForPlan() {
   const level = resolvePlanLevel();
-  if (level === "free") return { min: 15, max: 20 };
+  if (level === "blocked") return { min: 15, max: 20 };
   return { min: 5, max: 10 };
 }
 
@@ -2846,19 +2355,19 @@ function renderGlobalFrequencyUi() {
   if (!cards.length || !hint) return;
 
   const level = resolvePlanLevel();
-  const isFree = level === "free";
+  const isBlocked = level === "blocked";
   cards.forEach((card) => {
     const min = Number(card.dataset.min) || 0;
     const max = Number(card.dataset.max) || 0;
     const proOnly = card.dataset.proOnly === "1";
-    card.classList.toggle("locked", isFree && proOnly);
+    card.classList.toggle("locked", isBlocked && proOnly);
     card.classList.toggle(
       "active",
       min === globalMonitorFrequency.min && max === globalMonitorFrequency.max,
     );
   });
 
-  if (isFree && globalMonitorFrequency.min < 15) {
+  if (isBlocked && globalMonitorFrequency.min < 15) {
     globalMonitorFrequency = { min: 15, max: 20 };
     cards.forEach((card) => {
       const min = Number(card.dataset.min) || 0;
@@ -2871,6 +2380,16 @@ function renderGlobalFrequencyUi() {
     min: globalMonitorFrequency.min,
     max: globalMonitorFrequency.max,
   });
+  hint.classList.remove("risk-safe", "risk-mid", "risk-high", "risk-danger");
+  if (globalMonitorFrequency.min >= 15) {
+    hint.classList.add("risk-safe");
+  } else if (globalMonitorFrequency.min >= 5) {
+    hint.classList.add("risk-mid");
+  } else if (globalMonitorFrequency.min >= 3) {
+    hint.classList.add("risk-high");
+  } else {
+    hint.classList.add("risk-danger");
+  }
   if (qs("profileEditorMin")) qs("profileEditorMin").value = String(globalMonitorFrequency.min);
   if (qs("profileEditorMax")) qs("profileEditorMax").value = String(globalMonitorFrequency.max);
   onboardAlertFrequency = {
@@ -2886,6 +2405,74 @@ function renderGlobalFrequencyUi() {
   }
 }
 
+function readNotificationSettingsFromUi() {
+  return {
+    notifyBrowser: !!qs("notifyBrowser")?.checked,
+    notifyWebhook: !!qs("notifyWebhook")?.checked,
+    notifyTelegram: !!qs("notifyTelegram")?.checked,
+    webhookUrl: String(qs("notifyWebhookUrl")?.value || "").trim(),
+    telegramChatId: String(qs("telegramChatId")?.value || "").trim(),
+  };
+}
+
+function applyNotificationSettingsToUi(settings) {
+  if (qs("notifyBrowser")) qs("notifyBrowser").checked = !!settings.notifyBrowser;
+  if (qs("notifyWebhook")) qs("notifyWebhook").checked = !!settings.notifyWebhook;
+  if (qs("notifyTelegram")) qs("notifyTelegram").checked = !!settings.notifyTelegram;
+  if (qs("notifyWebhookUrl")) qs("notifyWebhookUrl").value = settings.webhookUrl || "";
+  if (qs("telegramChatId")) qs("telegramChatId").value = settings.telegramChatId || "";
+}
+
+async function loadNotificationSettings() {
+  const data = await chrome.storage.local.get([STORAGE_NOTIFICATION_SETTINGS_KEY]);
+  const saved = data?.[STORAGE_NOTIFICATION_SETTINGS_KEY];
+  if (saved && typeof saved === "object") {
+    notificationSettings = {
+      ...notificationSettings,
+      ...saved,
+    };
+  }
+  applyNotificationSettingsToUi(notificationSettings);
+}
+
+async function persistNotificationSettings() {
+  const next = {
+    ...notificationSettings,
+    ...readNotificationSettingsFromUi(),
+  };
+  if (next.notifyWebhook && next.webhookUrl) {
+    const granted = await new Promise((resolve) => {
+      chrome.runtime.sendMessage(
+        { type: "checkWebhookPermission", webhookUrl: next.webhookUrl },
+        (response) => resolve(!!response?.granted),
+      );
+    });
+    if (!granted) {
+      appendLog("logGeneral", "Webhook permission denied.", "err");
+      next.notifyWebhook = false;
+      if (qs("notifyWebhook")) qs("notifyWebhook").checked = false;
+    }
+  }
+
+  notificationSettings = next;
+  await chrome.storage.local.set({
+    [STORAGE_NOTIFICATION_SETTINGS_KEY]: notificationSettings,
+  });
+  appendLog("logGeneral", translate("settings.save_notifications"), "ok");
+}
+
+function buildTestLeadPayload() {
+  return {
+    alert_name: "Test alert",
+    lead_name: "Jane Doe",
+    group: "B2B Entrepreneurs",
+    post_text: "Anyone recommend a photographer for an event?",
+    post_url: "https://www.facebook.com/",
+    matched_keywords: ["recommend", "photographer"],
+    detected_at: new Date().toISOString(),
+  };
+}
+
 function renderProfileWizard() {
   const copy = getWizardLocaleCopy();
   const step = currentProfileWizardStep;
@@ -2898,8 +2485,6 @@ function renderProfileWizard() {
   const btnNext = qs("btnProfileNextStep");
   const btnSave = qs("btnSaveProfile");
   const btnStart = qs("btnProfileStartMonitoring");
-  const btnSkipWatch = qs("btnProfileSkipWatch");
-  const btnSkipExclude = qs("btnProfileSkipExclude");
 
   if (pill) {
     pill.textContent = copy.stepLabel
@@ -2907,8 +2492,8 @@ function renderProfileWizard() {
       .replace("{total}", String(total));
   }
 
-  if (question) question.textContent = copy.questions[step] || "";
-  if (hint) hint.textContent = copy.hints[step] || "";
+  if (question) question.textContent = translate("profiles.builder_simple_title");
+  if (hint) hint.textContent = translate("profiles.builder_simple_hint");
 
   const stepMap = {
     name: "profileStepName",
@@ -2919,6 +2504,10 @@ function renderProfileWizard() {
   Object.entries(stepMap).forEach(([name, id]) => {
     const el = qs(id);
     if (!el) return;
+    if (name === "name" || name === "watch" || name === "exclude") {
+      el.classList.add("active");
+      return;
+    }
     el.classList.toggle("active", name === step);
   });
 
@@ -2928,10 +2517,8 @@ function renderProfileWizard() {
   if (btnStart) btnStart.style.display = step === "summary" ? "" : "none";
   if (btnPrev) btnPrev.textContent = copy.btnBack;
   if (btnNext) btnNext.textContent = copy.btnNext;
-  if (btnSave) btnSave.textContent = copy.btnSave;
+  if (btnSave) btnSave.textContent = selectedProfileId ? copy.btnUpdate : copy.btnSave;
   if (btnStart) btnStart.textContent = copy.btnStart;
-  if (btnSkipWatch) btnSkipWatch.textContent = copy.skipWatch;
-  if (btnSkipExclude) btnSkipExclude.textContent = copy.skipExclude;
 
   updateProfileNameCounter();
   updateProfileSummaryCard();
@@ -2961,6 +2548,10 @@ function validateCurrentProfileWizardStep() {
     }
   }
 
+  if (currentProfileWizardStep === "watch") {
+    // Watch keywords are optional: empty means monitor all posts.
+  }
+
   return true;
 }
 
@@ -2970,14 +2561,54 @@ function renderProfiles() {
 
   if (!savedProfiles.length) {
     list.innerHTML = `<div class="muted">${translate("profiles.none_saved")}</div>`;
+    setProfileBuilderOpen(true);
   } else {
+    setProfileBuilderOpen(isProfileBuilderOpen);
     savedProfiles.forEach((profile) => {
-      const item = document.createElement("div");
+      const watchList = Array.isArray(profile.positiveKeywords)
+        ? profile.positiveKeywords
+        : [];
+      const excludeList = Array.isArray(profile.negativeKeywords)
+        ? profile.negativeKeywords
+        : [];
+      const watchPreview = watchList.length
+        ? watchList.slice(0, 5).join(", ")
+        : translate("profiles.all_posts");
+      const excludePreview = excludeList.length
+        ? excludeList.slice(0, 5).join(", ")
+        : translate("common.none");
+      const item = document.createElement("details");
       item.className = `profile-item ${profile.id === selectedProfileId ? "active" : ""}`;
+      item.open = profile.id === selectedProfileId;
       item.innerHTML =
+        `<summary>` +
+        `<div class="profile-item-head">` +
         `<div class="title">${profile.name}</div>` +
-        `<div class="meta">${profileKeywordsSummary(profile)}</div>`;
-      item.addEventListener("click", () => {
+        `<div class="meta">${profileKeywordsSummary(profile)}</div>` +
+        `</div>` +
+        `</summary>` +
+        `<div class="profile-item-body">` +
+        `<div class="muted"><strong>${translate("kw.watch_for")}:</strong> ${watchPreview}</div>` +
+        `<div class="muted"><strong>${translate("kw.exclude_words")}:</strong> ${excludePreview}</div>` +
+        `<div class="profile-item-actions">` +
+        `<button class="btn btn-gray" type="button" data-action="edit">${translate("btn.edit")}</button>` +
+        `<button class="btn btn-red" type="button" data-action="delete">${translate("btn.delete")}</button>` +
+        `</div>` +
+        `</div>`;
+      item.querySelector('[data-action="edit"]')?.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        setProfileBuilderOpen(true);
+        selectProfile(profile.id, true);
+      });
+      item.querySelector('[data-action="delete"]')?.addEventListener("click", async (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        await deleteProfileById(profile.id);
+      });
+      item.querySelector("summary")?.addEventListener("click", (event) => {
+        event.preventDefault();
+        setProfileBuilderOpen(true);
         selectProfile(profile.id, true);
       });
       list.appendChild(item);
@@ -2985,15 +2616,21 @@ function renderProfiles() {
   }
 
   const select = qs("monitorProfileSelect");
-  const previous = select.value;
-  select.innerHTML = `<option value="">${translate("monitor.select_alert")}</option>`;
-  savedProfiles.forEach((profile) => {
-    const opt = document.createElement("option");
-    opt.value = profile.id;
-    opt.textContent = profile.name;
-    select.appendChild(opt);
-  });
-  select.value = selectedProfileId || previous || "";
+  const activeProfileId =
+    selectedProfileId && getProfileById(selectedProfileId)
+      ? selectedProfileId
+      : (savedProfiles[0]?.id ? String(savedProfiles[0].id) : "");
+  if (select) {
+    select.innerHTML = `<option value="">${translate("monitor.select_alert")}</option>`;
+    savedProfiles.forEach((profile) => {
+      const opt = document.createElement("option");
+      opt.value = profile.id;
+      opt.textContent = profile.name;
+      select.appendChild(opt);
+    });
+    select.value = activeProfileId;
+    select.disabled = savedProfiles.length === 0;
+  }
 
   const badge = qs("activeProfileBadge");
   const selected = getProfileById(selectedProfileId);
@@ -3001,16 +2638,13 @@ function renderProfiles() {
     ? `${translate("profiles.active_label")}: ${selected.name}`
     : translate("profiles.none_selected");
   renderLeads();
-  const current = getProfileById(selectedProfileId);
-  if (current) {
-    const nameInput = qs("profileEditorName");
-    if (nameInput) nameInput.value = String(current.name || "");
-  }
+  renderProfileWizard();
 }
 
 function selectProfile(profileId, syncMonitorFields) {
   selectedProfileId = profileId || "";
   const profile = getProfileById(selectedProfileId);
+  setProfileBuilderOpen(true);
 
   if (profile) {
     qs("profileEditorName").value = profile.name;
@@ -3034,12 +2668,48 @@ function selectProfile(profileId, syncMonitorFields) {
     updateFrequencyCardSelection(globalMonitorFrequency.min, globalMonitorFrequency.max);
   }
 
+  syncProfileEditorChipsFromFields();
   renderProfiles();
   updateMonitorProfilePreview();
   updateProfileKeywordPreview();
   updateProfileSummaryCard();
-  renderProfileWizard();
   void refreshOnboardingStateFromContext();
+}
+
+function resetProfileEditorDraft() {
+  selectedProfileId = "";
+  qs("profileEditorName").value = "";
+  qs("profileEditorPositive").value = "";
+  qs("profileEditorNegative").value = "";
+  if (qs("profileWatchInput")) qs("profileWatchInput").value = "";
+  if (qs("profileExcludeInput")) qs("profileExcludeInput").value = "";
+  qs("profileAdvancedBlock")?.removeAttribute("open");
+  qs("profileEditorMin").value = String(globalMonitorFrequency.min);
+  qs("profileEditorMax").value = String(globalMonitorFrequency.max);
+  updateFrequencyCardSelection(globalMonitorFrequency.min, globalMonitorFrequency.max);
+  syncProfileEditorChipsFromFields();
+}
+
+async function deleteProfileById(profileId) {
+  const targetId = String(profileId || "").trim();
+  if (!targetId) {
+    appendLog("logGeneral", translate("profiles.select_to_delete"), "warn");
+    return;
+  }
+
+  savedProfiles = savedProfiles.filter((p) => p.id !== targetId);
+  const wasSelected = selectedProfileId === targetId;
+  if (wasSelected) {
+    resetProfileEditorDraft();
+  }
+
+  await persistProfiles();
+  renderProfiles();
+  updateMonitorProfilePreview();
+  updateProfileKeywordPreview();
+  await persistMonitorConfigFromUi();
+  appendLog("logGeneral", translate("profiles.removed"), "warn");
+  await refreshOnboardingStateFromContext();
 }
 
 async function loadProfiles() {
@@ -3047,6 +2717,7 @@ async function loadProfiles() {
   savedProfiles = Array.isArray(data?.[STORAGE_PROFILES_KEY])
     ? data[STORAGE_PROFILES_KEY]
     : [];
+  isProfileBuilderOpen = savedProfiles.length === 0;
   renderProfiles();
 }
 
@@ -3128,8 +2799,6 @@ async function saveProfileFromEditor() {
   }
 
   await persistProfiles();
-  const profile = getProfileById(selectedProfileId);
-  if (profile) await upsertAlertToCloud(profile);
   selectProfile(selectedProfileId, true);
   appendLog("logGeneral", translate("profiles.saved_ok"), "ok");
   await refreshOnboardingStateFromContext();
@@ -3138,14 +2807,9 @@ async function saveProfileFromEditor() {
 }
 
 function setupProfileActions() {
-  qs("btnNewProfile").addEventListener("click", () => {
-    selectedProfileId = "";
-    qs("profileEditorName").value = "";
-    qs("profileEditorPositive").value = "";
-    qs("profileEditorNegative").value = "";
-    qs("profileEditorMin").value = String(globalMonitorFrequency.min);
-    qs("profileEditorMax").value = String(globalMonitorFrequency.max);
-    updateFrequencyCardSelection(globalMonitorFrequency.min, globalMonitorFrequency.max);
+  qs("btnNewProfile")?.addEventListener("click", () => {
+    resetProfileEditorDraft();
+    setProfileBuilderOpen(true);
     currentProfileWizardStep = "name";
     renderProfiles();
     updateMonitorProfilePreview();
@@ -3153,33 +2817,23 @@ function setupProfileActions() {
     renderProfileWizard();
   });
 
-  qs("btnSaveProfile").addEventListener("click", async () => {
-    await saveProfileFromEditor();
-  });
-
-  qs("btnDeleteProfile").addEventListener("click", async () => {
-    if (!selectedProfileId) {
-      appendLog("logGeneral", translate("profiles.select_to_delete"), "warn");
-      return;
-    }
-
-    const deletingId = selectedProfileId;
-    savedProfiles = savedProfiles.filter((p) => p.id !== selectedProfileId);
-    selectedProfileId = "";
-    qs("profileEditorName").value = "";
-    qs("profileEditorPositive").value = "";
-    qs("profileEditorNegative").value = "";
-    qs("profileEditorMin").value = String(globalMonitorFrequency.min);
-    qs("profileEditorMax").value = String(globalMonitorFrequency.max);
-    updateFrequencyCardSelection(globalMonitorFrequency.min, globalMonitorFrequency.max);
-    await persistProfiles();
-    await deactivateAlertInCloud(deletingId);
+  qs("btnCreateNewAlertGlobal")?.addEventListener("click", () => {
+    resetProfileEditorDraft();
+    setProfileBuilderOpen(true);
+    currentProfileWizardStep = "name";
     renderProfiles();
     updateMonitorProfilePreview();
     updateProfileKeywordPreview();
-    await persistMonitorConfigFromUi();
-    appendLog("logGeneral", translate("profiles.removed"), "warn");
-    await refreshOnboardingStateFromContext();
+    renderProfileWizard();
+  });
+
+  qs("btnSaveProfile").addEventListener("click", () => {
+    void runButtonTask(
+      { buttonId: "btnSaveProfile", actionKey: "saveProfile", logId: "logGeneral" },
+      async () => {
+        await saveProfileFromEditor();
+      },
+    );
   });
 
   qs("monitorProfileSelect").addEventListener("change", async (event) => {
@@ -3203,27 +2857,53 @@ function setupProfileActions() {
     goProfileWizardStep(1);
   });
 
-  qs("btnProfileStartMonitoring").addEventListener("click", async () => {
-    const ok = await saveProfileFromEditor();
-    if (!ok) return;
-    activateTab("home");
-    qs("btnStartMonitor").click();
-  });
-
-  qs("btnProfileSkipWatch").addEventListener("click", () => {
-    const copy = getWizardLocaleCopy();
-    appendLog("logGeneral", copy.skipWatchWarn, "warn");
-    if (currentProfileWizardStep === "watch") goProfileWizardStep(1);
-  });
-
-  qs("btnProfileSkipExclude").addEventListener("click", () => {
-    if (currentProfileWizardStep === "exclude") goProfileWizardStep(1);
+  qs("btnProfileStartMonitoring").addEventListener("click", () => {
+    void runButtonTask(
+      {
+        buttonId: "btnProfileStartMonitoring",
+        actionKey: "profileStartMonitoring",
+        busyText: `⏳ ${translate("status.starting")}`,
+        logId: "logGeneral",
+      },
+      async () => {
+        const ok = await saveProfileFromEditor();
+        if (!ok) return;
+        activateTab("home");
+        qs("btnStartMonitor").click();
+      },
+    );
   });
 
   qs("profileEditorName").addEventListener("input", () => {
     updateProfileNameCounter();
     updateProfileSummaryCard();
   });
+
+  const setupProfileTagInput = (inputId, kind) => {
+    const input = qs(inputId);
+    if (!input) return;
+    const flush = () => {
+      const raw = String(input.value || "").trim();
+      if (!raw) return;
+      const tokens = raw
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean);
+      tokens.forEach((token) => addProfileKeyword(kind, token));
+      input.value = "";
+    };
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === ",") {
+        event.preventDefault();
+        flush();
+      }
+    });
+    input.addEventListener("blur", flush);
+  };
+
+  setupProfileTagInput("profileWatchInput", "watch");
+  setupProfileTagInput("profileExcludeInput", "exclude");
+
 
   qsa(".profile-watch-suggestion").forEach((btn) => {
     btn.addEventListener("click", (event) => {
@@ -3246,7 +2926,7 @@ function setupProfileActions() {
       const copy = getWizardLocaleCopy();
       const level = resolvePlanLevel();
       const proOnly = card.dataset.proOnly === "1";
-      if (level === "free" && proOnly) {
+      if (level === "blocked" && proOnly) {
         appendLog("logGeneral", copy.freeFrequencyLock, "warn");
         const warning = qs("profileFrequencyWarning");
         if (warning) warning.textContent = copy.freeFrequencyLock;
@@ -3261,7 +2941,7 @@ function setupProfileActions() {
 
       const warning = qs("profileFrequencyWarning");
       const highRisk = min <= 5;
-      if (level === "free" && min < 15) {
+      if (level === "blocked" && min < 15) {
         if (warning) {
           warning.textContent = copy.freeFrequencyLock;
         }
@@ -3274,21 +2954,11 @@ function setupProfileActions() {
     });
   });
 
-  ["notifyBrowser", "notifyWebhook", "notifySlack", "notifyInApp"].forEach(
+  ["notifyBrowser", "notifyWebhook", "notifyTelegram"].forEach(
     (id) => {
       const el = qs(id);
       if (!el) return;
       el.addEventListener("change", () => {
-        const copy = getWizardLocaleCopy();
-        const level = resolvePlanLevel();
-        if (
-          level === "free" &&
-          (id === "notifyWebhook" || id === "notifySlack") &&
-          el.checked
-        ) {
-          el.checked = false;
-          appendLog("logGeneral", copy.freeNotifyLock, "warn");
-        }
         updateProfileSummaryCard();
       });
     },
@@ -3337,9 +3007,12 @@ chrome.runtime.onMessage.addListener((message) => {
       lastLoadedGroups.set(key, g);
       upsertGroupCard(g);
     });
-    qs("groupCount").textContent = translate("groups.count", {
-      count: message.count || lastLoadedGroups.size,
-    });
+    const groupCount = qs("groupCount");
+    if (groupCount) {
+      groupCount.textContent = translate("groups.monitored_count", {
+        count: selectedGroupIds.size,
+      });
+    }
     updateSelectedGroupCount();
     applyGroupsVisibilityFilter();
     void persistLoadedGroups();
@@ -3391,10 +3064,12 @@ chrome.runtime.onMessage.addListener((message) => {
       setOrbState("connecting");
       appendLog("logGeneral", message.message || translate("log.cycle_started"), "info");
       qs("monitorNextRun").textContent = translate("status.checking_now");
+      syncHomeNextScanLabel();
       return;
     }
     const mins = Math.round((Number(message.nextDelayMs) || 0) / 60000);
     qs("monitorNextRun").textContent = translate("status.next_check", { mins });
+    syncHomeNextScanLabel();
     if (message.warmup) {
       setOrbState("monitoring");
       appendLog(
@@ -3466,8 +3141,27 @@ chrome.runtime.onMessage.addListener((message) => {
   }
 
   if (message?.type === "monitorError") {
-    setOrbState("error");
-    appendLog("logPosts", translate("log.monitor_error", { error: message.error }), "err");
+    const kind = classifyMonitorError(message.error);
+    if (kind === "fb_tab_missing") {
+      setOrbState("fb-disconnected");
+      qs("monitorStatus").textContent = translate("status.fb_tab_missing");
+      qs("monitorStatus").style.color = "#ffb066";
+      qs("monitorNextRun").textContent = translate("status.open_facebook_hint");
+      syncHomeNextScanLabel();
+      appendLog("logPosts", translate("log.monitor_fb_tab_missing"), "warn");
+      appendLog("logPosts", translate("log.monitor_fb_action_open"), "info");
+    } else if (kind === "fb_login_required") {
+      setOrbState("fb-disconnected");
+      qs("monitorStatus").textContent = translate("status.fb_login_required");
+      qs("monitorStatus").style.color = "#ffb066";
+      qs("monitorNextRun").textContent = translate("status.open_facebook_hint");
+      syncHomeNextScanLabel();
+      appendLog("logPosts", translate("log.monitor_fb_login_required"), "warn");
+      appendLog("logPosts", translate("log.monitor_fb_action_open"), "info");
+    } else {
+      setOrbState("error");
+      appendLog("logPosts", translate("log.monitor_error", { error: message.error }), "err");
+    }
   }
 
   if (message?.type === "take_profiles") {
@@ -3521,6 +3215,14 @@ setupSidebarTooltips();
 setupOnboardingWorkspaceActions();
 setupProfileActions();
 renderProfileWizard();
+chrome.runtime.sendMessage({ type: "panelOpened" }, () => {
+  // no-op: background enforces single extension tab and may close this tab.
+});
+
+qs("btnMainMonitorToggle")?.addEventListener("click", () => {
+  if (isMonitorRunning) qs("btnStopMonitor")?.click();
+  else qs("btnStartMonitor")?.click();
+});
 
 chrome.runtime.sendMessage({ type: "checkLogin" }, (response) => {
   if (response?.loggedIn) {
@@ -3633,7 +3335,7 @@ qs("btnGetGroups").addEventListener("click", () => {
   renderGroupsLoadingSkeleton();
   lastLoadedGroups.clear();
   void chrome.storage.local.set({ [STORAGE_LOADED_GROUPS_KEY]: [] });
-  qs("groupCount").textContent = translate("groups.fetching");
+  qs("groupCount").textContent = translate("groups.loading_groups");
 
   chrome.runtime.sendMessage({ type: "startGroupsStream" }, (response) => {
     if (!response?.success) {
@@ -3655,77 +3357,96 @@ qs("btnStopGroups").addEventListener("click", () => {
   });
 });
 
-qs("btnSelectAllGroups").addEventListener("click", async () => {
-  if (!lastLoadedGroups.size) {
-    appendLog("logGeneral", translate("log.load_groups_first"), "warn");
-    return;
-  }
-  qsa("#groupsList .group-card").forEach((card) => {
-    if (card.style.display === "none") return;
-    const gid = String(card.dataset.groupId || "");
-    if (gid) selectedGroupIds.add(gid);
-  });
-  await persistSelectedGroupIds();
-  qsa(".group-select").forEach((el) => {
-    const card = el.closest(".group-card");
-    if (!card || card.style.display === "none") return;
-    el.checked = true;
-    card.classList.add("selected");
-  });
-  appendLog("logGeneral", translate("log.selection_saved"), "ok");
+qs("btnSelectAllGroups").addEventListener("click", () => {
+  void runButtonTask(
+    { buttonId: "btnSelectAllGroups", actionKey: "selectAllGroups", logId: "logGeneral" },
+    async () => {
+      if (!lastLoadedGroups.size) {
+        appendLog("logGeneral", translate("log.load_groups_first"), "warn");
+        return;
+      }
+      qsa("#groupsList .group-card").forEach((card) => {
+        if (card.style.display === "none") return;
+        const gid = String(card.dataset.groupId || "");
+        if (gid) selectedGroupIds.add(gid);
+      });
+      await persistSelectedGroupIds();
+      qsa(".group-select").forEach((el) => {
+        const card = el.closest(".group-card");
+        if (!card || card.style.display === "none") return;
+        el.checked = true;
+        card.classList.add("selected");
+      });
+      appendLog("logGeneral", translate("log.selection_saved"), "ok");
+    },
+  );
 });
 
-qs("btnClearGroupSelection").addEventListener("click", async () => {
-  selectedGroupIds.clear();
-  await persistSelectedGroupIds();
-  qsa(".group-select").forEach((el) => {
-    el.checked = false;
-    const card = el.closest(".group-card");
-    if (card) card.classList.remove("selected");
-  });
-  appendLog("logGeneral", translate("log.selection_cleared"), "warn");
+qs("btnClearGroupSelection").addEventListener("click", () => {
+  void runButtonTask(
+    { buttonId: "btnClearGroupSelection", actionKey: "clearGroupSelection", logId: "logGeneral" },
+    async () => {
+      selectedGroupIds.clear();
+      await persistSelectedGroupIds();
+      qsa(".group-select").forEach((el) => {
+        el.checked = false;
+        const card = el.closest(".group-card");
+        if (card) card.classList.remove("selected");
+      });
+      appendLog("logGeneral", translate("log.selection_cleared"), "warn");
+    },
+  );
 });
 
-qs("btnStartMonitor").addEventListener("click", async () => {
-  if (!selectedProfileId) {
-    appendLog(
-      "logPosts",
-      translate("log.select_alert_first"),
-      "warn",
-    );
-    return;
-  }
-  if (!getProfileById(selectedProfileId)) {
-    appendLog(
-      "logPosts",
-      translate("log.alert_not_found"),
-      "err",
-    );
-    return;
-  }
+qs("btnStartMonitor").addEventListener("click", () => {
+  void runButtonTask(
+    {
+      buttonId: "btnStartMonitor",
+      actionKey: "startMonitor",
+      busyText: `⏳ ${translate("status.starting")}`,
+      logId: "logPosts",
+      errorKey: "log.start_monitor_failed",
+    },
+    async () => {
+      if (!savedProfiles.length) {
+        appendLog("logPosts", translate("profiles.none_saved"), "warn");
+        return;
+      }
+      if (!selectedProfileId || !getProfileById(selectedProfileId)) {
+        const fallback = savedProfiles[0];
+        if (!fallback?.id) {
+          appendLog("logPosts", translate("log.select_alert_first"), "warn");
+          return;
+        }
+        selectProfile(String(fallback.id), true);
+      }
 
-  if (selectedGroupIds.size === 0) {
-    appendLog(
-      "logPosts",
-      translate("log.select_one_group_before_monitor"),
-      "warn",
-    );
-    return;
-  }
+      if (selectedGroupIds.size === 0) {
+        appendLog(
+          "logPosts",
+          translate("log.select_one_group_before_monitor"),
+          "warn",
+        );
+        return;
+      }
 
-  const payload = resolveMonitorPayload();
-  const planCheck = enforcePlanForMonitorStart(payload);
-  if (!planCheck.ok) {
-    appendLog("logPosts", planCheck.error, "warn");
-    return;
-  }
+      const payload = resolveMonitorPayload();
+      const planCheck = enforcePlanForMonitorStart(payload);
+      if (!planCheck.ok) {
+        appendLog("logPosts", planCheck.error, "warn");
+        return;
+      }
 
-  await persistMonitorConfigFromUi();
-  setMonitorState(true, translate("status.starting"));
+      await persistMonitorConfigFromUi();
+      setMonitorState(true, translate("status.starting"));
 
-  chrome.runtime.sendMessage(
-    { type: "startPostMonitor", payload },
-    (response) => {
+      const response = await new Promise((resolve) => {
+        chrome.runtime.sendMessage(
+          { type: "startPostMonitor", payload },
+          (reply) => resolve(reply || {}),
+        );
+      });
+
       if (!response?.success) {
         setMonitorState(false, translate("status.stopped"));
         appendLog(
@@ -3740,11 +3461,7 @@ qs("btnStartMonitor").addEventListener("click", async () => {
       if (response?.sleeping) {
         setMonitorState(false, translate("status.sleep_mode"));
         setOrbState("paused");
-        appendLog(
-          "logPosts",
-          translate("log.sleep_mode_active"),
-          "warn",
-        );
+        appendLog("logPosts", translate("log.sleep_mode_active"), "warn");
         return;
       }
       appendLog("logPosts", translate("log.monitor_started"), "ok");
@@ -3766,15 +3483,174 @@ async function updateAccountUi() {
   }
 }
 
-async function maybeRefreshPlanFromCloud() {
+async function maybeRefreshPlanFromCloud(force = false) {
   const session = await getAuthSession();
   if (!session?.accessToken || !session?.userId) return;
-  if (cachedPlanState && isPlanCacheFresh(cachedPlanState)) return;
-  const fresh = await fetchPlanFromCloud(session.userId, session.accessToken);
-  if (fresh) cachedPlanState = fresh;
+
+  const now = Date.now();
+  if (!force && now < nextPlanSyncAt) return;
+  if (!force && cachedPlanState && isPlanCacheFresh(cachedPlanState)) {
+    nextPlanSyncAt = now + PLAN_SYNC_INTERVAL_MS;
+    return;
+  }
+
+  try {
+    const fresh = await fetchPlanFromCloud(session.userId, session.accessToken);
+    if (fresh) {
+      cachedPlanState = fresh;
+      nextPlanSyncAt = now + PLAN_SYNC_INTERVAL_MS;
+    } else {
+      nextPlanSyncAt = now + PLAN_SYNC_FAILURE_BACKOFF_MS;
+    }
+  } catch (_) {
+    nextPlanSyncAt = now + PLAN_SYNC_FAILURE_BACKOFF_MS;
+  }
+
   renderPlanBanner();
   renderProfileWizard();
   renderGlobalFrequencyUi();
+}
+
+function stopPostCheckoutPlanWatch(logFinished = false) {
+  if (!postCheckoutPlanTimer) return;
+  clearInterval(postCheckoutPlanTimer);
+  postCheckoutPlanTimer = null;
+  if (logFinished) {
+    appendLog("logGeneral", translate("msg.payment_watch_finished"), "info");
+  }
+}
+
+async function checkPaymentStatusNow(logNoChange = true) {
+  appendLog("logGeneral", translate("msg.payment_checking"), "info");
+  const before = resolvePlanLevel();
+  await maybeRefreshPlanFromCloud(true);
+  const after = resolvePlanLevel();
+  if (after === "pro" && before !== "pro") {
+    appendLog("logGeneral", translate("msg.payment_confirmed"), "ok");
+    return true;
+  }
+  if (logNoChange) {
+    appendLog("logGeneral", translate("msg.payment_status_refreshed"), "info");
+  }
+  return after === "pro";
+}
+
+function startPostCheckoutPlanWatch() {
+  stopPostCheckoutPlanWatch(false);
+  const startedAt = Date.now();
+  appendLog("logGeneral", translate("msg.payment_watch_started"), "info");
+  void checkPaymentStatusNow(false).then((isPro) => {
+    if (isPro) {
+      stopPostCheckoutPlanWatch(false);
+    }
+  });
+  postCheckoutPlanTimer = setInterval(async () => {
+    if (Date.now() - startedAt >= POST_CHECKOUT_PLAN_WINDOW_MS) {
+      stopPostCheckoutPlanWatch(true);
+      return;
+    }
+    const isPro = await checkPaymentStatusNow(false);
+    if (isPro) {
+      stopPostCheckoutPlanWatch(false);
+    }
+  }, POST_CHECKOUT_PLAN_INTERVAL_MS);
+}
+
+async function createStripeCheckoutSession() {
+  const config = getSupabaseConfig();
+  if (!config.url || !config.anonKey) {
+    throw new Error(translate("auth.missing_config"));
+  }
+
+  let session = await ensureActiveAuthSession();
+  if (!session?.accessToken) throw new Error(translate("msg.upgrade_signin_required"));
+
+  const callCheckout = async (token) =>
+    await fetch(`${config.url}/functions/v1/create-checkout-session`, {
+      method: "POST",
+      headers: authHeaders(config, token),
+      body: JSON.stringify({}),
+    });
+
+  let response = await callCheckout(session.accessToken);
+  let payload = await response.json().catch(() => ({}));
+
+  if (response.status === 401) {
+    const refreshed = await refreshAuthSessionToken(session);
+    if (refreshed?.accessToken) {
+      session = refreshed;
+      response = await callCheckout(session.accessToken);
+      payload = await response.json().catch(() => ({}));
+    }
+  }
+
+  if (!response.ok) {
+    const msg = String(payload?.error || payload?.message || "").trim();
+    throw new Error(msg || `Checkout request failed (${response.status})`);
+  }
+  const checkoutUrl = String(payload?.checkout_url || "").trim();
+  if (!/^https?:\/\//i.test(checkoutUrl)) {
+    throw new Error("Invalid checkout URL returned by billing service.");
+  }
+  return checkoutUrl;
+}
+
+async function resetWorkspaceForChangedEmail(nextEmail) {
+  const normalizedNext = String(nextEmail || "").trim().toLowerCase();
+  if (!normalizedNext) return false;
+
+  const session = await getAuthSession();
+  const stored = await chrome.storage.local.get([STORAGE_AUTH_EMAIL_KEY]);
+  const previousEmail = String(
+    session?.email || stored?.[STORAGE_AUTH_EMAIL_KEY] || "",
+  )
+    .trim()
+    .toLowerCase();
+
+  if (!previousEmail || previousEmail === normalizedNext) return false;
+
+  await clearAuthSession();
+  chrome.runtime.sendMessage({ type: "stopPostMonitor" }, () => {});
+  await chrome.storage.local.remove([
+    STORAGE_SELECTED_GROUP_IDS_KEY,
+    STORAGE_MONITOR_CONFIG_KEY,
+    STORAGE_PROFILES_KEY,
+    STORAGE_LOADED_GROUPS_KEY,
+    STORAGE_GLOBAL_FREQUENCY_KEY,
+    STORAGE_ONBOARDING_STATE_KEY,
+    STORAGE_NOTIFICATION_SETTINGS_KEY,
+  ]);
+
+  chrome.runtime.sendMessage({ type: "clearLeadHistory" }, () => {});
+
+  selectedGroupIds = new Set();
+  lastLoadedGroups.clear();
+  savedProfiles = [];
+  selectedProfileId = "";
+  leadsHistory = [];
+  onboardingState = "welcome";
+  onboardingAutoGroupLoadAttempted = false;
+  onboardingGroupsProgress = { started: false, lastCount: 0, lastAnnouncedAt: 0 };
+  globalMonitorFrequency = getDefaultFrequencyForPlan();
+  notificationSettings = {
+    notifyBrowser: true,
+    notifyWebhook: false,
+    notifyTelegram: false,
+    webhookUrl: "",
+    telegramChatId: "",
+  };
+
+  if (qs("groupsList")) qs("groupsList").innerHTML = "";
+  updateSelectedGroupCount();
+  renderProfiles();
+  renderLeads();
+  renderHomeInsights();
+  resetProfileEditorDraft();
+  renderGlobalFrequencyUi();
+  applyNotificationSettingsToUi(notificationSettings);
+  await setOnboardingState("welcome");
+  appendLog("logGeneral", "Account changed. Local workspace reset.", "warn");
+  return true;
 }
 
 async function handleAuthContinue() {
@@ -3785,51 +3661,20 @@ async function handleAuthContinue() {
     appendAuthGateLog(translate("auth.invalid_email"), "warn");
     return;
   }
+  await resetWorkspaceForChangedEmail(email);
   try {
-    // Existing account path: send magic link only for already-registered email.
-    await sendMagicLink(email, false);
+    // OTP path for both new and existing users.
+    await sendEmailOtpCode(email, true);
     await chrome.storage.local.set({ [STORAGE_AUTH_EMAIL_KEY]: email });
     appendAuthGateLog(translate("auth.magic_sent"), "ok");
     qs("authWaitRow").style.display = "flex";
+    if (qs("authCode")) qs("authCode").value = "";
     qs("btnAuthResend").disabled = true;
     setTimeout(() => {
       qs("btnAuthResend").disabled = false;
     }, 60000);
   } catch (err) {
-    // New account path: skip magic-link wait and continue to next stage with local trial.
-    const raw = String(err?.message || "");
-    const isLikelyNewEmail =
-      /user|not found|signup|email|otp|invalid/i.test(raw) ||
-      raw.includes("400") ||
-      raw.includes("422");
-
-    if (!isLikelyNewEmail) {
-      appendAuthGateLog(raw || String(err), "err");
-      return;
-    }
-
-    const trialState = {
-      plan: "trial",
-      trialEnd: Date.now() + 3 * 24 * 60 * 60 * 1000,
-      cachedAt: Date.now(),
-      source: "local",
-    };
-    cachedPlanState = trialState;
-
-    await chrome.storage.local.set({
-      [STORAGE_AUTH_EMAIL_KEY]: email,
-      [STORAGE_PLAN_STATE_KEY]: trialState,
-    });
-    await setAuthSession({
-      email,
-      authMode: "local_trial",
-      checkedAt: Date.now(),
-    });
-
-    await updateAccountUi();
-    renderPlanBanner();
-    setAuthGateVisible(false);
-    appendLog("logGeneral", translate("auth.new_user_local"), "ok");
+    appendAuthGateLog(extractUiErrorMessage(err), "err");
   }
 }
 
@@ -3849,8 +3694,7 @@ async function checkAuthSessionFromSupabase() {
   await setAuthSession(nextSession);
   setAuthGateVisible(false);
   await updateAccountUi();
-  await maybeRefreshPlanFromCloud();
-  await syncAlertsFromCloud();
+  await maybeRefreshPlanFromCloud(true);
   appendLog(
     "logGeneral",
     translate("auth.connected", { email: nextSession.email || "user" }),
@@ -3905,11 +3749,11 @@ qs("btnStopMonitor").addEventListener("click", () => {
   });
 });
 
-qs("btnOpenTechLog").addEventListener("click", () => {
+qs("btnOpenTechLog")?.addEventListener("click", () => {
   toggleTechnicalLogOverlay(true);
 });
 
-qs("btnOpenTechLogSettings").addEventListener("click", () => {
+qs("btnOpenTechLogSettings")?.addEventListener("click", () => {
   toggleTechnicalLogOverlay(true);
 });
 
@@ -3958,155 +3802,288 @@ qs("btnClearHistory").addEventListener("click", () => {
   });
 });
 
-qs("btnExportCsv").addEventListener("click", () => {
-  const leads = getFilteredLeads();
-  if (!leads.length) {
-    appendLog("logGeneral", translate("msg.csv_empty"), "warn");
-    return;
-  }
-
-  const headers = [
-    "detected_at",
-    "profile_name",
-    "group_id",
-    "group_name",
-    "poster_name",
-    "post_type",
-    "post_text",
-    "marketplace_text",
-    "post_url",
-    "group_url",
-    "user_profile_url",
-    "post_id",
-  ];
-
-  const escapeCsv = (value) => {
-    const raw = String(value ?? "");
-    if (raw.includes('"') || raw.includes(",") || raw.includes("\n")) {
-      return `"${raw.replace(/"/g, '""')}"`;
-    }
-    return raw;
-  };
-
-  const lines = [headers.join(",")];
-  for (const lead of leads) {
-    const row = [
-      new Date(Number(lead.detectedAt) || Date.now()).toISOString(),
-      lead.profileName,
-      lead.group_id,
-      lead.group_name,
-      lead.poster_name,
-      lead.post_type,
-      lead.post_text,
-      lead.marketplace_text,
-      lead.post_url,
-      lead.group_url,
-      lead.user_profile_url,
-      lead.post_id,
-    ].map(escapeCsv);
-    lines.push(row.join(","));
-  }
-
-  const blob = new Blob([lines.join("\n")], {
-    type: "text/csv;charset=utf-8;",
-  });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-  anchor.href = url;
-  anchor.download = `grabclientsnow-leads-${stamp}.csv`;
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  URL.revokeObjectURL(url);
-
-  appendLog(
-    "logGeneral",
-    translate("msg.csv_ok", { count: leads.length }),
-    "ok",
-  );
-});
-
 qs("btnPlanUpgrade").addEventListener("click", () => {
-  appendLog("logGeneral", translate("msg.upgrade_soon"), "info");
-});
-
-qs("btnPlanMaybeLater").addEventListener("click", () => {
-  const banner = qs("planBanner");
-  if (banner) banner.classList.remove("show");
-});
-
-qs("btnSignOut").addEventListener("click", async () => {
-  await clearAuthSession();
-  await updateAccountUi();
-  setAuthGateVisible(true);
-  appendLog("logGeneral", translate("msg.signed_out"), "warn");
-});
-
-qs("btnSaveSleepSchedule").addEventListener("click", () => {
-  const start = parseTimeString(qs("sleepStartTime").value, 22, 0);
-  const end = parseTimeString(qs("sleepEndTime").value, 7, 0);
-  const days = qsa(".sleep-day")
-    .filter((el) => el.checked)
-    .map((el) => Number(el.value));
-  const schedule = {
-    enabled: !!qs("sleepEnabled").checked,
-    startHour: start.hour,
-    startMinute: start.minute,
-    endHour: end.hour,
-    endMinute: end.minute,
-    days: days.length ? days : [1, 2, 3, 4, 5, 6, 0],
-    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
-  };
-
-  chrome.runtime.sendMessage(
-    { type: "setSleepSchedule", schedule },
-    (response) => {
-      if (response?.success) {
-        sleepScheduleState = response.schedule;
-        appendLog("logGeneral", translate("msg.sleep_saved"), "ok");
-        loadSleepScheduleUi();
-        return;
-      }
-      appendLog(
-        "logGeneral",
-        translate("msg.sleep_save_failed", {
-          error: response?.error || translate("common.none"),
-        }),
-        "err",
-      );
+  void runButtonTask(
+    {
+      buttonId: "btnPlanUpgrade",
+      actionKey: "planUpgrade",
+      busyText: `⏳ ${translate("common.checking")}`,
+      logId: "logGeneral",
+      errorKey: "msg.upgrade_failed",
+    },
+    async () => {
+      const checkoutUrl = await createStripeCheckoutSession();
+      await chrome.tabs.create({ url: checkoutUrl });
+      startPostCheckoutPlanWatch();
+      appendLog("logGeneral", translate("msg.upgrade_opening"), "ok");
     },
   );
 });
 
-qs("btnAuthContinue").addEventListener("click", async () => {
-  await handleAuthContinue();
+qs("btnPlanRefresh").addEventListener("click", () => {
+  void runButtonTask(
+    {
+      buttonId: "btnPlanRefresh",
+      actionKey: "planRefresh",
+      busyText: `⏳ ${translate("common.checking")}`,
+      logId: "logGeneral",
+    },
+    async () => {
+      await checkPaymentStatusNow(true);
+    },
+  );
 });
 
-qs("btnAuthResend").addEventListener("click", async () => {
-  const email = String(qs("authEmail").value || "")
-    .trim()
-    .toLowerCase();
-  if (!email) return;
-  try {
-    await sendMagicLink(email, false);
-    appendAuthGateLog(translate("auth.magic_sent"), "ok");
-    qs("btnAuthResend").disabled = true;
-    setTimeout(() => {
-      qs("btnAuthResend").disabled = false;
-    }, 60000);
-  } catch (err) {
-    appendAuthGateLog(err?.message || String(err), "err");
-  }
+qs("btnPlanMaybeLater").addEventListener("click", () => {
+  if (resolvePlanLevel() === "blocked") return;
+  const banner = qs("planBanner");
+  if (banner) banner.classList.remove("show");
 });
 
-qs("btnAuthCheckSession").addEventListener("click", async () => {
-  const ok = await checkAuthSessionFromSupabase();
-  if (!ok)
-    appendAuthGateLog(
-      translate("msg.session_not_active"),
-      "warn",
-    );
+qs("btnPlanLockUpgrade").addEventListener("click", () => {
+  qs("btnPlanUpgrade").click();
+});
+
+qs("btnPlanLockSignOut").addEventListener("click", () => {
+  qs("btnSignOut").click();
+});
+
+qs("btnSignOut").addEventListener("click", () => {
+  void runButtonTask(
+    { buttonId: "btnSignOut", actionKey: "signOut", logId: "logGeneral" },
+    async () => {
+      stopPostCheckoutPlanWatch(false);
+      await clearAuthSession();
+      await updateAccountUi();
+      setAuthGateVisible(true);
+      appendLog("logGeneral", translate("msg.signed_out"), "warn");
+    },
+  );
+});
+
+qs("btnSaveSleepSchedule").addEventListener("click", () => {
+  void runButtonTask(
+    { buttonId: "btnSaveSleepSchedule", actionKey: "saveSleepSchedule", logId: "logGeneral", errorKey: "msg.sleep_save_failed" },
+    async () => {
+      const start = parseTimeString(qs("sleepStartTime").value, 22, 0);
+      const end = parseTimeString(qs("sleepEndTime").value, 7, 0);
+      const days = qsa(".sleep-day")
+        .filter((el) => el.checked)
+        .map((el) => Number(el.value));
+      const schedule = {
+        enabled: !!qs("sleepEnabled").checked,
+        startHour: start.hour,
+        startMinute: start.minute,
+        endHour: end.hour,
+        endMinute: end.minute,
+        days: days.length ? days : [1, 2, 3, 4, 5, 6, 0],
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+      };
+
+      const response = await new Promise((resolve) => {
+        chrome.runtime.sendMessage(
+          { type: "setSleepSchedule", schedule },
+          (reply) => resolve(reply || {}),
+        );
+      });
+      if (!response?.success) {
+        throw new Error(response?.error || translate("common.none"));
+      }
+      sleepScheduleState = response.schedule;
+      appendLog("logGeneral", translate("msg.sleep_saved"), "ok");
+      loadSleepScheduleUi();
+    },
+  );
+});
+
+qs("sleepEnabled").addEventListener("change", () => {
+  syncSleepControlsUiState();
+});
+
+qs("btnSaveNotifications")?.addEventListener("click", () => {
+  void runButtonTask(
+    { buttonId: "btnSaveNotifications", actionKey: "saveNotifications", logId: "logGeneral" },
+    async () => {
+      await persistNotificationSettings();
+    },
+  );
+});
+
+qs("btnTestDesktop")?.addEventListener("click", () => {
+  void runButtonTask(
+    { buttonId: "btnTestDesktop", actionKey: "testDesktop", logId: "logGeneral" },
+    async () => {
+      const response = await new Promise((resolve) => {
+        chrome.runtime.sendMessage(
+          {
+            type: "testNotificationChannel",
+            channel: "desktop",
+            payload: buildTestLeadPayload(),
+            settings: readNotificationSettingsFromUi(),
+          },
+          (reply) => resolve(reply || {}),
+        );
+      });
+      if (response?.success) appendLog("logGeneral", "Desktop test sent.", "ok");
+      else throw new Error(response?.error || "Desktop test failed.");
+    },
+  );
+});
+
+qs("btnTestWebhook")?.addEventListener("click", () => {
+  void runButtonTask(
+    { buttonId: "btnTestWebhook", actionKey: "testWebhook", logId: "logGeneral" },
+    async () => {
+      const settings = readNotificationSettingsFromUi();
+      if (!settings.webhookUrl) {
+        appendLog("logGeneral", "Webhook URL is required.", "warn");
+        return;
+      }
+
+      const perm = await new Promise((resolve) => {
+        chrome.runtime.sendMessage(
+          { type: "checkWebhookPermission", webhookUrl: settings.webhookUrl },
+          (reply) => resolve(reply || {}),
+        );
+      });
+      if (!perm?.granted) throw new Error("Webhook permission denied.");
+
+      const response = await new Promise((resolve) => {
+        chrome.runtime.sendMessage(
+          {
+            type: "testNotificationChannel",
+            channel: "webhook",
+            payload: buildTestLeadPayload(),
+            settings,
+          },
+          (reply) => resolve(reply || {}),
+        );
+      });
+      if (response?.success) appendLog("logGeneral", "Webhook test sent.", "ok");
+      else throw new Error(response?.error || "Webhook test failed.");
+    },
+  );
+});
+
+qs("btnTestTelegram")?.addEventListener("click", () => {
+  void runButtonTask(
+    { buttonId: "btnTestTelegram", actionKey: "testTelegram", logId: "logGeneral" },
+    async () => {
+      const settings = readNotificationSettingsFromUi();
+      if (!settings.telegramChatId) {
+        appendLog("logGeneral", "Telegram chat_id is required.", "warn");
+        return;
+      }
+      const response = await new Promise((resolve) => {
+        chrome.runtime.sendMessage(
+          {
+            type: "testNotificationChannel",
+            channel: "telegram",
+            payload: buildTestLeadPayload(),
+            settings,
+          },
+          (reply) => resolve(reply || {}),
+        );
+      });
+      if (response?.success) appendLog("logGeneral", "Telegram test sent.", "ok");
+      else throw new Error(response?.error || "Telegram test failed.");
+    },
+  );
+});
+
+qs("btnAuthContinue").addEventListener("click", () => {
+  void runButtonTask(
+    { buttonId: "btnAuthContinue", actionKey: "authContinue", logId: "logAuthGate" },
+    async () => {
+      await handleAuthContinue();
+    },
+  );
+});
+
+qs("btnAuthResend").addEventListener("click", () => {
+  void runExclusiveAction("authResend", async () => {
+    const email = String(qs("authEmail").value || "")
+      .trim()
+      .toLowerCase();
+    if (!email) return;
+    const btn = qs("btnAuthResend");
+    if (btn) {
+      if (!btn.dataset.label) btn.dataset.label = btn.textContent || "";
+      btn.disabled = true;
+      btn.textContent = `⏳ ${translate("common.checking")}`;
+    }
+    try {
+      await sendEmailOtpCode(email, true);
+      appendAuthGateLog(translate("auth.magic_sent"), "ok");
+      if (qs("authCode")) qs("authCode").value = "";
+      if (btn) btn.textContent = btn.dataset.label || "Resend";
+      setTimeout(() => {
+        if (btn) btn.disabled = false;
+      }, 60000);
+    } catch (err) {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = btn.dataset.label || btn.textContent;
+      }
+      appendAuthGateLog(extractUiErrorMessage(err), "err");
+    }
+  });
+});
+
+qs("btnAuthVerifyCode").addEventListener("click", () => {
+  void runButtonTask(
+    { buttonId: "btnAuthVerifyCode", actionKey: "authVerifyCode", logId: "logAuthGate", errorKey: "msg.action_failed" },
+    async () => {
+      const email = String(qs("authEmail")?.value || "")
+        .trim()
+        .toLowerCase();
+      const code = String(qs("authCode")?.value || "").trim();
+
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+        appendAuthGateLog(translate("auth.invalid_email"), "warn");
+        return;
+      }
+      if (!/^\d{6}$/.test(code)) {
+        appendAuthGateLog(translate("auth.invalid_code"), "warn");
+        return;
+      }
+
+      appendAuthGateLog(translate("auth.checking"), "info");
+      const data = await verifyEmailOtpCode(email, code);
+      const accessToken =
+        String(data?.access_token || data?.session?.access_token || "").trim();
+      const refreshToken =
+        String(data?.refresh_token || data?.session?.refresh_token || "").trim();
+      const expiresIn = Number(
+        data?.expires_in || data?.session?.expires_in || 0,
+      );
+      const userId = String(data?.user?.id || data?.session?.user?.id || "").trim();
+      const userEmail = String(data?.user?.email || email).trim();
+      await resetWorkspaceForChangedEmail(userEmail || email);
+
+      if (!accessToken) {
+        throw new Error(translate("auth.code_verify_failed"));
+      }
+
+      await setAuthSession({
+        accessToken,
+        refreshToken,
+        expiresAt: expiresIn ? Date.now() + expiresIn * 1000 : 0,
+        userId,
+        email: userEmail || email,
+        checkedAt: Date.now(),
+      });
+
+      setAuthGateVisible(false);
+      await updateAccountUi();
+      await maybeRefreshPlanFromCloud(true);
+      appendLog(
+        "logGeneral",
+        translate("auth.connected", { email: userEmail || email }),
+        "ok",
+      );
+    },
+  );
 });
 
 qs("btnAuthChangeEmail").addEventListener("click", () => {
@@ -4137,11 +4114,22 @@ qsa(".settings-freq-card").forEach((card) => {
     };
     const level = resolvePlanLevel();
     const proOnly = card.dataset.proOnly === "1";
-    if (level === "free" && proOnly) {
-      appendLog("logGeneral", translate("plan.block_frequency"), "warn");
+    if (level === "blocked" && proOnly) {
+      appendLog("logGeneral", translate("plan.locked_action"), "warn");
       await persistGlobalMonitorFrequency({ min: 15, max: 20 });
       return;
     }
+
+    if (pair.min === 3) {
+      const confirmed = window.confirm(translate("settings.freq_confirm_3_5"));
+      if (!confirmed) return;
+    }
+
+    if (pair.min === 1) {
+      const confirmed = window.confirm(translate("settings.freq_confirm_1_3"));
+      if (!confirmed) return;
+    }
+
     await persistGlobalMonitorFrequency(pair);
   });
 });
@@ -4176,8 +4164,9 @@ qsa(".settings-freq-card").forEach((card) => {
   renderPlanBanner();
   await updateAccountUi();
   await bootstrapAuthGate();
-  await maybeRefreshPlanFromCloud();
+  await maybeRefreshPlanFromCloud(true);
   await loadGlobalMonitorFrequency();
+  await loadNotificationSettings();
   await loadSleepScheduleUi();
   await loadSelectedGroupIds();
   await loadMonitorConfigToUi();
@@ -4185,6 +4174,7 @@ qsa(".settings-freq-card").forEach((card) => {
   await loadPersistedGroups();
   await refreshLeadsHistory();
   updateMonitorProfilePreview();
+  syncProfileEditorChipsFromFields();
   updateProfileKeywordPreview();
   renderProfileWizard();
 
@@ -4211,12 +4201,4 @@ qsa(".settings-freq-card").forEach((card) => {
 
   await refreshOnboardingStateFromContext();
   renderGuidedHistory();
-
-  if (authPollingTimer) clearInterval(authPollingTimer);
-  authPollingTimer = setInterval(async () => {
-    if (qs("authGate")?.classList.contains("show")) {
-      await checkAuthSessionFromSupabase();
-    }
-    await maybeRefreshPlanFromCloud();
-  }, 3000);
 })();

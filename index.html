@@ -20,8 +20,8 @@
         --border-hover: #2a5a38;
         --green: #00ff88;
         --cyan: #00e5cc;
-        --green-dim: #00ff8830;
-        --cyan-dim: #00e5cc20;
+        --green-dim: #00ff8818;
+        --cyan-dim: #00e5cc12;
         --text: #e8f5ee;
         --text-muted: #a7cfba;
         --error: #ff4444;
@@ -100,8 +100,7 @@
       }
 
       .tab-btn.active {
-        border-color: var(--green);
-        box-shadow: 0 0 0 2px var(--green-dim);
+        border-color: #2f7d53;
         background: var(--surface-3);
       }
 
@@ -257,7 +256,7 @@
       .orb-svg {
         width: 100%;
         height: 100%;
-        filter: drop-shadow(0 0 12px var(--glow-color));
+        filter: drop-shadow(0 0 7px var(--glow-color));
       }
 
       .orb-ring-outer {
@@ -306,9 +305,7 @@
         transition: all 180ms ease-out;
       }
 
-      .card:hover {
-        border-color: var(--border-hover);
-      }
+      .card:hover { border-color: #2a4c39; }
 
       .card h2 {
         font-family: "Oxanium", sans-serif;
@@ -634,11 +631,17 @@
       .group-card.skeleton .bar { height: 10px; margin-bottom: 6px; }
       .group-card.skeleton .bar.short { width: 55%; }
 
-      .profiles-list { display: grid; gap: 8px; margin-top: 10px; max-height: 280px; overflow-y: auto; }
-      .profile-item { border: 1px solid var(--border); background: var(--surface); border-radius: 8px; padding: 8px; cursor: pointer; transition: all 160ms ease-out; }
-      .profile-item.active { border-color: var(--green); background: var(--surface-3); box-shadow: 0 0 0 1px var(--green-dim); }
+      .profiles-list { display: grid; gap: 8px; margin-top: 10px; max-height: 360px; overflow-y: auto; }
+      .profile-item { border: 1px solid #22372b; background: #0f1713; border-radius: 10px; transition: all 160ms ease-out; }
+      .profile-item.active { border-color: #3f7a5c; background: #132019; }
       .profile-item .title { font-size: 13px; font-weight: 700; color: var(--text); }
       .profile-item .meta { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
+      .profile-item summary { list-style: none; cursor: pointer; padding: 10px; }
+      .profile-item summary::-webkit-details-marker { display: none; }
+      .profile-item-head { display: flex; align-items: start; justify-content: space-between; gap: 8px; }
+      .profile-item-body { padding: 0 10px 10px; display: grid; gap: 8px; }
+      .profile-item-actions { display: inline-flex; gap: 6px; }
+      .profile-item-actions .btn { padding: 5px 9px; font-size: 11px; }
 
       .keywords-preview { margin-top: 10px; display: grid; gap: 8px; }
       .kw-block { background: #09140d; border: 1px solid var(--border); border-radius: 8px; padding: 8px; }
@@ -748,8 +751,54 @@
       .notify-item {
         border: 1px solid var(--border);
         border-radius: 10px;
-        padding: 8px;
+        padding: 0;
         background: #0b1911;
+        overflow: hidden;
+      }
+
+      .notify-card {
+        position: relative;
+        display: block;
+        padding: 10px;
+        cursor: pointer;
+      }
+
+      .notify-card input[type="checkbox"] {
+        position: absolute;
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .notify-card .notify-title {
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--text);
+      }
+
+      .notify-card .notify-desc {
+        font-size: 12px;
+        color: var(--text-muted);
+        margin-top: 4px;
+      }
+
+      .notify-card:has(input:checked) {
+        background: #0d2318;
+        box-shadow: inset 0 0 0 1px var(--green);
+      }
+
+      .notify-card:has(input:checked) .notify-title {
+        color: #d5ffe8;
+      }
+
+      .notify-help-list {
+        margin-top: 6px;
+        padding-left: 16px;
+        color: #cde7d8;
+        font-size: 12px;
+      }
+
+      .notify-help-list li {
+        margin: 4px 0;
       }
 
       .settings-note {
@@ -765,6 +814,123 @@
         border-color: #6f5518;
         background: #21190a;
         color: #ffd98a;
+      }
+
+      .sleep-card {
+        display: grid;
+        gap: 12px;
+      }
+
+      .sleep-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      .sleep-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        color: #e7fff4;
+        font-weight: 700;
+        font-size: 13px;
+        background: #0d2317;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 6px 10px;
+      }
+
+      .sleep-meta {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      .sleep-timezone {
+        color: #e2f9ee;
+        font-size: 12px;
+      }
+
+      .sleep-controls {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+        align-items: end;
+      }
+
+      .sleep-controls.disabled {
+        opacity: 0.55;
+      }
+
+      .sleep-field {
+        display: grid;
+        gap: 6px;
+      }
+
+      .sleep-field-label {
+        font-size: 12px;
+        color: #d8f5e7;
+        font-weight: 700;
+      }
+
+      .sleep-days {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .sleep-day-chip {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .sleep-day-chip input {
+        position: absolute;
+        opacity: 0;
+        width: 1px;
+        height: 1px;
+        pointer-events: none;
+      }
+
+      .sleep-day-label {
+        min-width: 40px;
+        text-align: center;
+        padding: 7px 10px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        background: #0a170f;
+        color: #cde7d8;
+        font-size: 12px;
+        font-weight: 700;
+        transition: border-color .2s ease, box-shadow .2s ease, color .2s ease, background .2s ease;
+      }
+
+      .sleep-day-chip input:checked + .sleep-day-label {
+        border-color: #7be2bc;
+        color: #ecfff5;
+        background: #123325;
+        box-shadow: 0 0 0 1px #7be2bc55;
+      }
+
+      .sleep-day-chip input:disabled + .sleep-day-label {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .sleep-save {
+        min-height: 40px;
+      }
+
+      @media (max-width: 860px) {
+        .sleep-controls {
+          grid-template-columns: 1fr;
+        }
       }
 
       .settings-freq-grid {
@@ -786,12 +952,50 @@
       .settings-freq-card .title {
         font-size: 13px;
         font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        justify-content: space-between;
       }
 
       .settings-freq-card .desc {
         margin-top: 4px;
         font-size: 12px;
         color: var(--text-muted);
+      }
+
+      .risk-badge {
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 0.02em;
+        text-transform: uppercase;
+        border-radius: 999px;
+        padding: 3px 6px;
+        border: 1px solid transparent;
+      }
+
+      .risk-badge.safe {
+        color: #cffff0;
+        background: #133525;
+        border-color: #2b7c59;
+      }
+
+      .risk-badge.reco {
+        color: #163927;
+        background: #8ef0bf;
+        border-color: #8ef0bf;
+      }
+
+      .risk-badge.high {
+        color: #ffd9a6;
+        background: #3a2610;
+        border-color: #7f5322;
+      }
+
+      .risk-badge.danger {
+        color: #ffcece;
+        background: #3c1717;
+        border-color: #7e2f2f;
       }
 
       .settings-freq-card.active {
@@ -814,9 +1018,62 @@
         box-shadow: 0 0 0 1px #ff8f8f55;
       }
 
+      .settings-freq-card.risk-high {
+        background: #12140f;
+        border-color: #3d3a2f;
+      }
+
+      .settings-freq-card.risk-high .title {
+        color: #efd7b0;
+      }
+
+      .settings-freq-card.risk-high .desc {
+        color: #baa88a;
+      }
+
+      .settings-freq-card.risk-safe {
+        background: #0d2118;
+      }
+
+      .settings-freq-card.risk-mid {
+        background: #0f1e17;
+      }
+
       .settings-freq-card.locked {
         opacity: 0.58;
         cursor: not-allowed;
+      }
+
+      .settings-freq-tip {
+        margin-top: 8px;
+        border-left: 3px solid #7be2bc;
+        background: #0d1f17;
+        border-radius: 8px;
+        padding: 8px 10px;
+        color: #d6f9ea;
+        font-size: 12px;
+      }
+
+      #globalFrequencyHint {
+        margin-top: 6px;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      #globalFrequencyHint.risk-safe {
+        color: #9ff1ca;
+      }
+
+      #globalFrequencyHint.risk-mid {
+        color: #d8f0c0;
+      }
+
+      #globalFrequencyHint.risk-high {
+        color: #ffd3a8;
+      }
+
+      #globalFrequencyHint.risk-danger {
+        color: #ffaeae;
       }
 
       .summary-card {
@@ -829,24 +1086,32 @@
       }
 
       .profile-builder-flat .wizard-head,
-      .profile-builder-flat .wizard-question,
-      .profile-builder-flat .wizard-hint,
       .profile-builder-flat #btnProfilePrevStep,
       .profile-builder-flat #btnProfileNextStep,
-      .profile-builder-flat #btnProfileStartMonitoring {
+      .profile-builder-flat #btnProfileStartMonitoring,
+      .profile-builder-flat #btnNewProfile {
         display: none !important;
       }
 
-      .profile-builder-flat .wizard-step {
+      .profile-builder-flat #profileStepName,
+      .profile-builder-flat #profileStepWatch {
         display: grid !important;
       }
 
-      .profile-builder-flat .wizard-step:not(.active) {
+      .profile-builder-flat #profileStepExclude {
+        display: grid !important;
+      }
+
+      .profile-builder-flat .wizard-step {
         margin-top: 8px;
       }
 
       .profile-builder-flat #btnSaveProfile {
         display: inline-flex !important;
+      }
+      .profile-builder-flat {
+        background: linear-gradient(180deg, #131b17 0%, #101814 100%);
+        border-color: #2b3e33;
       }
 
       .section-label {
@@ -855,16 +1120,190 @@
         font-weight: 700;
       }
 
+      .profile-intent-row .btn {
+        background: #16211c;
+        border-color: #2d4035;
+        color: #d8e9df;
+      }
+
+      .profile-advanced {
+        margin-top: 10px;
+        border: 1px solid #2a3e33;
+        border-radius: 10px;
+        background: #101813;
+        padding: 8px;
+      }
+
+      .profile-advanced > summary {
+        cursor: pointer;
+        color: #d3e6db;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .profile-advanced .wizard-step {
+        margin-top: 8px;
+      }
+
+      .system-state-card {
+        background: linear-gradient(170deg, #101a14 0%, #0a120e 100%);
+        border-color: #294638;
+        padding: 16px;
+      }
+
+      .system-state-headline {
+        font-family: "Oxanium", sans-serif;
+        font-size: 32px;
+        line-height: 1.1;
+        color: #e8f6ee;
+      }
+
+      .system-state-headline.on {
+        color: #c9f2dc;
+      }
+
+      .system-state-meta {
+        margin-top: 12px;
+        display: grid;
+        gap: 6px;
+      }
+
+      .system-state-meta .item {
+        font-size: 13px;
+        color: #bdd8ca;
+      }
+
+      .system-alert-picker {
+        margin-top: 12px;
+        display: grid;
+        gap: 6px;
+        width: min(420px, 100%);
+      }
+
+      .system-toggle-btn {
+        margin-top: 14px;
+        min-height: 52px;
+        width: min(320px, 100%);
+        font-size: 16px;
+        font-weight: 800;
+        border-radius: 12px;
+      }
+
+      .system-state-legacy {
+        display: none !important;
+      }
+
+      .groups-list-wrap {
+        margin-top: 10px;
+      }
+
+      .groups-list-wrap.collapsed .groups-list {
+        display: none;
+      }
+
+      .advanced-settings {
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: #0a150f;
+        padding: 8px;
+      }
+
+      .advanced-settings > summary {
+        cursor: pointer;
+        list-style: none;
+        font-family: "Oxanium", sans-serif;
+        font-size: 14px;
+        color: #d5ebe0;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 6px 4px;
+      }
+
+      .advanced-settings > summary::-webkit-details-marker {
+        display: none;
+      }
+
+      .advanced-settings > summary::after {
+        content: "▾";
+        font-size: 12px;
+        color: #9bcab4;
+      }
+
+      .advanced-settings:not([open]) > summary::after {
+        content: "▸";
+      }
+
+      .advanced-settings-body {
+        margin-top: 8px;
+        display: grid;
+        gap: 12px;
+      }
+
+      .frequency-simple-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .frequency-reco {
+        font-size: 12px;
+        color: #c4e6d6;
+      }
+
+      .frequency-link {
+        border: 0;
+        background: transparent;
+        color: var(--cyan);
+        text-decoration: underline;
+        cursor: pointer;
+        font-size: 12px;
+        padding: 0;
+      }
+
+      .frequency-options.collapsed {
+        display: none;
+      }
+
       .leads-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
       .leads-grid { display: grid; gap: 10px; }
       .lead-card { background: #09140d; border: 1px solid var(--border); border-radius: 12px; padding: 10px; }
       .lead-head { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
       .lead-title { font-size: 13px; font-weight: 700; color: var(--text); }
       .lead-meta { font-size: 11px; color: var(--text-muted); }
-      .lead-text { font-size: 13px; color: #cde7d8; white-space: pre-wrap; margin-bottom: 8px; }
+      .lead-text-wrap { margin-bottom: 8px; }
+      .lead-text { font-size: 13px; color: #cde7d8; white-space: pre-wrap; }
+      .lead-toggle { margin-top: 4px; font-size: 12px; font-weight: 700; }
       .lead-links { display: flex; flex-wrap: wrap; gap: 8px; }
-      .lead-links a { font-size: 12px; text-decoration: none; color: var(--cyan); font-weight: 700; }
-      .lead-links a:hover { text-decoration: underline; }
+      .lead-link-btn {
+        font-size: 12px;
+        text-decoration: none;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        padding: 4px 9px;
+        font-weight: 700;
+        line-height: 1;
+        transition: all 150ms ease;
+      }
+      .lead-link-btn:hover { transform: translateY(-1px); }
+      .lead-link-btn.post {
+        color: #7af7dd;
+        background: #00e5cc12;
+        border-color: #1d5a4f;
+      }
+      .lead-link-btn.person {
+        color: #8be8ff;
+        background: #4db8ff14;
+        border-color: #245472;
+      }
+      .lead-link-btn.group {
+        color: #9effb9;
+        background: #00ff8814;
+        border-color: #246b44;
+      }
 
       .agent-chat {
         display: grid;
@@ -1093,13 +1532,80 @@
       .auth-gate.show { display: flex; }
 
       .auth-card {
-        width: min(540px, 96vw);
+        width: min(760px, 96vw);
         border: 1px solid var(--border);
-        border-radius: 14px;
-        background: var(--surface);
-        padding: 16px;
+        border-radius: 16px;
+        background: linear-gradient(160deg, #0c1b12 0%, #0a160f 100%);
+        padding: 18px;
         display: grid;
-        gap: 12px;
+        gap: 14px;
+        box-shadow: 0 18px 48px #00000055;
+      }
+
+      .auth-shell {
+        display: grid;
+        grid-template-columns: 210px minmax(0, 1fr);
+        gap: 16px;
+        align-items: center;
+      }
+
+      .auth-hero {
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: #08130d;
+        min-height: 220px;
+        padding: 14px;
+        display: grid;
+        place-items: center;
+        gap: 10px;
+      }
+
+      .auth-orb {
+        width: 96px;
+        height: 96px;
+        border-radius: 50%;
+        position: relative;
+        display: grid;
+        place-items: center;
+      }
+
+      .auth-orb::before {
+        content: "";
+        position: absolute;
+        inset: 8px;
+        border-radius: 50%;
+        border: 1px solid #1b5c3b;
+        animation: auth-orb-spin 7s linear infinite;
+      }
+
+      .auth-orb::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: 50%;
+        border: 1px dashed #2d8a56;
+        opacity: 0.7;
+        animation: auth-orb-spin 11s linear infinite reverse;
+      }
+
+      .auth-orb-core {
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        background: radial-gradient(circle at 30% 30%, #7cf7c1 0%, #00d877 65%, #00a85c 100%);
+        box-shadow: 0 0 18px #00ff8870;
+        animation: auth-orb-pulse 2.1s ease-in-out infinite;
+      }
+
+      .auth-hero-note {
+        font-size: 12px;
+        color: #b9decb;
+        text-align: center;
+      }
+
+      .auth-content {
+        display: grid;
+        gap: 10px;
       }
 
       .auth-title {
@@ -1116,11 +1622,91 @@
         display: flex;
         gap: 8px;
         flex-wrap: wrap;
+        align-items: center;
+      }
+
+      .auth-row .input {
+        flex: 1 1 240px;
+        min-width: 0;
+      }
+
+      .auth-primary-row .btn {
+        min-width: 140px;
+      }
+
+      .plan-lock-gate {
+        position: fixed;
+        inset: 0;
+        z-index: 90;
+        background: rgba(4, 10, 7, 0.92);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+      }
+
+      .plan-lock-gate.show { display: flex; }
+
+      .plan-lock-card {
+        width: min(560px, 96vw);
+        border: 1px solid #6d2f2f;
+        border-radius: 14px;
+        background: linear-gradient(135deg, #120d0d, #1b0f0f);
+        padding: 16px;
+        display: grid;
+        gap: 12px;
+      }
+
+      .plan-lock-title {
+        font-family: "Oxanium", sans-serif;
+        font-size: 22px;
+        color: #ffe3e3;
+      }
+
+      .plan-lock-copy {
+        color: #ffd3d3;
+        font-size: 13px;
+      }
+
+      .plan-lock-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
       }
 
       .auth-topbar {
         display: flex;
         justify-content: flex-end;
+      }
+
+      @media (max-width: 760px) {
+        .auth-card {
+          padding: 14px;
+        }
+
+        .auth-shell {
+          grid-template-columns: 1fr;
+        }
+
+        .auth-hero {
+          min-height: 160px;
+        }
+
+        .auth-topbar {
+          justify-content: center;
+        }
+
+        .auth-content {
+          text-align: center;
+        }
+
+        .auth-row {
+          justify-content: center;
+        }
+
+        .auth-row .input {
+          flex-basis: 100%;
+        }
       }
 
       .help-grid {
@@ -1200,6 +1786,11 @@
         0%, 45% { opacity: 1; }
         46%, 100% { opacity: 0; }
       }
+      @keyframes auth-orb-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+      @keyframes auth-orb-pulse {
+        0%, 100% { transform: scale(0.94); box-shadow: 0 0 10px #00ff8855; }
+        50% { transform: scale(1.08); box-shadow: 0 0 22px #00ff8899; }
+      }
 
       @media (max-width: 860px) {
         .hero { grid-template-columns: 1fr; }
@@ -1237,6 +1828,7 @@
           <button class="tab-btn" data-tab="groups" data-icon="👥"><span data-i18n="tab.groups">👥 Groups</span></button>
           <button class="tab-btn" data-tab="leads" data-icon="📌"><span data-i18n="tab.leads">📌 Leads</span></button>
           <button class="tab-btn" data-tab="profiles" data-icon="🎯"><span data-i18n="tab.alerts">🎯 Alerts</span></button>
+          <button class="tab-btn" data-tab="notifications" data-icon="🔔"><span data-i18n="tab.notifications">🔔 Notifications</span></button>
           <button class="tab-btn" data-tab="settings" data-icon="⚙️"><span data-i18n="tab.settings">⚙️ Settings</span></button>
           <button class="tab-btn" data-tab="help" data-icon="❓"><span data-i18n="tab.help">❓ Help</span></button>
         </nav>
@@ -1246,7 +1838,6 @@
             <span class="fb-dot" id="fbFooterDot"></span>
             <span id="fbFooterText" data-i18n="footer.fb_status">FB status</span>
           </div>
-          <div class="log-shortcut" id="btnOpenTechLog" data-i18n="footer.log">&lt;/&gt; Log</div>
         </div>
       </aside>
 
@@ -1277,6 +1868,7 @@
               <div class="plan-banner-text" id="planBannerText"></div>
               <div class="plan-banner-actions">
                 <button class="btn btn-green" id="btnPlanUpgrade" data-i18n="btn.upgrade">Upgrade</button>
+                <button class="btn btn-blue" id="btnPlanRefresh" data-i18n="btn.check_payment">Check payment</button>
                 <button class="btn btn-gray" id="btnPlanMaybeLater" data-i18n="btn.maybe_later">Maybe later</button>
               </div>
             </div>
@@ -1367,48 +1959,34 @@
               </div>
             </div>
 
-            <div class="card home-operational" id="cardMonitoring">
-              <h2 data-i18n="home.live_monitoring">Live Monitoring</h2>
-              <div class="row" style="margin-bottom:8px">
+            <div class="card home-operational system-state-card" id="cardSystemState">
+              <h2 data-i18n="home.status_title">System Status</h2>
+              <div class="system-state-headline" id="systemStateHeadline">Monitoring is OFF</div>
+              <div class="system-state-meta">
+                <div class="item" id="homeGroupsMonitored">Checking 0 groups</div>
+                <div class="item" id="homeNextScanStatus">Next scan: waiting...</div>
+                <div class="item" id="homeLastLead">Last lead: none yet</div>
+                <div class="item" id="homeLeadsSummary" data-i18n="home.leads_7d" data-i18n-count="0">0 leads in last 7 days</div>
+              </div>
+              <div class="system-alert-picker">
+                <span class="section-label" data-i18n="home.active_alert">Active alert</span>
                 <select class="select" id="monitorProfileSelect">
                   <option value="" data-i18n="monitor.select_alert">Select an alert</option>
                 </select>
+              </div>
+              <button class="btn btn-green system-toggle-btn" id="btnMainMonitorToggle">Start monitoring</button>
+
+              <div class="system-state-legacy">
                 <button class="btn btn-green" id="btnStartMonitor" data-i18n="monitor.start">Start Monitoring</button>
                 <button class="btn btn-red" id="btnStopMonitor" disabled data-i18n="monitor.stop">Stop Monitoring</button>
                 <span id="monitorStatus" class="muted" data-i18n="monitor.idle">idle</span>
                 <span id="monitorNextRun" class="muted" data-i18n="monitor.waiting">waiting...</span>
-              </div>
-              <div class="keywords-preview">
-                <div class="kw-block">
-                  <div class="kw-title" data-i18n="kw.watch_for">Watch for</div>
-                  <div class="kw-list" id="monitorPreviewPos"></div>
-                </div>
-                <div class="kw-block">
-                  <div class="kw-title" data-i18n="kw.exclude_words">Exclude words</div>
-                  <div class="kw-list" id="monitorPreviewNeg"></div>
-                </div>
-              </div>
-            </div>
-
-            <div class="card home-operational" id="cardInsights">
-              <h2 data-i18n="home.performance">Performance Overview</h2>
-              <div class="row">
-                <span class="status-pill" id="homeSystemStatus">
-                  <span class="status-dot"></span>
-                  <span data-i18n="home.system_idle">System idle</span>
-                </span>
-                <span class="muted" id="homeLeadsSummary" data-i18n="home.leads_7d" data-i18n-count="0">0 leads in last 7 days</span>
-              </div>
-              <div class="insights-grid">
-                <div class="kw-block">
-                  <div class="kw-title" data-i18n="home.top_groups">Top groups by leads</div>
-                  <div class="insights-list" id="homeTopGroups"></div>
-                </div>
-                <div class="kw-block">
-                  <div class="kw-title" data-i18n="home.weekly_trend">Weekly trend</div>
-                  <svg class="trend-chart" id="homeTrendChart" viewBox="0 0 360 130" preserveAspectRatio="none"></svg>
-                  <div class="muted" id="homeTrendMeta"></div>
-                </div>
+                <span class="status-pill" id="homeSystemStatus"></span>
+                <div class="kw-list" id="monitorPreviewPos"></div>
+                <div class="kw-list" id="monitorPreviewNeg"></div>
+                <div class="insights-list" id="homeTopGroups"></div>
+                <svg class="trend-chart" id="homeTrendChart" viewBox="0 0 360 130" preserveAspectRatio="none"></svg>
+                <div class="muted" id="homeTrendMeta"></div>
               </div>
             </div>
           </div>
@@ -1427,8 +2005,7 @@
                 <input type="checkbox" id="groupsOnlySelected" />
                 <span data-i18n="groups.show_selected_only">show selected only</span>
               </label>
-              <span id="groupCount" class="muted"></span>
-              <span id="selectedGroupCount" class="accent"></span>
+              <span id="groupCount" class="muted">0 groups monitored</span>
             </div>
             <div class="muted" id="groupsSelectionSummary" style="margin-top:6px"></div>
             <div class="muted" id="groupsEmptyState" style="margin-top:8px; display:none"></div>
@@ -1438,15 +2015,22 @@
 
         <section class="panel" data-panel="profiles">
           <div class="grid">
-            <div class="card profile-builder-flat">
+            <div class="card">
+              <div class="row" style="justify-content:space-between;align-items:center">
+                <h2 data-i18n="profiles.saved">Saved Alerts</h2>
+                <button class="btn btn-gray" id="btnCreateNewAlertGlobal" data-i18n="profiles.create_new">Create New Alert</button>
+              </div>
+              <div class="profiles-list" id="profilesList"></div>
+            </div>
+            <div class="card profile-builder-flat" id="profileBuilderCard">
               <h2 data-i18n="profiles.builder">Alert Builder</h2>
               <div class="wizard-head">
-                <div class="wizard-step-pill" id="profileWizardPill">Step 1 of 4</div>
+                <div class="wizard-step-pill" id="profileWizardPill">Builder</div>
                 <span id="activeProfileBadge" class="accent" data-i18n="profiles.none_selected">none selected</span>
               </div>
 
-              <div class="wizard-question" id="profileWizardQuestion" data-i18n="profiles.question_name">What do you want to call this alert?</div>
-              <div class="wizard-hint" id="profileWizardHint"></div>
+              <div class="wizard-question" id="profileWizardQuestion" data-i18n="profiles.builder_simple_title">Alert setup</div>
+              <div class="wizard-hint" id="profileWizardHint" data-i18n="profiles.builder_simple_hint">Define your lead intent and save.</div>
 
               <div class="wizard-step active" id="profileStepName">
                 <span class="section-label" data-i18n="profiles.name_label">Alert name</span>
@@ -1456,62 +2040,48 @@
 
               <div class="wizard-step" id="profileStepWatch">
                 <span class="section-label" data-i18n="profiles.watch_label">Watch for words</span>
-                <textarea class="textarea" id="profileEditorPositive" data-i18n-placeholder="profiles.watch_ph" placeholder="looking for, anyone recommend, need help with"></textarea>
-                <div class="row">
+                <div class="tag-editor">
+                  <div class="tag-chips" id="profileWatchChips"></div>
+                  <input class="input tag-input" id="profileWatchInput" data-i18n-placeholder="profiles.keyword_input_ph" placeholder="Type a phrase and press Enter. Example: looking for plumber" />
+                </div>
+                <span class="section-label" data-i18n="profiles.common_intent">Common intent phrases</span>
+                <div class="row profile-intent-row">
                   <button class="btn btn-gray profile-watch-suggestion" data-value="looking for" data-i18n="sugg.looking_for">looking for</button>
                   <button class="btn btn-gray profile-watch-suggestion" data-value="anyone recommend" data-i18n="sugg.anyone_recommend">anyone recommend</button>
                   <button class="btn btn-gray profile-watch-suggestion" data-value="need help with" data-i18n="sugg.need_help_with">need help with</button>
-                  <button class="btn btn-gray profile-watch-suggestion" data-value="best" data-i18n="sugg.best_blank">best ___</button>
+                  <button class="btn btn-gray profile-watch-suggestion" data-value="recommendations for" data-i18n="sugg.recommendations_for">recommendations for</button>
                 </div>
-                <div class="row">
-                  <button class="btn btn-gray" id="btnProfileSkipWatch" data-i18n="profiles.skip_watch">Skip - notify me about all posts</button>
-                </div>
+                <input type="hidden" id="profileEditorPositive" />
               </div>
 
-              <div class="wizard-step" id="profileStepExclude">
-                <span class="section-label" data-i18n="profiles.exclude_label">Exclude words</span>
-                <textarea class="textarea" id="profileEditorNegative" data-i18n-placeholder="profiles.exclude_ph" placeholder="Exclude words"></textarea>
-                <div class="row">
-                  <button class="btn btn-gray profile-exclude-suggestion" data-value="selling" data-i18n="sugg.selling">selling</button>
-                  <button class="btn btn-gray profile-exclude-suggestion" data-value="for sale" data-i18n="sugg.for_sale">for sale</button>
-                  <button class="btn btn-gray profile-exclude-suggestion" data-value="hiring" data-i18n="sugg.hiring">hiring</button>
-                  <button class="btn btn-gray profile-exclude-suggestion" data-value="job post" data-i18n="sugg.job_post">job post</button>
+              <details class="profile-advanced" id="profileAdvancedBlock">
+                <summary data-i18n="profiles.advanced_title">Advanced</summary>
+                <div class="wizard-step" id="profileStepExclude">
+                  <span class="section-label" data-i18n="profiles.exclude_label">Exclude words</span>
+                  <div class="tag-editor">
+                    <div class="tag-chips" id="profileExcludeChips"></div>
+                    <input class="input tag-input" id="profileExcludeInput" data-i18n-placeholder="profiles.keyword_input_ph" placeholder="Type a phrase and press Enter. Example: looking for plumber" />
+                  </div>
+                  <div class="row profile-intent-row">
+                    <button class="btn btn-gray profile-exclude-suggestion" data-value="selling" data-i18n="sugg.selling">selling</button>
+                    <button class="btn btn-gray profile-exclude-suggestion" data-value="for sale" data-i18n="sugg.for_sale">for sale</button>
+                    <button class="btn btn-gray profile-exclude-suggestion" data-value="hiring" data-i18n="sugg.hiring">hiring</button>
+                    <button class="btn btn-gray profile-exclude-suggestion" data-value="job post" data-i18n="sugg.job_post">job post</button>
+                  </div>
+                  <input type="hidden" id="profileEditorNegative" />
                 </div>
-                <div class="row">
-                  <button class="btn btn-gray" id="btnProfileSkipExclude" data-i18n="profiles.skip">Skip</button>
-                </div>
-              </div>
+              </details>
 
               <input class="input" id="profileEditorMin" type="number" min="1" value="5" style="display:none" />
               <input class="input" id="profileEditorMax" type="number" min="1" value="10" style="display:none" />
 
-              <div class="wizard-step" id="profileStepSummary">
-                <div class="summary-card" id="profileSummaryCard"></div>
-              </div>
-
-              <div class="keywords-preview">
-                <div class="kw-block">
-                  <div class="kw-title" data-i18n="kw.watch_for">Watch for</div>
-                  <div class="kw-list" id="profilePreviewPos"></div>
-                </div>
-                <div class="kw-block">
-                  <div class="kw-title" data-i18n="kw.exclude_words">Exclude words</div>
-                  <div class="kw-list" id="profilePreviewNeg"></div>
-                </div>
-              </div>
-
               <div class="row" style="margin-top:8px">
                 <button class="btn btn-gray" id="btnProfilePrevStep" data-i18n="btn.back">Back</button>
                 <button class="btn btn-green" id="btnProfileNextStep" data-i18n="btn.next">Next</button>
-                <button class="btn btn-green" id="btnSaveProfile" style="display:none" data-i18n="btn.save_alert">Save Alert</button>
+                <button class="btn btn-green" id="btnSaveProfile" style="display:none" data-i18n="btn.create_alert">Create Alert</button>
                 <button class="btn btn-blue" id="btnProfileStartMonitoring" style="display:none" data-i18n="btn.start_monitoring">Start monitoring</button>
-                <button class="btn btn-gray" id="btnNewProfile" data-i18n="btn.new">New</button>
-                <button class="btn btn-red" id="btnDeleteProfile" data-i18n="btn.delete">Delete</button>
+                <button class="btn btn-gray" id="btnNewProfile" data-i18n="profiles.create_new">Create New Alert</button>
               </div>
-            </div>
-            <div class="card">
-              <h2 data-i18n="profiles.saved">Saved Alerts</h2>
-              <div class="profiles-list" id="profilesList"></div>
             </div>
           </div>
         </section>
@@ -1537,65 +2107,85 @@
 
         <section class="panel" data-panel="settings">
           <div class="grid">
-            <div class="card">
-              <h2 data-i18n="settings.sleep_title">Monitor Sleep Schedule</h2>
-              <div class="settings-note" data-i18n="settings.sleep_note">
-                Sleep schedule pauses monitoring during rest hours to reduce detection risk.
-                Keep this ON for safer account behavior.
-              </div>
-              <div class="row">
-                <label class="muted" style="display:inline-flex;align-items:center;gap:6px">
-                  <input type="checkbox" id="sleepEnabled" checked />
-                  <span data-i18n="settings.sleep_enable">Enable sleep schedule</span>
-                </label>
-                <span class="muted" id="sleepTimezone" data-i18n="settings.timezone_auto">Timezone: auto</span>
-              </div>
-              <div class="row">
-                <span class="muted" data-i18n="settings.active_from">Active from</span>
-                <input class="input" id="sleepEndTime" type="time" value="07:00" />
-                <span class="muted" data-i18n="settings.to">to</span>
-                <input class="input" id="sleepStartTime" type="time" value="22:00" />
-                <button class="btn btn-gray" id="btnSaveSleepSchedule" data-i18n="settings.sleep_save">Save Sleep Schedule</button>
-              </div>
-              <div class="row" id="sleepDaysRow"></div>
-            </div>
+            <details class="advanced-settings" id="advancedSettings">
+              <summary data-i18n="settings.advanced_title">Advanced Settings</summary>
+              <div class="advanced-settings-body">
+                <div class="card sleep-card">
+                  <div class="sleep-head">
+                    <h2 data-i18n="settings.sleep_title">Monitor Sleep Schedule</h2>
+                    <label class="sleep-toggle">
+                      <input type="checkbox" id="sleepEnabled" checked />
+                      <span data-i18n="settings.sleep_enable">Enable sleep schedule</span>
+                    </label>
+                  </div>
+                  <div class="settings-note" data-i18n="settings.sleep_note">
+                    Sleep schedule pauses monitoring during rest hours to reduce detection risk.
+                    Keep this ON for safer account behavior.
+                  </div>
+                  <div class="sleep-meta">
+                    <span class="sleep-timezone" id="sleepTimezone" data-i18n="settings.timezone_auto">Timezone: auto</span>
+                  </div>
+                  <div class="sleep-controls" id="sleepControls">
+                    <label class="sleep-field">
+                      <span class="sleep-field-label" data-i18n="settings.active_from">Active from</span>
+                      <input class="input" id="sleepEndTime" type="time" value="07:00" />
+                    </label>
+                    <label class="sleep-field">
+                      <span class="sleep-field-label" data-i18n="settings.to">to</span>
+                      <input class="input" id="sleepStartTime" type="time" value="22:00" />
+                    </label>
+                    <button class="btn btn-green sleep-save" id="btnSaveSleepSchedule" data-i18n="settings.sleep_save">Save Sleep Schedule</button>
+                  </div>
+                  <div class="sleep-days" id="sleepDaysRow"></div>
+                </div>
 
-            <div class="card">
-              <h2 data-i18n="settings.frequency_title">Check frequency (global)</h2>
-              <div class="settings-note warn" data-i18n="settings.frequency_note">
-                One global setting for all alerts. Lower intervals are faster but increase detection risk.
-              </div>
-              <div class="settings-freq-grid" id="settingsFrequencyGrid">
+                <div class="card">
+                  <div class="frequency-simple-head">
+                    <h2 data-i18n="settings.frequency_title">Check frequency (global)</h2>
+                    <span class="frequency-reco" data-i18n="settings.frequency_reco">Balanced (recommended)</span>
+                  </div>
+                  <div class="settings-freq-tip" data-i18n="settings.frequency_tip">
+                    Recommended for most accounts: 15-20 min (safest) or 5-10 min (balanced).
+                  </div>
+                  <div class="frequency-options" id="settingsFrequencyDetails">
+                    <div class="settings-note warn" data-i18n="settings.frequency_note">
+                      One global setting for all alerts. Lower intervals are faster but increase detection risk.
+                    </div>
+                    <div class="settings-freq-grid" id="settingsFrequencyGrid">
                 <button class="settings-freq-card risk-safe" data-min="15" data-max="20">
-                  <div class="title" data-i18n="settings.freq_15_20_title">🕐 Every 15-20 min</div>
+                  <div class="title">
+                    <span data-i18n="settings.freq_15_20_title">🕐 Every 15-20 min</span>
+                    <span class="risk-badge safe" data-i18n="settings.badge_safest">Safest</span>
+                  </div>
                   <div class="desc" data-i18n="settings.freq_15_20_desc">Most discreet · Safest option</div>
                 </button>
                 <button class="settings-freq-card risk-mid" data-min="5" data-max="10" data-pro-only="1">
-                  <div class="title" data-i18n="settings.freq_5_10_title">✅ Every 5-10 min</div>
+                  <div class="title">
+                    <span data-i18n="settings.freq_5_10_title">✅ Every 5-10 min</span>
+                    <span class="risk-badge reco" data-i18n="settings.badge_recommended">Recommended</span>
+                  </div>
                   <div class="desc" data-i18n="settings.freq_5_10_desc">Recommended balance · Pro</div>
                 </button>
                 <button class="settings-freq-card risk-high" data-min="3" data-max="5" data-pro-only="1">
-                  <div class="title" data-i18n="settings.freq_3_5_title">🔄 Every 3-5 min</div>
+                  <div class="title">
+                    <span data-i18n="settings.freq_3_5_title">🔄 Every 3-5 min</span>
+                    <span class="risk-badge high" data-i18n="settings.badge_high_risk">High risk</span>
+                  </div>
                   <div class="desc" data-i18n="settings.freq_3_5_desc">Elevated risk · Pro</div>
                 </button>
                 <button class="settings-freq-card risk-high" data-min="1" data-max="3" data-pro-only="1">
-                  <div class="title" data-i18n="settings.freq_1_3_title">⚡ Every 1-3 min</div>
+                  <div class="title">
+                    <span data-i18n="settings.freq_1_3_title">⚡ Every 1-3 min</span>
+                    <span class="risk-badge danger" data-i18n="settings.badge_highest_risk">Highest risk</span>
+                  </div>
                   <div class="desc" data-i18n="settings.freq_1_3_desc">Highest risk · Pro</div>
                 </button>
+                    </div>
+                  </div>
+                  <div class="muted" id="globalFrequencyHint"></div>
+                </div>
               </div>
-              <div class="muted" id="globalFrequencyHint"></div>
-            </div>
-
-            <div class="card">
-              <h2 data-i18n="settings.notifications_title">Notifications (global)</h2>
-              <div class="muted" data-i18n="settings.notifications_note">Applies to all alerts. You can combine multiple channels.</div>
-              <div class="notify-grid">
-                <label class="notify-item"><input type="checkbox" id="notifyBrowser" checked /> <span data-i18n="settings.notify_browser">🔔 Browser notifications</span></label>
-                <label class="notify-item" id="notifyWebhookWrap"><input type="checkbox" id="notifyWebhook" /> <span data-i18n="settings.notify_webhook">🔗 Webhook (Pro)</span></label>
-                <label class="notify-item" id="notifySlackWrap"><input type="checkbox" id="notifySlack" /> <span data-i18n="settings.notify_slack">💬 Slack (Pro)</span></label>
-                <label class="notify-item"><input type="checkbox" id="notifyInApp" checked /> <span data-i18n="settings.notify_in_app">🔕 In-app only</span></label>
-              </div>
-            </div>
+            </details>
 
             <div class="card">
               <h2 data-i18n="settings.account">Account</h2>
@@ -1619,7 +2209,6 @@
             <div class="card">
               <h2 data-i18n="settings.data">Data</h2>
               <div class="row">
-                <button class="btn btn-gray" id="btnExportCsv" data-i18n="data.export_csv_soon">Export CSV (soon)</button>
                 <button class="btn btn-red" id="btnClearHistory" data-i18n="data.clear_lead_history">Clear Lead History</button>
               </div>
             </div>
@@ -1644,6 +2233,66 @@
               <div class="log" id="logGeneral" style="margin-top:10px"></div>
             </div>
 
+          </div>
+        </section>
+
+        <section class="panel" data-panel="notifications">
+          <div class="grid">
+            <div class="card">
+              <h2 data-i18n="settings.notifications_title">Notifications (global)</h2>
+              <div class="muted" data-i18n="settings.notifications_note">Applies to all alerts. You can combine multiple channels.</div>
+              <div class="notify-grid">
+                <div class="notify-item">
+                  <label class="notify-card">
+                    <input type="checkbox" id="notifyBrowser" checked />
+                    <div class="notify-title" data-i18n="settings.notify_browser">🔔 Desktop notifications</div>
+                    <div class="notify-desc" data-i18n="settings.notify_browser_desc">Best for instant alerts while working on this device.</div>
+                  </label>
+                </div>
+                <div class="notify-item" id="notifyTelegramWrap">
+                  <label class="notify-card">
+                    <input type="checkbox" id="notifyTelegram" />
+                    <div class="notify-title" data-i18n="settings.notify_telegram">📨 Telegram</div>
+                    <div class="notify-desc" data-i18n="settings.notify_telegram_desc">Get lead alerts on mobile through your Telegram bot.</div>
+                  </label>
+                </div>
+                <div class="notify-item" id="notifyWebhookWrap">
+                  <label class="notify-card">
+                    <input type="checkbox" id="notifyWebhook" />
+                    <div class="notify-title" data-i18n="settings.notify_webhook">🔗 Custom webhook</div>
+                    <div class="notify-desc" data-i18n="settings.notify_webhook_desc">Send leads to your own app, n8n, Make, Zapier, or internal APIs.</div>
+                  </label>
+                </div>
+              </div>
+
+              <div class="settings-note" style="margin-top:10px">
+                <strong data-i18n="settings.notify_telegram_title">Telegram notifications:</strong>
+                <span data-i18n="settings.notify_telegram_body">Use the GrabClientsNow bot to receive instant lead alerts on Telegram.</span>
+                <ol class="notify-help-list">
+                  <li data-i18n="settings.telegram_how_1">Open Telegram and search for <strong>GrabClientsNow bot</strong>.</li>
+                  <li data-i18n="settings.telegram_how_2">Send <code>/start</code> to the bot once.</li>
+                  <li data-i18n="settings.telegram_how_3">Use @userinfobot to get your numeric <code>chat_id</code>.</li>
+                  <li data-i18n="settings.telegram_how_4">Paste that chat_id below and click Test Telegram.</li>
+                </ol>
+              </div>
+              <div class="row" style="margin-top:8px">
+                <input class="input" id="telegramChatId" data-i18n-placeholder="settings.telegram_chatid_ph" placeholder="Telegram chat_id (e.g. 123456789)" />
+                <button class="btn btn-gray" id="btnTestTelegram" data-i18n="settings.test_telegram">Test Telegram</button>
+              </div>
+              <div class="settings-note" style="margin-top:10px">
+                <strong data-i18n="settings.notify_webhook_title">Custom webhook:</strong>
+                <span data-i18n="settings.notify_webhook_body">For technical users. Send leads to your own app, n8n, Make, Zapier, or internal APIs.</span>
+              </div>
+              <div class="row" style="margin-top:8px">
+                <input class="input" id="notifyWebhookUrl" data-i18n-placeholder="settings.webhook_url_ph" placeholder="https://your-webhook-url.com/endpoint" />
+                <button class="btn btn-gray" id="btnTestWebhook" data-i18n="settings.test_webhook">Test webhook</button>
+              </div>
+              <div class="row" style="margin-top:8px">
+                <button class="btn btn-gray" id="btnTestDesktop" data-i18n="settings.test_desktop">Test desktop</button>
+                <button class="btn btn-green" id="btnSaveNotifications" data-i18n="settings.save_notifications">Save notifications</button>
+                <a class="btn btn-gray" id="btnAskMoreChannels" href="mailto:withdonebetter@gmail.com?subject=GrabClientsNow%20-%20Need%20more%20notification%20channels" data-i18n="settings.notify_ask_more">Ask for more channels</a>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -1699,18 +2348,40 @@
             <option value="pt-br">Português (BR)</option>
           </select>
         </div>
-        <div class="auth-title" data-i18n="auth.title">Welcome to GrabClientsNow</div>
-        <div class="auth-copy" id="authCopy" data-i18n="auth.copy">Enter your email to get started.</div>
-        <div class="auth-row">
-          <input class="input" id="authEmail" type="email" data-i18n-placeholder="auth.email_ph" placeholder="you@email.com" style="min-width:280px" />
-          <button class="btn btn-green" id="btnAuthContinue" data-i18n="auth.continue">Continue</button>
-        </div>
-        <div class="auth-row" id="authWaitRow" style="display:none">
-          <button class="btn btn-gray" id="btnAuthCheckSession" data-i18n="auth.clicked_link">I clicked the link</button>
-          <button class="btn btn-gray" id="btnAuthResend" disabled data-i18n="auth.resend">Resend email</button>
-          <button class="btn btn-gray" id="btnAuthChangeEmail" data-i18n="auth.change_email">Use a different email</button>
+        <div class="auth-shell">
+          <div class="auth-hero">
+            <div class="auth-orb"><span class="auth-orb-core"></span></div>
+            <div class="auth-hero-note" data-i18n="auth.secure_note">Secure email access</div>
+          </div>
+          <div class="auth-content">
+            <div class="auth-title" data-i18n="auth.title">Welcome to GrabClientsNow</div>
+            <div class="auth-copy" id="authCopy" data-i18n="auth.copy">Enter your email to get started.</div>
+            <div class="auth-row auth-primary-row">
+              <input class="input" id="authEmail" type="email" data-i18n-placeholder="auth.email_ph" placeholder="you@email.com" />
+              <button class="btn btn-green" id="btnAuthContinue" data-i18n="auth.continue">Continue</button>
+            </div>
+            <div class="auth-row" id="authWaitRow" style="display:none">
+              <input class="input" id="authCode" type="text" maxlength="8" data-i18n-placeholder="auth.code_ph" placeholder="123456" />
+              <button class="btn btn-green" id="btnAuthVerifyCode" data-i18n="auth.verify_code">Verify code</button>
+              <button class="btn btn-gray" id="btnAuthResend" disabled data-i18n="auth.resend">Resend email</button>
+              <button class="btn btn-gray" id="btnAuthChangeEmail" data-i18n="auth.change_email">Use a different email</button>
+            </div>
+          </div>
         </div>
         <div class="log" id="logAuthGate" style="max-height:160px"></div>
+      </div>
+    </div>
+
+    <div class="plan-lock-gate" id="planLockGate">
+      <div class="plan-lock-card">
+        <div class="plan-lock-title" data-i18n="plan.lock_title">Trial ended</div>
+        <div class="plan-lock-copy" data-i18n="plan.lock_body">
+          Your trial has ended. Upgrade to Pro to keep monitoring and alerts active.
+        </div>
+        <div class="plan-lock-actions">
+          <button class="btn btn-green" id="btnPlanLockUpgrade" data-i18n="btn.upgrade">Upgrade</button>
+          <button class="btn btn-gray" id="btnPlanLockSignOut" data-i18n="account.sign_out">Sign out</button>
+        </div>
       </div>
     </div>
 

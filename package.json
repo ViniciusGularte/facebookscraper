@@ -1,0 +1,29 @@
+{
+  "name": "grabclientsnow-extension",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Build pipeline for GrabClientsNow Chrome extension",
+  "scripts": {
+    "clean": "rm -rf dist",
+    "test": "node --test tests/*.test.js",
+    "test:e2e": "node --test tests/e2e/*.test.js",
+    "test:e2e:billing": "node --test tests/e2e/billing.e2e.test.js",
+    "test:webhook": "node scripts/test-stripe-webhook.mjs",
+    "test:webhook:strict": "WEBHOOK_TEST_STRICT=1 node scripts/test-stripe-webhook.mjs",
+    "test:billing": "node scripts/test-billing-flow.mjs",
+    "test:billing:strict": "BILLING_TEST_STRICT=1 node scripts/test-billing-flow.mjs",
+    "test:magiclink": "node scripts/test-magiclink-lifecycle.mjs",
+    "test:prod-readiness": "node scripts/test-prod-readiness.mjs",
+    "test:webhook:health": "node scripts/test-webhook-health.mjs",
+    "grant:pro": "node scripts/grant-pro-access.mjs",
+    "revoke:pro": "node scripts/grant-pro-access.mjs --revoke-pro",
+    "build": "npm run test && node scripts/build.mjs",
+    "build:dev": "NO_OBFUSCATE=1 node scripts/build.mjs",
+    "pack": "BUILD_ZIP=1 node scripts/build.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "javascript-obfuscator": "^5.3.0"
+  }
+}

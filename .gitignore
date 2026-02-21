@@ -1,0 +1,4 @@
+node_modules/
+dist/
+grabclientsnow-extension.zip
+.env

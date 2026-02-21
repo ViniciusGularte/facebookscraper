@@ -7,717 +7,8 @@
  *  - Obter a data de criação do perfil
  */
 
-"use strict";
-
-// ─────────────────────────────────────────────────────────────
-// PARSER DE JSON PERMISSIVO (jsonrepair)
-// Converte JSON malformado/parcial em JSON válido
-// ─────────────────────────────────────────────────────────────
-
-class JsonParseError extends Error {
-  constructor(message, position) {
-    super(`${message} at position ${position}`);
-    this.position = position;
-  }
-}
-
-// Códigos de espaço em branco aceitos
-const SPACE = 32;
-const NEWLINE = 10;
-const TAB = 9;
-const CARRIAGE = 13;
-const NBSP = 160;
-const EN_SPACE = 8192;
-const HAIR_SPACE = 8202;
-const NARROW_NBSP = 8239;
-const MATH_SPACE = 8287;
-const IDEOGRAPHIC = 12288;
-
-function isHexChar(ch) {
-  return /^[0-9A-Fa-f]$/.test(ch);
-}
-function isDigit(ch) {
-  return ch >= "0" && ch <= "9";
-}
-function isPrintable(ch) {
-  return ch >= " ";
-}
-function isSpecialChar(ch) {
-  return ",:[]/{}()\n+".includes(ch);
-}
-function isAlpha(ch) {
-  return (
-    (ch >= "a" && ch <= "z") ||
-    (ch >= "A" && ch <= "Z") ||
-    ch === "_" ||
-    ch === "$"
-  );
-}
-function isAlphaNumeric(ch) {
-  return isAlpha(ch) || (ch >= "0" && ch <= "9");
-}
-function isSpecialArray(ch) {
-  return ",[]/{}\n+".includes(ch);
-}
-function isQuoteOrWord(ch) {
-  return isQuote(ch) || /^[[{\w-]$/.test(ch);
-}
-function isEscapeChar(ch) {
-  return (
-    "\n" === ch || "\r" === ch || "\t" === ch || "\b" === ch || "\f" === ch
-  );
-}
-
-const URL_PROTOCOL_REGEX = /^(http|https|ftp|mailto|file|data|irc):\/\/$/;
-const URL_CHAR_REGEX = /^[A-Za-z0-9-._~:/?#@!$&'()*+;=]$/;
-
-function isWhitespace(str, pos) {
-  const code = str.charCodeAt(pos);
-  return (
-    code === SPACE || code === NEWLINE || code === TAB || code === CARRIAGE
-  );
-}
-
-function isWhitespaceNoNewline(str, pos) {
-  const code = str.charCodeAt(pos);
-  return code === SPACE || code === TAB || code === CARRIAGE;
-}
-
-function isUnicodeSpace(str, pos) {
-  const code = str.charCodeAt(pos);
-  return (
-    code === NBSP ||
-    (code >= EN_SPACE && code <= HAIR_SPACE) ||
-    code === NARROW_NBSP ||
-    code === MATH_SPACE ||
-    code === IDEOGRAPHIC
-  );
-}
-
-function isQuote(ch) {
-  return isDoubleQuote(ch) || isSingleQuote(ch);
-}
-function isDoubleQuote(ch) {
-  return ch === '"' || ch === "\u201C" || ch === "\u201D";
-}
-function isStandardDoubleQuote(ch) {
-  return ch === '"';
-}
-function isSingleQuote(ch) {
-  return (
-    ch === "'" ||
-    ch === "\u2018" ||
-    ch === "\u2019" ||
-    ch === "`" ||
-    ch === "\u00B4"
-  );
-}
-function isStandardSingleQuote(ch) {
-  return ch === "'";
-}
-
-function removeLastOccurrence(str, char, remove = false) {
-  const idx = str.lastIndexOf(char);
-  if (idx === -1) return str;
-  return str.substring(0, idx) + (remove ? "" : str.substring(idx + 1));
-}
-
-function insertBeforeTrailingWhitespace(str, insertion) {
-  let end = str.length;
-  if (!isWhitespace(str, end - 1)) return str + insertion;
-  while (isWhitespace(str, end - 1)) end--;
-  return str.substring(0, end) + insertion + str.substring(end);
-}
-
-function removeCharAt(str, pos, count) {
-  return str.substring(0, pos) + str.substring(pos + count);
-}
-
-const ESCAPE_MAP = {
-  "\b": "\\b",
-  "\f": "\\f",
-  "\n": "\\n",
-  "\r": "\\r",
-  "\t": "\\t",
-};
-const UNESCAPE_MAP = {
-  '"': '"',
-  "\\": "\\",
-  "/": "/",
-  b: "\b",
-  f: "\f",
-  n: "\n",
-  r: "\r",
-  t: "\t",
-};
-
-/**
- * Tenta corrigir e parsear JSON malformado.
- * Retorna string JSON válida ou lança JsonParseError.
- */
-function repairJson(input) {
-  let pos = 0;
-  let output = "";
-
-  skipCodeFences(["```", "[```", "{```"]);
-
-  if (!parseValue()) {
-    throw new JsonParseError("Unexpected end of json string", input.length);
-  }
-
-  skipCodeFences(["```", "```]", "```}"]);
-
-  const hasComma = consumeChar(",");
-  if (hasComma) skipWhitespace();
-
-  if (isQuoteOrWord(input[pos]) && /[,\n][ \t\r]*$/.test(output)) {
-    if (!hasComma) output = insertBeforeTrailingWhitespace(output, ",");
-    parseImplicitArray();
-  } else if (hasComma) {
-    output = removeLastOccurrence(output, ",");
-  }
-
-  while (input[pos] === "}" || input[pos] === "]") {
-    pos++;
-    skipWhitespace();
-  }
-
-  if (pos >= input.length) return output;
-
-  // ── Funções internas ──────────────────────────────────────
-
-  function parseValue() {
-    skipWhitespace();
-    const result =
-      parseObject() ||
-      parseArray() ||
-      parseString() ||
-      parseNumber() ||
-      parseLiteral("true", "true") ||
-      parseLiteral("false", "false") ||
-      parseLiteral("null", "null") ||
-      parseLiteral("True", "true") ||
-      parseLiteral("False", "false") ||
-      parseLiteral("None", "null") ||
-      parseUnquotedString(false) ||
-      parseRegexLiteral();
-
-    skipWhitespace();
-    return result;
-  }
-
-  function skipWhitespace(includeNewlines = true) {
-    const start = pos;
-    let moved;
-    do {
-      moved = skipSpaceChars(includeNewlines);
-      if (moved) moved = skipComment();
-    } while (moved);
-    return pos > start;
-  }
-
-  function skipSpaceChars(includeNewlines) {
-    const checker = includeNewlines ? isWhitespace : isWhitespaceNoNewline;
-    let acc = "";
-    for (;;) {
-      if (checker(input, pos)) {
-        acc += input[pos];
-        pos++;
-      } else if (isUnicodeSpace(input, pos)) {
-        acc += " ";
-        pos++;
-      } else break;
-    }
-    if (acc.length > 0) {
-      output += acc;
-      return true;
-    }
-    return false;
-  }
-
-  function skipComment() {
-    if (input[pos] === "/" && input[pos + 1] === "*") {
-      while (pos < input.length && !isEndOfBlockComment(input, pos)) pos++;
-      pos += 2;
-      return true;
-    }
-    if (input[pos] === "/" && input[pos + 1] === "/") {
-      while (pos < input.length && input[pos] !== "\n") pos++;
-      return true;
-    }
-    return false;
-  }
-
-  function skipCodeFences(fences) {
-    if (matchAndSkip(fences)) {
-      if (isAlpha(input[pos]))
-        while (pos < input.length && isAlphaNumeric(input[pos])) pos++;
-      skipWhitespace();
-      return true;
-    }
-    return false;
-  }
-
-  function matchAndSkip(options) {
-    for (const opt of options) {
-      const end = pos + opt.length;
-      if (input.slice(pos, end) === opt) {
-        pos = end;
-        return true;
-      }
-    }
-    return false;
-  }
-
-  function consumeChar(ch) {
-    if (input[pos] === ch) {
-      output += input[pos];
-      pos++;
-      return true;
-    }
-    return false;
-  }
-
-  function skipChar(ch) {
-    if (input[pos] === ch) {
-      pos++;
-      return true;
-    }
-    return false;
-  }
-
-  function skipEllipsis() {
-    skipWhitespace();
-    if (
-      input[pos] === "." &&
-      input[pos + 1] === "." &&
-      input[pos + 2] === "."
-    ) {
-      pos += 3;
-      skipWhitespace();
-      skipChar(",");
-      return true;
-    }
-    return false;
-  }
-
-  function parseObject() {
-    if (input[pos] !== "{") return false;
-
-    output += "{";
-    pos++;
-    skipWhitespace();
-    if (input[pos] === ",") {
-      pos++;
-    }
-    skipWhitespace();
-
-    let first = true;
-    while (pos < input.length && input[pos] !== "}") {
-      let needsComma;
-      if (first) {
-        needsComma = true;
-        first = false;
-      } else {
-        needsComma = consumeChar(",");
-        if (!needsComma) output = insertBeforeTrailingWhitespace(output, ",");
-        skipWhitespace();
-      }
-
-      skipEllipsis();
-      if (!parseString() && !parseUnquotedString(true)) {
-        if (["}", "{", "]", "[", undefined].includes(input[pos])) {
-          output = removeLastOccurrence(output, ",");
-        } else {
-          throwObjectKeyExpected();
-        }
-        break;
-      }
-
-      skipWhitespace();
-      const hasColon = consumeChar(":");
-      const atEnd = pos >= input.length;
-
-      if (!hasColon) {
-        if (isQuoteOrWord(input[pos]) || atEnd)
-          output = insertBeforeTrailingWhitespace(output, ":");
-        else throwColonExpected();
-      }
-
-      if (!parseValue()) {
-        if (hasColon || atEnd) output += "null";
-        else throwColonExpected();
-      }
-    }
-
-    if (input[pos] === "}") {
-      output += "}";
-      pos++;
-    } else output = insertBeforeTrailingWhitespace(output, "}");
-
-    return true;
-  }
-
-  function parseArray() {
-    if (input[pos] !== "[") return false;
-
-    output += "[";
-    pos++;
-    skipWhitespace();
-    if (input[pos] === ",") {
-      pos++;
-    }
-    skipWhitespace();
-
-    let first = true;
-    while (pos < input.length && input[pos] !== "]") {
-      if (first) {
-        first = false;
-      } else {
-        if (!consumeChar(","))
-          output = insertBeforeTrailingWhitespace(output, ",");
-      }
-      skipEllipsis();
-      if (!parseValue()) {
-        output = removeLastOccurrence(output, ",");
-        break;
-      }
-    }
-
-    if (input[pos] === "]") {
-      output += "]";
-      pos++;
-    } else output = insertBeforeTrailingWhitespace(output, "]");
-
-    return true;
-  }
-
-  function parseImplicitArray() {
-    let first = true;
-    let hasMore = true;
-    while (hasMore) {
-      if (first) {
-        first = false;
-      } else {
-        if (!consumeChar(","))
-          output = insertBeforeTrailingWhitespace(output, ",");
-      }
-      hasMore = parseValue();
-    }
-    if (!hasMore) output = removeLastOccurrence(output, ",");
-    output = `[\n${output}\n]`;
-  }
-
-  function parseNumber() {
-    const start = pos;
-
-    if (input[pos] === "-") {
-      pos++;
-      if (isEndOfInput()) {
-        appendNumberSuffix(start);
-        return true;
-      }
-      if (!isDigit(input[pos])) {
-        pos = start;
-        return false;
-      }
-    }
-
-    while (isDigit(input[pos])) pos++;
-
-    if (input[pos] === ".") {
-      pos++;
-      if (isEndOfInput()) {
-        appendNumberSuffix(start);
-        return true;
-      }
-      if (!isDigit(input[pos])) {
-        pos = start;
-        return false;
-      }
-      while (isDigit(input[pos])) pos++;
-    }
-
-    if (input[pos] === "e" || input[pos] === "E") {
-      pos++;
-      if (input[pos] === "-" || input[pos] === "+") pos++;
-      if (isEndOfInput()) {
-        appendNumberSuffix(start);
-        return true;
-      }
-      if (!isDigit(input[pos])) {
-        pos = start;
-        return false;
-      }
-      while (isDigit(input[pos])) pos++;
-    }
-
-    if (!isEndOfInput()) {
-      pos = start;
-      return false;
-    }
-    if (pos > start) {
-      const raw = input.slice(start, pos);
-      output += /^0\d/.test(raw) ? `"${raw}"` : raw;
-      return true;
-    }
-    return false;
-  }
-
-  function parseLiteral(token, replacement) {
-    if (input.slice(pos, pos + token.length) === token) {
-      output += replacement;
-      pos += token.length;
-      return true;
-    }
-    return false;
-  }
-
-  function parseRegexLiteral() {
-    if (input[pos] !== "/") return;
-    const start = pos;
-    for (
-      pos++;
-      pos < input.length && (input[pos] !== "/" || input[pos - 1] === "\\");
-      pos++
-    );
-    pos++;
-    output += `"${input.substring(start, pos)}"`;
-    return true;
-  }
-
-  function parseString(strict = false, stopAt = -1) {
-    let hadBackslash = input[pos] === "\\";
-    if (hadBackslash) {
-      pos++;
-    }
-
-    if (!isQuote(input[pos])) return false;
-
-    const quoteType = isStandardDoubleQuote(input[pos])
-      ? isStandardDoubleQuote
-      : isStandardSingleQuote(input[pos])
-        ? isStandardSingleQuote
-        : isSingleQuote(input[pos])
-          ? isSingleQuote
-          : isDoubleQuote;
-
-    const startPos = pos;
-    const outputStart = output.length;
-    let strOutput = '"';
-
-    pos++;
-    for (;;) {
-      if (pos >= input.length) {
-        const nonWsPos = findLastNonWhitespace(pos - 1);
-        if (!strict && isSpecialChar(input.charAt(nonWsPos))) {
-          pos = startPos;
-          output = output.substring(0, outputStart);
-          return parseString(true);
-        }
-        strOutput = insertBeforeTrailingWhitespace(strOutput, '"');
-        output += strOutput;
-        return true;
-      }
-
-      if (pos === stopAt) {
-        strOutput = insertBeforeTrailingWhitespace(strOutput, '"');
-        output += strOutput;
-        return true;
-      }
-
-      if (quoteType(input[pos])) {
-        const closingPos = pos;
-        const strOutputStart = strOutput.length;
-        strOutput += '"';
-        pos++;
-        output += strOutput;
-        skipWhitespace(false);
-
-        if (
-          strict ||
-          pos >= input.length ||
-          isSpecialChar(input[pos]) ||
-          isQuote(input[pos]) ||
-          isDigit(input[pos])
-        ) {
-          concatenateStrings();
-          return true;
-        }
-
-        const prevNonWs = findLastNonWhitespace(closingPos - 1);
-        const prevChar = input.charAt(prevNonWs);
-
-        if (prevChar === ",") {
-          pos = startPos;
-          output = output.substring(0, outputStart);
-          return parseString(false, prevNonWs);
-        }
-        if (isSpecialChar(prevChar)) {
-          pos = startPos;
-          output = output.substring(0, outputStart);
-          return parseString(true);
-        }
-
-        output = output.substring(0, outputStart);
-        pos = closingPos + 1;
-        strOutput = `${strOutput.substring(0, strOutputStart)}\\${strOutput.substring(strOutputStart)}`;
-      } else {
-        if (strict && isSpecialArray(input[pos])) {
-          if (
-            input[pos - 1] === ":" &&
-            URL_PROTOCOL_REGEX.test(input.substring(startPos + 1, pos + 2))
-          ) {
-            while (pos < input.length && URL_CHAR_REGEX.test(input[pos])) {
-              strOutput += input[pos];
-              pos++;
-            }
-          }
-          strOutput = insertBeforeTrailingWhitespace(strOutput, '"');
-          output += strOutput;
-          concatenateStrings();
-          return true;
-        }
-
-        if (input[pos] === "\\") {
-          const nextCh = input.charAt(pos + 1);
-          if (UNESCAPE_MAP[nextCh] !== undefined) {
-            strOutput += input.slice(pos, pos + 2);
-            pos += 2;
-          } else if (nextCh === "u") {
-            let hexLen = 2;
-            while (hexLen < 6 && isHexChar(input[pos + hexLen])) hexLen++;
-            if (hexLen === 6) {
-              strOutput += input.slice(pos, pos + 6);
-              pos += 6;
-            } else if (pos + hexLen >= input.length) {
-              pos = input.length;
-            } else throwInvalidUnicode();
-          } else {
-            strOutput += nextCh;
-            pos += 2;
-          }
-        } else {
-          const ch = input.charAt(pos);
-          if (ch === '"' && input[pos - 1] !== "\\") {
-            strOutput += `\\${ch}`;
-            pos++;
-          } else if (isEscapeChar(ch)) {
-            strOutput += ESCAPE_MAP[ch];
-            pos++;
-          } else {
-            if (!isPrintable(ch)) throwInvalidChar(ch);
-            strOutput += ch;
-            pos++;
-          }
-        }
-      }
-
-      if (hadBackslash) skipChar("\\");
-    }
-  }
-
-  function concatenateStrings() {
-    let concatenated = false;
-    for (skipWhitespace(); input[pos] === "+"; ) {
-      concatenated = true;
-      pos++;
-      skipWhitespace();
-      output = removeLastOccurrence(output, '"', true);
-      const outLen = output.length;
-      const success = parseString();
-      if (success) output = removeCharAt(output, outLen, 1);
-      else output = insertBeforeTrailingWhitespace(output, '"');
-    }
-    return concatenated;
-  }
-
-  function parseUnquotedString(isObjectKey) {
-    const start = pos;
-    if (isAlpha(input[pos])) {
-      while (pos < input.length && isAlphaNumeric(input[pos])) pos++;
-      let lookAhead = pos;
-      while (isWhitespace(input, lookAhead)) lookAhead++;
-      if (input[lookAhead] === "(") {
-        pos = lookAhead + 1;
-        parseValue();
-        if (input[pos] === ")") {
-          pos++;
-          if (input[pos] === ";") pos++;
-        }
-        return true;
-      }
-    }
-
-    while (
-      pos < input.length &&
-      !isSpecialArray(input[pos]) &&
-      !isQuote(input[pos]) &&
-      (!isObjectKey || input[pos] !== ":")
-    )
-      pos++;
-
-    if (
-      input[pos - 1] === ":" &&
-      URL_PROTOCOL_REGEX.test(input.substring(start, pos + 2))
-    ) {
-      while (pos < input.length && URL_CHAR_REGEX.test(input[pos])) pos++;
-    }
-
-    if (pos > start) {
-      while (isWhitespace(input, pos - 1) && pos > 0) pos--;
-      const raw = input.slice(start, pos);
-      output += raw === "undefined" ? "null" : JSON.stringify(raw);
-      if (input[pos] === '"') pos++;
-      return true;
-    }
-  }
-
-  function findLastNonWhitespace(idx) {
-    while (idx > 0 && isWhitespace(input, idx)) idx--;
-    return idx;
-  }
-
-  function isEndOfInput() {
-    return (
-      pos >= input.length ||
-      isSpecialChar(input[pos]) ||
-      isWhitespace(input, pos)
-    );
-  }
-
-  function appendNumberSuffix(start) {
-    output += `${input.slice(start, pos)}0`;
-  }
-
-  // Error helpers
-  function throwInvalidChar(ch) {
-    throw new JsonParseError(`Invalid character ${JSON.stringify(ch)}`, pos);
-  }
-  function throwObjectKeyExpected() {
-    throw new JsonParseError("Object key expected", pos);
-  }
-  function throwColonExpected() {
-    throw new JsonParseError("Colon expected", pos);
-  }
-  function throwInvalidUnicode() {
-    const seq = input.slice(pos, pos + 6);
-    throw new JsonParseError(`Invalid unicode character "${seq}"`, pos);
-  }
-  function throwUnexpectedChar() {
-    throw new JsonParseError(
-      `Unexpected character ${JSON.stringify(input[pos])}`,
-      pos,
-    );
-  }
-
-  throwUnexpectedChar();
-}
-
-function isEndOfBlockComment(str, pos) {
-  return str[pos] === "*" && str[pos + 1] === "/";
-}
-
+import { repairJson } from "./json-repair.js";
+import { getTabIdsToClose, pickKeepTab } from "./extension-tabs.js";
 // ─────────────────────────────────────────────────────────────
 // UTILITÁRIOS GERAIS
 // ─────────────────────────────────────────────────────────────
@@ -1192,6 +483,9 @@ const MONITOR_ALARM_NAME = "post-monitor-cycle";
 const SLEEP_SCHEDULE_ALARM_NAME = "sleep-schedule-check";
 const MONITOR_RUNTIME_STORAGE_KEY = "postMonitorRuntime";
 const SLEEP_SCHEDULE_STORAGE_KEY = "sleepSchedule";
+const NOTIFICATION_SETTINGS_STORAGE_KEY = "notificationSettingsGlobal";
+const TELEGRAM_EDGE_URL =
+  "https://hfnwpzglvbzkvhrcwmet.supabase.co/functions/v1/telegram-notify";
 let monitorConfig = {
   selectedGroupIds: [],
   positiveKeywords: [],
@@ -1202,6 +496,120 @@ let monitorConfig = {
 };
 let isSleepModeActive = false;
 let wasRunningBeforeSleep = false;
+
+function getDefaultNotificationSettings() {
+  return {
+    notifyBrowser: true,
+    notifyWebhook: false,
+    notifyTelegram: false,
+    webhookUrl: "",
+    telegramChatId: "",
+  };
+}
+
+async function loadNotificationSettings() {
+  const data = await chrome.storage.local.get([NOTIFICATION_SETTINGS_STORAGE_KEY]);
+  const raw = data?.[NOTIFICATION_SETTINGS_STORAGE_KEY];
+  if (!raw || typeof raw !== "object") return getDefaultNotificationSettings();
+  return { ...getDefaultNotificationSettings(), ...raw };
+}
+
+async function postJsonWithTimeout(url, payload, timeoutMs = 10000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+    const text = await response.text();
+    return { ok: response.ok, status: response.status, text };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function sendDesktopLeadNotification(payload) {
+  if (!chrome.notifications?.create) {
+    return { ok: false, error: "notifications API unavailable" };
+  }
+  const notificationId = `lead-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const message =
+    `${payload?.lead_name || "Lead"} in ${payload?.group || "group"}\n` +
+    `${String(payload?.post_text || "").slice(0, 120)}`;
+  await chrome.notifications.create(notificationId, {
+    type: "basic",
+    iconUrl: "assets/icon.png",
+    title: "GrabClientsNow",
+    message,
+    priority: 2,
+  });
+  return { ok: true };
+}
+
+async function sendWebhookLeadNotification(webhookUrl, payload) {
+  if (!webhookUrl) return { ok: false, error: "missing webhook url" };
+  try {
+    const res = await postJsonWithTimeout(webhookUrl, payload, 10000);
+    if (!res.ok) return { ok: false, error: `HTTP ${res.status}` };
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err?.message || "request failed" };
+  }
+}
+
+async function sendTelegramLeadNotification(chatId, payload) {
+  if (!TELEGRAM_EDGE_URL || TELEGRAM_EDGE_URL.includes("YOUR_PROJECT")) {
+    return { ok: false, error: "telegram edge url not configured" };
+  }
+  if (!chatId) return { ok: false, error: "missing chat_id" };
+  try {
+    const res = await postJsonWithTimeout(
+      TELEGRAM_EDGE_URL,
+      { chat_id: chatId, ...payload },
+      10000,
+    );
+    if (!res.ok) return { ok: false, error: `HTTP ${res.status}` };
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err?.message || "request failed" };
+  }
+}
+
+function buildLeadNotificationPayload(post, profileName) {
+  return {
+    alert_name: profileName || "",
+    lead_name: post?.poster_name || "",
+    group: post?.group_name || "",
+    post_text: String(post?.post_text || post?.marketplace_text || "")
+      .replace(/\s+/g, " ")
+      .trim(),
+    post_url: post?.post_url || post?.marketplace_listing_url || "",
+    matched_keywords: [],
+    detected_at: new Date().toISOString(),
+  };
+}
+
+async function dispatchLeadNotifications(matches, profileName) {
+  if (!Array.isArray(matches) || matches.length === 0) return;
+  const settings = await loadNotificationSettings();
+  const payload = buildLeadNotificationPayload(matches[0], profileName);
+
+  if (settings.notifyBrowser) {
+    const result = await sendDesktopLeadNotification(payload);
+    if (!result.ok) log("[NOTIFY] Desktop failed:", result.error);
+  }
+  if (settings.notifyWebhook && settings.webhookUrl) {
+    const result = await sendWebhookLeadNotification(settings.webhookUrl, payload);
+    if (!result.ok) log("[NOTIFY] Webhook failed:", result.error);
+  }
+  if (settings.notifyTelegram && settings.telegramChatId) {
+    const result = await sendTelegramLeadNotification(settings.telegramChatId, payload);
+    if (!result.ok) log("[NOTIFY] Telegram failed:", result.error);
+  }
+}
 
 function getDefaultSleepSchedule() {
   return {
@@ -1485,13 +893,13 @@ async function runPostMonitorCycle() {
         .trim();
       const postUrl = post?.post_url || post?.marketplace_listing_url || "";
       log(`[MONITOR][POST ${idx + 1}]`);
-      log(`  Grupo: ${post?.group_name || "Grupo"}`);
-      log(`  Pessoa: ${post?.poster_name || "Pessoa"}`);
-      log(`  Tipo: ${post?.post_type || "post"}`);
-      log(`  Conteúdo: ${content || "(sem texto)"}`);
-      log(`  Link grupo: ${post?.group_url || "(sem link)"}`);
-      log(`  Link pessoa: ${post?.user_profile_url || "(sem link)"}`);
-      log(`  Link post: ${postUrl || "(sem link)"}`);
+      log(`  Group: ${post?.group_name || "Group"}`);
+      log(`  Person: ${post?.poster_name || "Person"}`);
+      log(`  Type: ${post?.post_type || "post"}`);
+      log(`  Content: ${content || "(no text)"}`);
+      log(`  Group link: ${post?.group_url || "(no link)"}`);
+      log(`  Person link: ${post?.user_profile_url || "(no link)"}`);
+      log(`  Post link: ${postUrl || "(no link)"}`);
     });
 
     chrome.runtime.sendMessage({
@@ -1505,6 +913,7 @@ async function runPostMonitorCycle() {
     if (!wasWarmupCycle) {
       if (matched.length > 0) {
         await saveLeadsToHistory(matched, monitorConfig.profileName);
+        await dispatchLeadNotifications(matched, monitorConfig.profileName);
         chrome.runtime.sendMessage({
           type: "monitorMatches",
           profileName: monitorConfig.profileName,
@@ -1868,15 +1277,6 @@ async function fetchGroupFeedPosts() {
         }
       }
 
-      if (isFirstRun) {
-        isFirstRun = false;
-        cutoffTimestamp =
-          allPosts.length > 0
-            ? getLatestTimestamp(allPosts)
-            : Math.floor(Date.now() / 1000);
-        break;
-      }
-
       if (cursor) {
         nextCursor = cursor;
       } else {
@@ -1890,7 +1290,15 @@ async function fetchGroupFeedPosts() {
     }
   }
 
-  if (allPosts.length > 0) cutoffTimestamp = getLatestTimestamp(allPosts);
+  if (isFirstRun) {
+    isFirstRun = false;
+    cutoffTimestamp =
+      allPosts.length > 0
+        ? getLatestTimestamp(allPosts)
+        : Math.floor(Date.now() / 1000);
+  } else if (allPosts.length > 0) {
+    cutoffTimestamp = getLatestTimestamp(allPosts);
+  }
   return allPosts.reverse();
 }
 
@@ -2293,8 +1701,48 @@ function parseRegularPost(node) {
 // LISTENERS DE MENSAGENS (comunicação com popup/content scripts)
 // ─────────────────────────────────────────────────────────────
 
-// Abre a página principal de debug ao clicar no ícone da extensão
-chrome.action.onClicked.addListener(() => {
+function isExtensionPageTab(tab) {
+  const url = String(tab?.url || "");
+  return url.startsWith(chrome.runtime.getURL(""));
+}
+
+async function getExtensionTabs() {
+  const allTabs = await chrome.tabs.query({});
+  return allTabs.filter(isExtensionPageTab);
+}
+
+async function focusTab(tab) {
+  if (!tab || typeof tab.id !== "number") return;
+  await chrome.tabs.update(tab.id, { active: true });
+  if (typeof tab.windowId === "number") {
+    await chrome.windows.update(tab.windowId, { focused: true });
+  }
+}
+
+async function enforceSingleExtensionTab(preferredTabId = null) {
+  const extTabs = await getExtensionTabs();
+  if (!extTabs.length) return null;
+
+  const keepTab = pickKeepTab(extTabs, preferredTabId);
+  if (!keepTab || typeof keepTab.id !== "number") return null;
+
+  const toClose = getTabIdsToClose(extTabs, keepTab.id);
+
+  if (toClose.length) {
+    await chrome.tabs.remove(toClose);
+  }
+  await focusTab(keepTab);
+  return keepTab.id;
+}
+
+// Abre/foca a página principal da extensão ao clicar no ícone.
+chrome.action.onClicked.addListener(async () => {
+  const extTabs = await getExtensionTabs();
+  if (extTabs.length) {
+    const preferred = pickKeepTab(extTabs);
+    await enforceSingleExtensionTab(preferred?.id);
+    return;
+  }
   chrome.tabs.create({ url: "index.html" });
 });
 
@@ -2331,6 +1779,32 @@ ensureSleepScheduleAlarm();
 
 // Handler principal de mensagens
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  // ── panelOpened (single-tab guard) ───────────────────────
+  if (message.type === "panelOpened") {
+    (async () => {
+      try {
+        const senderTabId = typeof sender?.tab?.id === "number" ? sender.tab.id : null;
+        const extTabs = await getExtensionTabs();
+        if (extTabs.length <= 1) {
+          sendResponse({ success: true, duplicateClosed: false });
+          return;
+        }
+
+        // Se abriu uma nova aba, mantém a já existente e fecha a nova (sender).
+        const existing = extTabs.find((tab) => tab.id !== senderTabId);
+        const keepId = existing?.id ?? senderTabId;
+        await enforceSingleExtensionTab(keepId);
+        sendResponse({ success: true, duplicateClosed: true, keepTabId: keepId });
+      } catch (err) {
+        sendResponse({
+          success: false,
+          error: err?.message || "Failed to enforce single extension tab.",
+        });
+      }
+    })();
+    return true;
+  }
+
   // ── resetBackgroundState ──────────────────────────────────
   if (message.type === "resetBackgroundState") {
     isFirstRun = true;
@@ -2633,6 +2107,54 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({
           success: false,
           error: err?.message || "Falha ao limpar histórico de leads.",
+        });
+      }
+    })();
+    return true;
+  }
+
+  // ── testNotificationChannel ───────────────────────────────
+  if (message.type === "testNotificationChannel") {
+    (async () => {
+      try {
+        const channel = String(message.channel || "").trim();
+        const settings =
+          message.settings && typeof message.settings === "object"
+            ? message.settings
+            : await loadNotificationSettings();
+        const payload = message.payload || {
+          alert_name: "Test alert",
+          lead_name: "Test lead",
+          group: "Test group",
+          post_text: "This is a test notification payload.",
+          post_url: "https://www.facebook.com/",
+          matched_keywords: [],
+          detected_at: new Date().toISOString(),
+        };
+
+        let result = { ok: false, error: "invalid channel" };
+        if (channel === "desktop") {
+          result = await sendDesktopLeadNotification(payload);
+        } else if (channel === "webhook") {
+          result = await sendWebhookLeadNotification(
+            String(settings.webhookUrl || ""),
+            payload,
+          );
+        } else if (channel === "telegram") {
+          result = await sendTelegramLeadNotification(
+            String(settings.telegramChatId || ""),
+            payload,
+          );
+        }
+
+        sendResponse({
+          success: !!result.ok,
+          error: result.ok ? "" : result.error || "notification test failed",
+        });
+      } catch (err) {
+        sendResponse({
+          success: false,
+          error: err?.message || "notification test failed",
         });
       }
     })();
