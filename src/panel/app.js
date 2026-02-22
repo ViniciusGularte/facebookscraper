@@ -11,6 +11,7 @@ import {
   STORAGE_AUTH_EMAIL_KEY,
   STORAGE_ONBOARDING_STATE_KEY,
   STORAGE_NOTIFICATION_SETTINGS_KEY,
+  STORAGE_GUIDED_TIPS_DISMISSED_KEY,
   PLAN_CACHE_TTL_MS,
   SUPABASE_URL,
   SUPABASE_ANON_KEY,
@@ -46,6 +47,7 @@ let currentGuidedActions = [];
 let guidedCommandHistory = [];
 let guidedHistoryCursor = -1;
 let onboardingAutoGroupLoadAttempted = false;
+let guidedTipsDismissed = false;
 let onboardingGroupsProgress = {
   started: false,
   lastCount: 0,
@@ -211,6 +213,23 @@ async function loadOnboardingState() {
   const value = String(data?.[STORAGE_ONBOARDING_STATE_KEY] || "").trim();
   const allowed = new Set(["welcome", "fb_connect", "groups", "alert", "ready"]);
   onboardingState = allowed.has(value) ? value : "welcome";
+}
+
+async function loadGuidedTipsPreference() {
+  const data = await chrome.storage.local.get([STORAGE_GUIDED_TIPS_DISMISSED_KEY]);
+  guidedTipsDismissed = !!data?.[STORAGE_GUIDED_TIPS_DISMISSED_KEY];
+}
+
+function applyGuidedTipsVisibility() {
+  const block = qs("guidedTipsBlock");
+  if (!block) return;
+  block.classList.toggle("dismissed", guidedTipsDismissed);
+}
+
+async function dismissGuidedTips() {
+  guidedTipsDismissed = true;
+  applyGuidedTipsVisibility();
+  await chrome.storage.local.set({ [STORAGE_GUIDED_TIPS_DISMISSED_KEY]: true });
 }
 
 async function refreshOnboardingStateFromContext() {
@@ -626,6 +645,7 @@ function renderOnboardingChat() {
   setHomeOperationalVisibility(showOperational);
   updateOnboardingWorkspaceVisibility();
   if (guidedCard) guidedCard.classList.toggle("guided-ready", showOperational);
+  applyGuidedTipsVisibility();
   if (guidedTitle) {
     guidedTitle.textContent = translate("home.guided_setup");
   }
@@ -1451,7 +1471,7 @@ function updateSelectedGroupCount() {
 
 function updateLeadsCount() {
   const count = Array.isArray(leadsHistory) ? leadsHistory.length : 0;
-  qs("leadsCount").textContent = translate("leads.count_7d", { count });
+  qs("leadsCount").textContent = translate("leads.count_short_7d", { count });
 }
 
 function renderHomeInsights() {
@@ -1751,6 +1771,27 @@ function formatLeadDate(ts) {
   return date.toLocaleString();
 }
 
+function formatLeadDateShort(ts) {
+  const date = new Date(Number(ts) || Date.now());
+  return date.toLocaleDateString(undefined, { day: "2-digit", month: "short" });
+}
+
+function formatLeadRelative(ts) {
+  const value = Number(ts) || Date.now();
+  const diffMs = Math.max(0, Date.now() - value);
+  const diffMin = Math.floor(diffMs / 60000);
+  if (diffMin < 1) return currentLanguage === "pt-br" ? "agora" : "now";
+  if (diffMin < 60) {
+    return currentLanguage === "pt-br" ? `${diffMin}min atrás` : `${diffMin}m ago`;
+  }
+  const diffHours = Math.floor(diffMin / 60);
+  if (diffHours < 24) {
+    return currentLanguage === "pt-br" ? `${diffHours}h atrás` : `${diffHours}h ago`;
+  }
+  const diffDays = Math.floor(diffHours / 24);
+  return currentLanguage === "pt-br" ? `${diffDays}d atrás` : `${diffDays}d ago`;
+}
+
 function firstNonEmpty(...values) {
   for (const value of values) {
     const txt = String(value || "").trim();
@@ -1759,9 +1800,10 @@ function firstNonEmpty(...values) {
   return "";
 }
 
-const LEAD_TEXT_TRUNCATE_AT = 420;
+const LEAD_HEADLINE_TRUNCATE_AT = 96;
+const LEAD_PREVIEW_TRUNCATE_AT = 260;
 
-function buildLink(label, href, variant = "neutral") {
+function buildLink(label, href, variant = "secondary") {
   const a = document.createElement("a");
   a.textContent = label;
   a.href = href;
@@ -1771,32 +1813,107 @@ function buildLink(label, href, variant = "neutral") {
   return a;
 }
 
-function buildLeadTextBlock(fullText) {
+function extractLeadTextParts(fullText) {
+  const normalizedText = String(fullText || "").trim();
+  if (!normalizedText) {
+    return { headline: "", preview: "", fullBody: "", shouldTruncate: false };
+  }
+  const lines = normalizedText
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const sourceHeadline = lines[0] || normalizedText;
+  const headline = sourceHeadline.length > LEAD_HEADLINE_TRUNCATE_AT
+    ? `${sourceHeadline.slice(0, LEAD_HEADLINE_TRUNCATE_AT).trimEnd()}...`
+    : sourceHeadline;
+  const remaining = lines.slice(1).join(" ").trim();
+  const fullBody = remaining || normalizedText;
+  const shouldTruncate = fullBody.length > LEAD_PREVIEW_TRUNCATE_AT;
+  const preview = shouldTruncate
+    ? `${fullBody.slice(0, LEAD_PREVIEW_TRUNCATE_AT).trimEnd()}...`
+    : fullBody;
+  return { headline, preview, fullBody, shouldTruncate };
+}
+
+function buildHighlightedTextBlock(text, keyword, className) {
+  const node = document.createElement("div");
+  node.className = className;
+  const normalizedText = String(text || "");
+  const normalizedKeyword = String(keyword || "").trim();
+  if (!normalizedKeyword) {
+    node.textContent = normalizedText;
+    return node;
+  }
+
+  const base = normalizedText.toLowerCase();
+  const needle = normalizedKeyword.toLowerCase();
+  const idx = base.indexOf(needle);
+  if (idx < 0) {
+    node.textContent = normalizedText;
+    return node;
+  }
+
+  node.appendChild(document.createTextNode(normalizedText.slice(0, idx)));
+  const mark = document.createElement("mark");
+  mark.className = "lead-keyword-mark";
+  mark.textContent = normalizedText.slice(idx, idx + normalizedKeyword.length);
+  node.appendChild(mark);
+  node.appendChild(
+    document.createTextNode(normalizedText.slice(idx + normalizedKeyword.length)),
+  );
+  return node;
+}
+
+function resolveLeadMatchedKeyword(lead, leadText) {
+  const profileName = String(lead?.profileName || "").trim();
+  if (!profileName) return "";
+  const profile = savedProfiles.find(
+    (item) => String(item?.name || "").trim() === profileName,
+  );
+  if (!profile) return "";
+  const normalizedLeadText = normalizeGuidedText(leadText);
+  const keywords = Array.isArray(profile.positiveKeywords)
+    ? profile.positiveKeywords
+    : [];
+  for (const keyword of keywords) {
+    const raw = String(keyword || "").trim();
+    if (!raw) continue;
+    if (normalizedLeadText.includes(normalizeGuidedText(raw))) {
+      return raw;
+    }
+  }
+  return "";
+}
+
+function buildLeadTextBlock(fullText, matchedKeyword) {
   const wrap = document.createElement("div");
   wrap.className = "lead-text-wrap";
 
-  const text = document.createElement("div");
-  text.className = "lead-text";
-  wrap.appendChild(text);
+  const { headline, preview, fullBody, shouldTruncate } = extractLeadTextParts(fullText);
+  const headlineNode = buildHighlightedTextBlock(headline, matchedKeyword, "lead-text-headline");
+  wrap.appendChild(headlineNode);
 
-  const normalizedText = String(fullText || "").trim();
-  const shouldTruncate = normalizedText.length > LEAD_TEXT_TRUNCATE_AT;
+  let currentBodyNode = buildHighlightedTextBlock(preview, matchedKeyword, "lead-text");
+  wrap.appendChild(currentBodyNode);
+
   if (!shouldTruncate) {
-    text.textContent = normalizedText;
     return wrap;
   }
 
-  const truncated = `${normalizedText.slice(0, LEAD_TEXT_TRUNCATE_AT).trimEnd()}...`;
   let expanded = false;
-  text.textContent = truncated;
-
   const toggle = document.createElement("button");
   toggle.type = "button";
   toggle.className = "linklike lead-toggle";
   toggle.textContent = translate("leads.show_more");
   toggle.addEventListener("click", () => {
     expanded = !expanded;
-    text.textContent = expanded ? normalizedText : truncated;
+    const nextBodyNode = buildHighlightedTextBlock(
+      expanded ? fullBody : preview,
+      matchedKeyword,
+      "lead-text",
+    );
+    currentBodyNode.replaceWith(nextBodyNode);
+    currentBodyNode = nextBodyNode;
     toggle.textContent = expanded
       ? translate("leads.show_less")
       : translate("leads.show_more");
@@ -1810,7 +1927,7 @@ function renderLeads() {
   list.innerHTML = "";
   const filtered = getFilteredLeads();
 
-  qs("leadsCount").textContent = translate("leads.count_7d", {
+  qs("leadsCount").textContent = translate("leads.count_short_7d", {
     count: filtered.length,
   });
 
@@ -1826,55 +1943,59 @@ function renderLeads() {
     const card = document.createElement("div");
     card.className = "lead-card";
 
-    const head = document.createElement("div");
-    head.className = "lead-head";
+    const groupRow = document.createElement("div");
+    groupRow.className = "lead-group";
+    groupRow.textContent = lead.group_name || translate("groups.title");
 
-    const left = document.createElement("div");
-    const title = document.createElement("div");
-    title.className = "lead-title";
-    title.textContent = `${lead.group_name || translate("groups.title")} • ${lead.poster_name || translate("common.none")}`;
     const meta = document.createElement("div");
     meta.className = "lead-meta";
-    meta.textContent = `${formatLeadDate(lead.detectedAt)}${
-      lead.profileName
-        ? translate("leads.meta_profile", { profile: lead.profileName })
-        : ""
-    }`;
-    left.appendChild(title);
-    left.appendChild(meta);
-
-    const right = document.createElement("div");
-    right.className = "lead-meta";
-    right.textContent = lead.post_type || "";
-
-    head.appendChild(left);
-    head.appendChild(right);
+    const leadDate = `${formatLeadDateShort(lead.detectedAt)} • ${formatLeadRelative(
+      lead.detectedAt,
+    )}`;
+    meta.textContent = lead.poster_name
+      ? `${leadDate}${translate("leads.by_author", { name: lead.poster_name })}`
+      : leadDate;
 
     const leadText = firstNonEmpty(
       lead.post_text,
       lead.marketplace_text,
       translate("leads.no_text"),
     );
-    const textBlock = buildLeadTextBlock(leadText);
+    const matchedKeyword = resolveLeadMatchedKeyword(lead, leadText);
+    const textBlock = buildLeadTextBlock(leadText, matchedKeyword);
+
+    const detected = document.createElement("div");
+    detected.className = "lead-detected";
+    if (matchedKeyword) {
+      detected.textContent = translate("leads.detected", { keyword: matchedKeyword });
+    } else if (lead.profileName) {
+      detected.textContent = translate("leads.alert_name", {
+        profile: lead.profileName,
+      });
+    } else {
+      detected.style.display = "none";
+    }
 
     const links = document.createElement("div");
     links.className = "lead-links";
     if (lead.post_url)
       links.appendChild(
-        buildLink(translate("leads.link_post"), lead.post_url, "post"),
+        buildLink(translate("leads.open_post"), lead.post_url, "post-primary"),
       );
     if (lead.user_profile_url) {
       links.appendChild(
-        buildLink(translate("leads.link_person"), lead.user_profile_url, "person"),
+        buildLink(translate("leads.link_person_short"), lead.user_profile_url, "secondary"),
       );
     }
     if (lead.group_url)
       links.appendChild(
-        buildLink(translate("leads.link_group"), lead.group_url, "group"),
+        buildLink(translate("leads.link_group_short"), lead.group_url, "secondary"),
       );
 
-    card.appendChild(head);
+    card.appendChild(groupRow);
+    card.appendChild(meta);
     card.appendChild(textBlock);
+    card.appendChild(detected);
     card.appendChild(links);
     list.appendChild(card);
   });
@@ -3783,7 +3904,11 @@ qs("btnClearTechLog").addEventListener("click", () => {
   renderTechnicalLogOverlay();
 });
 
-qs("btnClearHistory").addEventListener("click", () => {
+qs("btnGuidedTipsDismiss")?.addEventListener("click", () => {
+  void dismissGuidedTips();
+});
+
+function clearLeadHistoryFromUi() {
   chrome.runtime.sendMessage({ type: "clearLeadHistory" }, (response) => {
     if (response?.success) {
       leadsHistory = [];
@@ -3800,7 +3925,10 @@ qs("btnClearHistory").addEventListener("click", () => {
       );
     }
   });
-});
+}
+
+qs("btnClearHistory")?.addEventListener("click", clearLeadHistoryFromUi);
+qs("btnClearLeadsTop")?.addEventListener("click", clearLeadHistoryFromUi);
 
 qs("btnPlanUpgrade").addEventListener("click", () => {
   void runButtonTask(
@@ -4160,6 +4288,7 @@ qsa(".settings-freq-card").forEach((card) => {
 (async () => {
   await loadLanguage();
   await loadOnboardingState();
+  await loadGuidedTipsPreference();
   cachedPlanState = await loadPlanState();
   renderPlanBanner();
   await updateAccountUi();

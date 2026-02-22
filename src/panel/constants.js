@@ -9,6 +9,7 @@ export const STORAGE_AUTH_SESSION_KEY = "authSession";
 export const STORAGE_AUTH_EMAIL_KEY = "authEmail";
 export const STORAGE_ONBOARDING_STATE_KEY = "onboardingState";
 export const STORAGE_NOTIFICATION_SETTINGS_KEY = "notificationSettingsGlobal";
+export const STORAGE_GUIDED_TIPS_DISMISSED_KEY = "guidedTipsDismissed";
 export const PLAN_CACHE_TTL_MS = 30 * 60 * 1000;
 
 // Fixed Supabase project config
