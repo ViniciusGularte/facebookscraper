@@ -484,6 +484,9 @@ const SLEEP_SCHEDULE_ALARM_NAME = "sleep-schedule-check";
 const MONITOR_RUNTIME_STORAGE_KEY = "postMonitorRuntime";
 const SLEEP_SCHEDULE_STORAGE_KEY = "sleepSchedule";
 const NOTIFICATION_SETTINGS_STORAGE_KEY = "notificationSettingsGlobal";
+const NOTIFICATION_CLICK_MAP_KEY = "notificationClickMap";
+const NOTIFICATION_CLICK_MAX_ITEMS = 50;
+const NOTIFICATION_CLICK_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const TELEGRAM_EDGE_URL =
   "https://hfnwpzglvbzkvhrcwmet.supabase.co/functions/v1/telegram-notify";
 let monitorConfig = {
@@ -546,7 +549,45 @@ async function sendDesktopLeadNotification(payload) {
     message,
     priority: 2,
   });
+  await storeNotificationClickTarget(notificationId, payload?.post_url || "");
   return { ok: true };
+}
+
+async function storeNotificationClickTarget(notificationId, url) {
+  if (!notificationId || !url) return;
+  const data = await chrome.storage.local.get([NOTIFICATION_CLICK_MAP_KEY]);
+  const raw = data?.[NOTIFICATION_CLICK_MAP_KEY];
+  const now = Date.now();
+  const map = raw && typeof raw === "object" ? raw : {};
+
+  for (const [key, value] of Object.entries(map)) {
+    const ts = Number(value?.createdAt || 0);
+    if (!ts || now - ts > NOTIFICATION_CLICK_TTL_MS) {
+      delete map[key];
+    }
+  }
+
+  map[notificationId] = { url, createdAt: now };
+  const entries = Object.entries(map);
+  if (entries.length > NOTIFICATION_CLICK_MAX_ITEMS) {
+    entries
+      .sort((a, b) => Number(a[1]?.createdAt || 0) - Number(b[1]?.createdAt || 0))
+      .slice(0, entries.length - NOTIFICATION_CLICK_MAX_ITEMS)
+      .forEach(([key]) => delete map[key]);
+  }
+  await chrome.storage.local.set({ [NOTIFICATION_CLICK_MAP_KEY]: map });
+}
+
+async function consumeNotificationClickTarget(notificationId) {
+  if (!notificationId) return "";
+  const data = await chrome.storage.local.get([NOTIFICATION_CLICK_MAP_KEY]);
+  const raw = data?.[NOTIFICATION_CLICK_MAP_KEY];
+  if (!raw || typeof raw !== "object") return "";
+  const entry = raw[notificationId];
+  if (!entry?.url) return "";
+  delete raw[notificationId];
+  await chrome.storage.local.set({ [NOTIFICATION_CLICK_MAP_KEY]: raw });
+  return entry.url;
 }
 
 async function sendWebhookLeadNotification(webhookUrl, payload) {
@@ -1744,6 +1785,18 @@ chrome.action.onClicked.addListener(async () => {
     return;
   }
   chrome.tabs.create({ url: "index.html" });
+});
+
+// Abre o post ao clicar na notificação desktop.
+chrome.notifications?.onClicked?.addListener(async (notificationId) => {
+  const url = await consumeNotificationClickTarget(notificationId);
+  if (!url) return;
+  await chrome.tabs.create({ url });
+  try {
+    await chrome.notifications.clear(notificationId);
+  } catch (_) {
+    // ignore
+  }
 });
 
 // Notifica o front-end sobre atualizações disponíveis

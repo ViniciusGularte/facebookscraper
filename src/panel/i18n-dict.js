@@ -8,6 +8,8 @@ export const I18N = {
     "status.fb_login_required": "facebook login required",
     "status.open_facebook_hint":
       "Open facebook.com in a tab, log in if needed, then click Start Monitoring again.",
+    "status.fb_hint":
+      "Facebook not detected. Open a facebook.com tab, log in, then click Recheck.",
     "btn.upgrade": "Upgrade",
     "btn.maybe_later": "Maybe later",
     "btn.new": "New",
@@ -43,6 +45,8 @@ export const I18N = {
     "home.leads_7d": "{count} leads in last 7 days",
     "home.machine_on": "Monitoring is ON",
     "home.machine_off": "Monitoring is OFF",
+    "home.sleep_banner":
+      "🌙 Sleep mode active. Monitoring will resume automatically at the configured time.",
     "home.pause_monitoring": "Pause",
     "home.start_monitoring_main": "Start monitoring",
     "home.active_alert": "Active alert",
@@ -291,6 +295,8 @@ export const I18N = {
     "btn.save_changes": "Save Changes",
     "btn.save_alert": "Save Alert",
     "btn.start_monitoring": "Start monitoring",
+    "btn.check_login_short": "Recheck Facebook",
+    "btn.try_again": "Try again",
     "kw.watch_for": "Watch for",
     "kw.exclude_words": "Exclude words",
     "leads.title": "Leads",
@@ -450,6 +456,8 @@ export const I18N = {
     "status.fb_login_required": "login do Facebook necessário",
     "status.open_facebook_hint":
       "Abra facebook.com em uma aba, faça login se necessário e clique em Iniciar monitoramento novamente.",
+    "status.fb_hint":
+      "Facebook não detectado. Abra uma aba do facebook.com, faça login e clique em Reverificar.",
     "btn.upgrade": "Upgrade",
     "btn.maybe_later": "Depois",
     "btn.new": "Novo",
@@ -484,6 +492,8 @@ export const I18N = {
     "home.leads_7d": "{count} leads nos últimos 7 dias",
     "home.machine_on": "Monitoramento está LIGADO",
     "home.machine_off": "Monitoramento está DESLIGADO",
+    "home.sleep_banner":
+      "🌙 Modo repouso ativo. Monitor será retomado automaticamente no horário configurado.",
     "home.pause_monitoring": "Pausar",
     "home.start_monitoring_main": "Iniciar monitoramento",
     "home.active_alert": "Alerta ativo",
@@ -772,6 +782,8 @@ export const I18N = {
     "btn.save_changes": "Salvar Alterações",
     "btn.save_alert": "Salvar alerta",
     "btn.start_monitoring": "Iniciar monitoramento",
+    "btn.check_login_short": "Reverificar Facebook",
+    "btn.try_again": "Tentar novamente",
     "kw.watch_for": "Include words",
     "kw.exclude_words": "Exclude words",
     "leads.title": "Leads",

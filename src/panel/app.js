@@ -632,6 +632,37 @@ function setAgentActions(actions) {
   renderAgentActionsByQuery(query);
 }
 
+function checkFacebookLogin() {
+  return new Promise((resolve) => {
+    chrome.runtime.sendMessage({ type: "checkLogin" }, (response) => {
+      resolve(response || {});
+    });
+  });
+}
+
+async function runOnboardingFacebookCheck(feed) {
+  if (isCheckingFacebookLogin) return;
+  isCheckingFacebookLogin = true;
+  addAgentMessage(feed, translate("onboard.fb_checking"), true, false);
+  renderOnboardingChat();
+  const response = await checkFacebookLogin();
+  isCheckingFacebookLogin = false;
+  if (response?.loggedIn) {
+    setLoginStatus(true, `Logged as ${response.userId}`);
+    await setOnboardingState("groups");
+    return;
+  }
+  fbConnectFailures += 1;
+  addAgentMessage(feed, translate("onboard.fb_not_connected"), true);
+  appendLog("logGeneral", translate("onboard.fb_not_connected"), "warn");
+  if (fbConnectFailures >= 3) {
+    const copy = getOnboardingCopy();
+    addAgentMessage(feed, copy.connectFail, true);
+    toggleTechnicalLogOverlay(true);
+  }
+  renderOnboardingChat();
+}
+
 function renderOnboardingChat() {
   const copy = getOnboardingCopy();
   const feed = qs("agentFeed");
@@ -697,7 +728,7 @@ function renderOnboardingChat() {
 
   if (onboardingState === "fb_connect") {
     addAgentMessage(feed, translate("onboard.fb_prompt"));
-    setAgentActions([
+    const actions = [
       {
         label: isCheckingFacebookLogin
           ? translate("common.checking")
@@ -708,32 +739,7 @@ function renderOnboardingChat() {
         keywords: currentLanguage === "pt-br"
           ? ["sim", "logado", "continuar"]
           : ["yes", "logged", "continue"],
-        onClick: () => {
-          if (isCheckingFacebookLogin) return;
-          isCheckingFacebookLogin = true;
-          addAgentMessage(
-            feed,
-            translate("onboard.fb_checking"),
-            true,
-            false,
-          );
-          renderOnboardingChat();
-          chrome.runtime.sendMessage({ type: "checkLogin" }, async (response) => {
-            isCheckingFacebookLogin = false;
-            if (response?.loggedIn) {
-              setLoginStatus(true, `Logged as ${response.userId}`);
-              await setOnboardingState("groups");
-              return;
-            }
-            fbConnectFailures += 1;
-            appendLog("logGeneral", translate("onboard.fb_not_connected"), "warn");
-            if (fbConnectFailures >= 3) {
-              addAgentMessage(feed, copy.connectFail, true);
-              toggleTechnicalLogOverlay(true);
-            }
-            renderOnboardingChat();
-          });
-        },
+        onClick: () => runOnboardingFacebookCheck(feed),
       },
       {
         label: currentLanguage === "pt-br" ? "Não, ainda não" : "No, not yet",
@@ -763,7 +769,20 @@ function renderOnboardingChat() {
           await chrome.tabs.create({ url: "https://www.facebook.com/" });
         },
       },
-    ]);
+    ];
+    if (fbConnectFailures > 0) {
+      actions.unshift({
+        label: translate("btn.try_again"),
+        kind: "btn-blue",
+        icon: "🔁",
+        disabled: isCheckingFacebookLogin,
+        keywords: currentLanguage === "pt-br"
+          ? ["tentar", "repetir", "retry"]
+          : ["try", "retry", "again"],
+        onClick: () => runOnboardingFacebookCheck(feed),
+      });
+    }
+    setAgentActions(actions);
     return;
   }
 
@@ -1270,6 +1289,10 @@ function setLoginStatus(ok, label) {
   const el = qs("loginStatus");
   const dotColor = ok ? "var(--green)" : "#ff8800";
   el.innerHTML = `<span class="status-dot" style="background:${dotColor}"></span> ${label}`;
+  const checkBtn = qs("btnCheckLoginHero");
+  const hint = qs("loginHint");
+  if (checkBtn) checkBtn.style.display = ok ? "none" : "inline-flex";
+  if (hint) hint.classList.toggle("show", !ok);
   const footerDot = qs("fbFooterDot");
   const footerText = qs("fbFooterText");
   if (footerDot) footerDot.style.background = ok ? "var(--green)" : "#ff8800";
@@ -1413,6 +1436,13 @@ function setMonitorState(running, label) {
   }
   syncHomeNextScanLabel();
   renderHomeInsights();
+}
+
+function setSleepBannerVisible(visible, message = "") {
+  const banner = qs("sleepModeBanner");
+  if (!banner) return;
+  if (message) banner.textContent = message;
+  banner.classList.toggle("show", !!visible);
 }
 
 function classifyMonitorError(rawError) {
@@ -3173,8 +3203,13 @@ chrome.runtime.onMessage.addListener((message) => {
   if (message?.type === "monitorSleep") {
     if (message.active) {
       setOrbState("paused");
+      setSleepBannerVisible(
+        true,
+        message.message || translate("home.sleep_banner"),
+      );
       appendLog("logPosts", message.message || translate("log.sleep_mode_active"), "warn");
     } else {
+      setSleepBannerVisible(false);
       setOrbState(isMonitorRunning ? "monitoring" : "idle");
       appendLog("logPosts", message.message || translate("log.sleep_mode_ended"), "ok");
     }
@@ -3343,6 +3378,10 @@ chrome.runtime.sendMessage({ type: "panelOpened" }, () => {
 qs("btnMainMonitorToggle")?.addEventListener("click", () => {
   if (isMonitorRunning) qs("btnStopMonitor")?.click();
   else qs("btnStartMonitor")?.click();
+});
+
+qs("btnCheckLoginHero")?.addEventListener("click", () => {
+  qs("btnCheckLogin")?.click();
 });
 
 chrome.runtime.sendMessage({ type: "checkLogin" }, (response) => {
@@ -4316,14 +4355,17 @@ qsa(".settings-freq-card").forEach((card) => {
       if (response.sleepModeActive) {
         setMonitorState(false, "sleep mode");
         setOrbState("paused");
+        setSleepBannerVisible(true, translate("home.sleep_banner"));
       } else {
         setMonitorState(
           !!response.running,
           response.running ? translate("status.monitoring") : translate("status.stopped"),
         );
+        setSleepBannerVisible(false);
       }
     } else {
       setMonitorState(false, translate("status.stopped"));
+      setSleepBannerVisible(false);
     }
     void refreshOnboardingStateFromContext();
   });

@@ -202,6 +202,30 @@
         font-size: 12px;
       }
 
+      .login-action-row {
+        margin-top: 8px;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .login-hint {
+        margin-top: 6px;
+        display: none;
+        font-size: 12px;
+        color: #f2c27a;
+      }
+
+      .login-hint.show {
+        display: block;
+      }
+
+      .btn-compact {
+        padding: 6px 10px;
+        font-size: 12px;
+      }
+
       .plan-banner {
         margin-top: 10px;
         border: 1px solid var(--border);
@@ -1229,6 +1253,23 @@
         color: #c9f2dc;
       }
 
+      .system-state-banner {
+        margin-top: 10px;
+        padding: 10px 12px;
+        border-radius: 10px;
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: 0.01em;
+        color: #f7f0c7;
+        background: linear-gradient(135deg, #3b2a0e 0%, #2a1f0a 100%);
+        border: 1px solid #6a5321;
+        display: none;
+      }
+
+      .system-state-banner.show {
+        display: block;
+      }
+
       .system-state-meta {
         margin-top: 12px;
         display: grid;
@@ -1986,9 +2027,15 @@
           <div class="hero-copy">
             <h2 data-i18n="hero.title">Monitoring command center</h2>
             <p data-i18n="hero.subtitle">Direct leads from Facebook groups. Zero fluff. Fast execution.</p>
-            <span id="loginStatus" class="status-pill">
-              <span class="status-dot"></span> <span data-i18n="status.checking_fb">checking Facebook session...</span>
-            </span>
+            <div class="login-action-row">
+              <span id="loginStatus" class="status-pill">
+                <span class="status-dot"></span> <span data-i18n="status.checking_fb">checking Facebook session...</span>
+              </span>
+              <button class="btn btn-gray btn-compact" id="btnCheckLoginHero" data-i18n="btn.check_login_short">Recheck Facebook</button>
+            </div>
+            <div class="login-hint" id="loginHint" data-i18n="status.fb_hint">
+              Facebook not detected. Open a facebook.com tab, log in, then click Recheck.
+            </div>
             <div class="plan-banner" id="planBanner">
               <div class="plan-banner-text" id="planBannerText"></div>
               <div class="plan-banner-actions">
@@ -2124,6 +2171,9 @@
             <div class="card home-operational system-state-card" id="cardSystemState">
               <h2 data-i18n="home.status_title">System Status</h2>
               <div class="system-state-headline" id="systemStateHeadline">Monitoring is OFF</div>
+              <div class="system-state-banner" id="sleepModeBanner" data-i18n="home.sleep_banner">
+                🌙 Sleep mode ativo. Monitor será retomado automaticamente no horário configurado.
+              </div>
               <div class="system-state-meta">
                 <div class="item" id="homeGroupsMonitored">Checking 0 groups</div>
                 <div class="item" id="homeNextScanStatus">Next scan: waiting...</div>
