@@ -14,69 +14,112 @@ npm install
 npm test
 ```
 
-### Integration / E2E / billing tests
+### Integration / E2E / license tests
 
 ```bash
 npm run test:e2e
-npm run test:webhook
-npm run test:billing
-npm run test:magiclink
-npm run test:prod-readiness
-npm run test:webhook:health
+npm run test:license
 ```
 
 What each one does:
-- `test:webhook`: sends signed Stripe-like events to `stripe-webhook` and checks response.
-- `test:billing`: validates billing flow in current mode (magic-link-only by default).
-- `test:magiclink`: full lifecycle test (creates temp user, OTP path, webhook, DB check, cleanup).
-- `test:prod-readiness`: broader readiness check (idempotency, refund/dispute, users row policy).
-- `test:webhook:health`: operational health check with latency threshold and optional alert webhook.
+- `test:e2e`: remote endpoint checks for `validate-license` when env is configured.
+- `test:license`: runs trial and paid-license checks against the deployed `validate-license` edge function.
+
+Notes:
+- `test:e2e` only runs the remote checks when `RUN_REMOTE_LICENSE_E2E=1`.
+- `test:license` is intended for a deployed Supabase project with network access.
 
 Main env vars used by those tests:
 - `SUPABASE_URL`
 - `SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
-- `STRIPE_WEBHOOK_SECRET`
-- Optional: `STRIPE_SECRET_KEY`, `TEST_USER_EMAIL`, `TEST_USER_PASSWORD`
-- Optional policy/health vars: `PROD_EXPECTED_FINAL_PLAN`, `PROD_WEBHOOK_MAX_MS`, `WEBHOOK_HEALTH_MAX_MS`, `ALERT_WEBHOOK_URL`
+- Optional: `TEST_LICENSE_EMAIL`, `TEST_LICENSE_KEY`, `TEST_TRIAL_EMAIL`
 
 See `.env.example` for full examples.
 
-## Manual Plan Operations (Admin)
+## License Backend Contract
 
-Use the script below when you sell outside Stripe and need to manually grant/revoke access for an existing extension user.
+The extension now uses a license + device flow:
 
-### Grant Pro
+- The panel sends license operations to `POST /functions/v1/validate-license`.
+- Expected actions: `activate`, `status`, `start_trial`, `release_device`.
+- Expected request fields:
+  - `email` only for `start_trial`
+  - `licenseKey` for paid license actions
+  - `deviceId`
+  - optional `deviceName`
+  - optional `appVersion`
+  - `trialDays: 1` for the free trial path
+- Expected normalized response fields:
+  - `plan`: `pro`, `trial`, or `free`
+  - `email`
+  - `trial_end`
+  - `purchase_date`
+  - `licenseKeyMasked` or `license_key_masked`
+  - `device_id`
+  - `device_name`
+
+Suggested Supabase table:
+
+- `licenses`
+  - `email text`
+  - `license_key text`
+  - `plan text`
+  - `trial_device_id text`
+  - `trial_end timestamptz`
+  - `purchase_date timestamptz`
+  - `updated_at timestamptz`
+- `license_devices`
+  - `license_id uuid`
+  - `device_id text`
+  - `device_name text`
+  - `last_seen_at timestamptz`
+  - `released_at timestamptz`
+  - `is_active boolean`
+
+Device rule:
+- one active device per license
+- a second device is rejected with `LICENSE_IN_USE`
+- stale devices can be reclaimed after the configured inactivity window
+- free trial is also limited per device, not only per email
+
+Gumroad verification should happen inside the Edge Function, not directly in the extension.
+
+Recommended Gumroad env vars:
+- `GUMROAD_ACCESS_TOKEN`
+- `GUMROAD_PRODUCT_ID`
+- optional fallback: `GUMROAD_PRODUCT_PERMALINK`
+
+## Manual License Operations (Admin)
+
+Use the script below to manually grant, trial, or revoke access in `public.licenses`.
+
+### Grant License
 
 ```bash
-npm run grant:pro -- --email user@email.com
+npm run grant:license -- --email user@email.com
 ```
 
 Also supported:
 
 ```bash
-npm run grant:pro -- --user-id 00000000-0000-0000-0000-000000000000
-npm run grant:pro -- --email user@email.com --plan trial --trial-days 7
-npm run grant:pro -- --email user@email.com --dry-run
+npm run grant:license -- --email user@email.com --plan trial --trial-days 1
+npm run grant:license -- --email user@email.com --plan pro --license-key ABCD-1234-EFGH
+npm run grant:license -- --email user@email.com --dry-run
 ```
 
-### Revoke Pro (last script created)
+### Revoke License
 
 ```bash
-npm run revoke:pro -- --email user@email.com
+npm run revoke:license -- --email user@email.com
 ```
 
 Also supported:
-
-```bash
-npm run revoke:pro -- --user-id 00000000-0000-0000-0000-000000000000
-npm run revoke:pro -- --email user@email.com --clear-stripe-id
-```
 
 Notes:
 - Uses `SUPABASE_SERVICE_ROLE_KEY`.
-- Resolves user from `auth.users` (by email or id) and upserts `public.users`.
-- `--revoke-pro` sets plan to `free` and clears `purchase_date` / `refund_window`.
+- Writes directly to `public.licenses`.
+- `--revoke` sets plan to `free` and clears trial/purchase fields.
 
 ## Build (minified + obfuscated)
 

@@ -15,45 +15,45 @@ const manifestRaw = readFileSync(manifestPath, "utf8");
 const manifest = JSON.parse(manifestRaw);
 const indexHtml = readFileSync(indexHtmlPath, "utf8");
 
-test("auth flow validates email and otp code format", () => {
+test("license flow validates email and license key format", () => {
   assert.match(panelSource, /if \(!\/\^\[\^@\\s\]\+\@\[\^@\\s\]\+\\\.\[\^@\\s\]\+\$\/\.test\(email\)\)/);
-  assert.match(panelSource, /if \(!\/\^\\d\{6\}\$\/\.test\(code\)\)/);
+  assert.match(panelSource, /if \(licenseKey\.length < 8\)/);
   assert.match(panelSource, /translate\("auth\.invalid_email"\)/);
-  assert.match(panelSource, /translate\("auth\.invalid_code"\)/);
+  assert.match(panelSource, /translate\("auth\.invalid_license_key"\)/);
 });
 
-test("auth continue uses otp create-user path and resend cooldown", () => {
-  assert.match(panelSource, /await sendEmailOtpCode\(email, true\)/);
-  assert.match(panelSource, /qs\("btnAuthResend"\)\.disabled = true/);
-  assert.match(panelSource, /setTimeout\(\(\) => \{\s*qs\("btnAuthResend"\)\.disabled = false;\s*\}, 60000\)/);
+test("license flow uses supabase edge function for activation and trial", () => {
+  assert.match(panelSource, /LICENSE_ACCESS_FUNCTION_PATH/);
+  assert.match(panelSource, /action: "activate"/);
+  assert.match(panelSource, /action: "start_trial"/);
+  assert.match(panelSource, /trialDays: 1/);
 });
 
-test("session persistence and cleanup paths are present", () => {
-  assert.match(panelSource, /function getAuthSession\(/);
-  assert.match(panelSource, /function setAuthSession\(/);
-  assert.match(panelSource, /function clearAuthSession\(/);
-  assert.match(panelSource, /STORAGE_AUTH_SESSION_KEY/);
-  assert.match(panelSource, /STORAGE_AUTH_EMAIL_KEY/);
+test("license persistence and cleanup paths are present", () => {
+  assert.match(panelSource, /function getLicenseSession\(/);
+  assert.match(panelSource, /function setLicenseSession\(/);
+  assert.match(panelSource, /function clearLicenseSession\(/);
+  assert.match(panelSource, /STORAGE_LICENSE_SESSION_KEY/);
+  assert.match(panelSource, /STORAGE_LICENSE_EMAIL_KEY/);
 });
 
-test("session refresh logic protects long-running usage", () => {
-  assert.match(panelSource, /ensureActiveAuthSession/);
-  assert.match(panelSource, /expiresAt - Date\.now\(\) < 60 \* 1000/);
-  assert.match(panelSource, /refreshAuthSessionToken\(session\)/);
-  assert.match(panelSource, /grant_type=refresh_token/);
+test("license refresh logic protects long-running usage", () => {
+  assert.match(panelSource, /function refreshLicenseState\(/);
+  assert.match(panelSource, /action: "status"/);
+  assert.match(panelSource, /persistLicenseState\(payload, \{ email, licenseKey, deviceId, deviceName \}, requestVersion\)/);
+  assert.match(panelSource, /licenseSessionVersion/);
 });
 
-test("checkout flow handles auth failures and malformed response", () => {
-  assert.match(panelSource, /functions\/v1\/create-checkout-session/);
-  assert.match(panelSource, /if \(response\.status === 401\)/);
-  assert.match(panelSource, /throw new Error\(translate\("msg\.upgrade_signin_required"\)\)/);
-  assert.match(panelSource, /Invalid checkout URL returned by billing service\./);
+test("gumroad flow opens configured checkout and surfaces missing config", () => {
+  assert.match(panelSource, /function getGumroadCheckoutUrl\(/);
+  assert.match(panelSource, /translate\("msg\.license_buy_unavailable"\)/);
+  assert.match(panelSource, /chrome\.tabs\.create\(\{ url: getGumroadCheckoutUrl\(\) \}\)/);
 });
 
 test("plan state polling uses cached window to reduce unnecessary requests", () => {
   assert.match(panelSource, /PLAN_CACHE_TTL_MS/);
-  assert.match(panelSource, /POST_CHECKOUT_PLAN_INTERVAL_MS/);
-  assert.match(panelSource, /POST_CHECKOUT_PLAN_WINDOW_MS/);
+  assert.match(panelSource, /PLAN_SYNC_INTERVAL_MS/);
+  assert.match(panelSource, /PLAN_SYNC_FAILURE_BACKOFF_MS/);
 });
 
 test("monitor classifier handles facebook-tab missing and login-required", () => {
@@ -157,14 +157,15 @@ test("guided setup card contains best-results and support CTAs", () => {
   assert.match(indexHtml, /data-i18n="onboard\.contact_support"/);
 });
 
-test("critical i18n coverage exists for auth, network and plan lock", () => {
+test("critical i18n coverage exists for license, network and plan lock", () => {
   const keys = [
     "auth.invalid_email",
-    "auth.invalid_code",
-    "auth.code_verify_failed",
+    "auth.invalid_license_key",
+    "auth.license_activated",
+    "auth.trial_started",
     "status.open_facebook_hint",
-    "msg.upgrade_signin_required",
-    "msg.payment_checking",
+    "msg.license_checking",
+    "msg.license_buy_opening",
     "plan.locked_action",
     "data.clear_lead_history",
     "onboard.playbook_title",

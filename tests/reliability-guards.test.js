@@ -32,17 +32,18 @@ test("monitor error classifier maps facebook disconnected cases", () => {
   assert.match(panelSource, /session expired/i);
 });
 
-test("checkout flow retries once after 401 with refresh token", () => {
-  assert.match(panelSource, /if \(response\.status === 401\)/);
-  assert.match(panelSource, /refreshAuthSessionToken\(session\)/);
-  assert.match(panelSource, /response = await callCheckout\(session\.accessToken\)/);
+test("license refresh flow always hits the edge function with stored credentials", () => {
+  assert.match(panelSource, /function refreshLicenseState\(/);
+  assert.match(panelSource, /const email = String\(session\?\.email \|\| ""\)/);
+  assert.match(panelSource, /const licenseKey = String\(session\?\.licenseKey \|\| ""\)/);
+  assert.match(panelSource, /action: "status"/);
 });
 
-test("active auth session refreshes when token is near expiration", () => {
-  assert.match(panelSource, /function ensureActiveAuthSession\(/);
-  assert.match(panelSource, /expiresAt - Date\.now\(\) < 60 \* 1000/);
-  assert.match(panelSource, /if \(expiresSoon \|\| !session\?\.userId\)/);
-  assert.match(panelSource, /const refreshed = await refreshAuthSessionToken\(session\)/);
+test("license state is normalized before being cached locally", () => {
+  assert.match(panelSource, /function normalizeLicenseState\(/);
+  assert.match(panelSource, /function normalizeLicensePlan\(/);
+  assert.match(panelSource, /licenseKeyMasked/);
+  assert.match(panelSource, /cachedPlanState = \{/);
 });
 
 test("background has explicit facebook-tab and timeout protection", () => {

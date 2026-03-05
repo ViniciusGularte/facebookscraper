@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "GrabClientsNow",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "Monitor Facebook groups and capture leads in real time.",
   "permissions": ["storage", "tabs", "scripting", "alarms", "notifications"],
   "host_permissions": [
@@ -9,6 +9,7 @@
     "https://web.facebook.com/*",
     "https://*.supabase.co/*"
   ],
+  "optional_host_permissions": ["https://*/*", "http://*/*"],
   "icons": {
     "16": "assets/icon.png",
     "32": "assets/icon.png",

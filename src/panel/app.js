@@ -7,14 +7,18 @@ import {
   STORAGE_GLOBAL_FREQUENCY_KEY,
   STORAGE_LANGUAGE_KEY,
   STORAGE_PLAN_STATE_KEY,
-  STORAGE_AUTH_SESSION_KEY,
-  STORAGE_AUTH_EMAIL_KEY,
+  STORAGE_LICENSE_SESSION_KEY,
+  STORAGE_LICENSE_EMAIL_KEY,
+  STORAGE_DEVICE_ID_KEY,
+  STORAGE_TERMS_ACCEPTANCE_KEY,
   STORAGE_ONBOARDING_STATE_KEY,
   STORAGE_NOTIFICATION_SETTINGS_KEY,
   STORAGE_GUIDED_TIPS_DISMISSED_KEY,
   PLAN_CACHE_TTL_MS,
   SUPABASE_URL,
   SUPABASE_ANON_KEY,
+  GUMROAD_PRODUCT_URL,
+  LICENSE_ACCESS_FUNCTION_PATH,
   PROFILE_WIZARD_STEPS,
   ORB_STATES,
 } from "./constants.js";
@@ -29,15 +33,17 @@ let selectedProfileId = "";
 let leadsHistory = [];
 let orbStateTimeout = null;
 let currentLanguage = "en";
+const SUPPORTED_LANGUAGES = new Set(["en", "pt-br", "es", "fr", "de"]);
+const TERMS_VERSION = "v1";
 let technicalLogEntries = [];
-let postCheckoutPlanTimer = null;
 let sleepScheduleState = null;
 let onboardingState = "welcome";
 let fbConnectFailures = 0;
 let isFacebookConnected = false;
+let lastFacebookUserId = "";
 let welcomeNudgeTimer = null;
-let onboardAlertFrequency = { min: 5, max: 10 };
-let globalMonitorFrequency = { min: 5, max: 10 };
+let onboardAlertFrequency = { min: 3, max: 8 };
+let globalMonitorFrequency = { min: 3, max: 8 };
 let onboardWatchKeywords = [];
 let onboardExcludeKeywords = [];
 let profileWatchKeywords = [];
@@ -54,6 +60,8 @@ let onboardingGroupsProgress = {
   lastAnnouncedAt: 0,
 };
 let isCheckingFacebookLogin = false;
+let lastOnboardingChatSignature = "";
+let activePlanRefreshPromise = null;
 let notificationSettings = {
   notifyBrowser: true,
   notifyWebhook: false,
@@ -64,9 +72,11 @@ let notificationSettings = {
 let currentProfileWizardStep = "name";
 const PLAN_SYNC_INTERVAL_MS = 60000;
 const PLAN_SYNC_FAILURE_BACKOFF_MS = 5 * 60 * 1000;
-const POST_CHECKOUT_PLAN_INTERVAL_MS = 30000;
-const POST_CHECKOUT_PLAN_WINDOW_MS = 5 * 60 * 1000;
+const LICENSE_TRIAL_DURATION_MS = 24 * 60 * 60 * 1000;
 let nextPlanSyncAt = 0;
+let isTermsAccepted = false;
+let authMode = "";
+let licenseSessionVersion = 0;
 
 function appendLog(logId, text, type = "") {
   const log = qs(logId);
@@ -115,6 +125,82 @@ function toggleTechnicalLogOverlay(open) {
   overlay.classList.toggle("open", !!open);
 }
 
+function toggleTermsOverlay(open) {
+  const overlay = qs("termsOverlay");
+  if (!overlay) return;
+  overlay.classList.toggle("open", !!open);
+}
+
+function syncAuthTermsUi() {
+  const checkbox = qs("authTermsAccepted");
+  const activateBtn = qs("btnAuthVerifyCode");
+  const trialBtn = qs("btnAuthResend");
+  if (checkbox) {
+    checkbox.checked = isTermsAccepted;
+  }
+  if (activateBtn) {
+    activateBtn.disabled = !isTermsAccepted;
+  }
+  if (trialBtn) {
+    trialBtn.disabled = !isTermsAccepted;
+  }
+}
+
+function setAuthMode(mode = "") {
+  authMode = mode === "trial" || mode === "license" ? mode : "";
+  qs("authLicenseSection")?.toggleAttribute("hidden", authMode !== "license");
+  qs("authTrialSection")?.toggleAttribute("hidden", authMode !== "trial");
+  qs("btnAuthModeLicense")?.classList.toggle("active", authMode === "license");
+  qs("btnAuthModeTrial")?.classList.toggle("active", authMode === "trial");
+}
+
+function setTrialUpsellVisible(show) {
+  qs("dashboardTrialCta")?.toggleAttribute("hidden", !show);
+}
+
+function beginLicenseSessionRequest(exclusive = false) {
+  if (exclusive) {
+    licenseSessionVersion += 1;
+  }
+  return licenseSessionVersion;
+}
+
+function isCurrentLicenseSessionRequest(version) {
+  return Number(version) === licenseSessionVersion;
+}
+
+function resetAuthGateFields() {
+  if (qs("authEmail")) qs("authEmail").value = "";
+  if (qs("authCode")) qs("authCode").value = "";
+  setAuthMode("");
+  setTrialUpsellVisible(false);
+}
+
+async function loadTermsAcceptanceState() {
+  const data = await chrome.storage.local.get([STORAGE_TERMS_ACCEPTANCE_KEY]);
+  const raw = data?.[STORAGE_TERMS_ACCEPTANCE_KEY];
+  isTermsAccepted =
+    !!raw &&
+    typeof raw === "object" &&
+    !!raw.accepted &&
+    String(raw.version || "") === TERMS_VERSION;
+  syncAuthTermsUi();
+}
+
+async function setTermsAccepted(accepted) {
+  isTermsAccepted = !!accepted;
+  if (isTermsAccepted) {
+    await chrome.storage.local.set({
+      [STORAGE_TERMS_ACCEPTANCE_KEY]: {
+        accepted: true,
+        version: TERMS_VERSION,
+        acceptedAt: Date.now(),
+      },
+    });
+  }
+  syncAuthTermsUi();
+}
+
 function formatTechnicalLogForClipboard() {
   return technicalLogEntries
     .map((item) => `[${item.ts}] ${item.text}`)
@@ -128,13 +214,55 @@ function translate(key, vars = {}) {
   }, raw);
 }
 
+const SUPPORT_CONTACT_EMAIL = "withdonebetter@gmail.com";
+
+function buildLocalizedMailto(subjectKey, bodyKey = "") {
+  const subject = translate(subjectKey);
+  const body = bodyKey ? translate(bodyKey) : "";
+  const params = [`subject=${encodeURIComponent(subject)}`];
+  if (body) params.push(`body=${encodeURIComponent(body)}`);
+  return `mailto:${SUPPORT_CONTACT_EMAIL}?${params.join("&")}`;
+}
+
+function applyLocalizedMailtoLinks() {
+  const assign = (id, subjectKey, bodyKey = "") => {
+    const el = qs(id);
+    if (!el) return;
+    el.setAttribute("href", buildLocalizedMailto(subjectKey, bodyKey));
+  };
+
+  assign("linkGuidedContactSupport", "mail.subject.support");
+  assign("btnAskMoreChannels", "mail.subject.more_channels");
+  assign("linkRoadmapPrimary", "mail.subject.roadmap_interest", "mail.body.roadmap_interest");
+  assign("linkRoadmapSecondary", "mail.subject.roadmap_suggestion");
+  assign("linkHelpFeature", "mail.subject.feature_suggestion");
+  assign("linkHelpPartner", "mail.subject.partner_inquiry");
+  assign("linkHelpAffiliate", "mail.subject.affiliate_join");
+}
+
 function applyI18n() {
   document.documentElement.lang =
-    currentLanguage === "pt-br" ? "pt-BR" : "en-US";
+    currentLanguage === "pt-br"
+      ? "pt-BR"
+      : currentLanguage === "es"
+        ? "es-ES"
+        : currentLanguage === "fr"
+          ? "fr-FR"
+          : currentLanguage === "de"
+            ? "de-DE"
+            : "en-US";
   qsa("[data-i18n]").forEach((el) => {
     const key = el.getAttribute("data-i18n");
     if (!key) return;
-    el.textContent = translate(key);
+    const localized = translate(key);
+    el.textContent = localized;
+    if (
+      key.startsWith("sugg.") &&
+      el instanceof HTMLElement &&
+      el.hasAttribute("data-value")
+    ) {
+      el.dataset.value = localized;
+    }
   });
   qsa("[data-i18n-placeholder]").forEach((el) => {
     const key = el.getAttribute("data-i18n-placeholder");
@@ -146,6 +274,7 @@ function applyI18n() {
   if (languageSelect) languageSelect.value = currentLanguage;
   const authLanguageSelect = qs("authLanguageSelect");
   if (authLanguageSelect) authLanguageSelect.value = currentLanguage;
+  applyLocalizedMailtoLinks();
   qsa(".btn").forEach((btn) => {
     btn.dataset.label = btn.textContent;
   });
@@ -158,6 +287,9 @@ function activateTab(tabName) {
   qsa(".panel").forEach((p) => {
     p.classList.toggle("active", p.dataset.panel === tabName);
   });
+  if (tabName === "leads") {
+    chrome.runtime.sendMessage({ type: "markNotificationsSeen" }, () => {});
+  }
   if (tabName === "profiles") {
     if (!selectedProfileId && savedProfiles.length) {
       selectedProfileId = String(savedProfiles[0]?.id || "");
@@ -282,6 +414,13 @@ function addAgentMessage(container, text, muted = false, typing = true) {
       row.classList.remove("typing");
     }
   }, 14);
+}
+
+function buildOnboardingChatSignature(parts = []) {
+  return parts
+    .map((part) => String(part || "").trim())
+    .filter(Boolean)
+    .join("||");
 }
 
 function clearWelcomeNudgeTimer() {
@@ -497,6 +636,25 @@ function addOnboardKeyword(kind, rawValue) {
   return true;
 }
 
+async function saveOnboardingAlert() {
+  const name = String(qs("onboardAlertName")?.value || "").trim();
+  const watch = onboardWatchKeywords.join(", ");
+  const exclude = onboardExcludeKeywords.join(", ");
+  qs("profileEditorName").value = name;
+  qs("profileEditorPositive").value = watch;
+  qs("profileEditorNegative").value = exclude;
+  qs("profileEditorMin").value = String(globalMonitorFrequency.min);
+  qs("profileEditorMax").value = String(globalMonitorFrequency.max);
+
+  const ok = await saveProfileFromEditor();
+  if (!ok) {
+    appendLog("logGeneral", translate("onboard.create_save_first"), "warn");
+    return false;
+  }
+  await setOnboardingState("ready");
+  return true;
+}
+
 function normalizeProfileKeyword(value) {
   return String(value || "").trim().toLowerCase();
 }
@@ -648,7 +806,8 @@ async function runOnboardingFacebookCheck(feed) {
   const response = await checkFacebookLogin();
   isCheckingFacebookLogin = false;
   if (response?.loggedIn) {
-    setLoginStatus(true, `Logged as ${response.userId}`);
+    lastFacebookUserId = String(response.userId || "").trim();
+    setLoginStatus(true, `${translate("status.logged")}: ${response.userId}`);
     await setOnboardingState("groups");
     return;
   }
@@ -708,9 +867,18 @@ function renderOnboardingChat() {
     }
   }
 
+  let chatSignature = onboardingState;
+
   if (onboardingState === "welcome") {
-    addAgentMessage(feed, copy.welcome1);
-    addAgentMessage(feed, copy.welcome2);
+    chatSignature = buildOnboardingChatSignature([
+      onboardingState,
+      copy.welcome1,
+      copy.welcome2,
+    ]);
+    const shouldAnimate = lastOnboardingChatSignature !== chatSignature;
+    lastOnboardingChatSignature = chatSignature;
+    addAgentMessage(feed, copy.welcome1, false, shouldAnimate);
+    addAgentMessage(feed, copy.welcome2, false, shouldAnimate);
     setAgentActions([
       {
         label: translate("btn.next"),
@@ -727,7 +895,13 @@ function renderOnboardingChat() {
   }
 
   if (onboardingState === "fb_connect") {
-    addAgentMessage(feed, translate("onboard.fb_prompt"));
+    chatSignature = buildOnboardingChatSignature([
+      onboardingState,
+      translate("onboard.fb_prompt"),
+    ]);
+    const shouldAnimate = lastOnboardingChatSignature !== chatSignature;
+    lastOnboardingChatSignature = chatSignature;
+    addAgentMessage(feed, translate("onboard.fb_prompt"), false, shouldAnimate);
     const actions = [
       {
         label: isCheckingFacebookLogin
@@ -788,7 +962,13 @@ function renderOnboardingChat() {
 
   if (onboardingState === "groups") {
     maybeAutoLoadOnboardingGroups();
-    addAgentMessage(feed, translate("onboard.groups_pick"));
+    chatSignature = buildOnboardingChatSignature([
+      onboardingState,
+      translate("onboard.groups_pick"),
+    ]);
+    const shouldAnimate = lastOnboardingChatSignature !== chatSignature;
+    lastOnboardingChatSignature = chatSignature;
+    addAgentMessage(feed, translate("onboard.groups_pick"), false, shouldAnimate);
     renderOnboardingGroupsList();
     setAgentActions([
       {
@@ -818,15 +998,20 @@ function renderOnboardingChat() {
   }
 
   if (onboardingState === "alert") {
-    addAgentMessage(feed, copy.alert1);
-    addAgentMessage(feed, copy.alert2, true);
-    addAgentMessage(
-      feed,
-      selectedProfileId
-        ? translate("onboard.alert_ready")
-        : translate("onboard.alert_create_first"),
-      true,
-    );
+    const alertStatusText = selectedProfileId
+      ? translate("onboard.alert_ready")
+      : translate("onboard.alert_create_first");
+    chatSignature = buildOnboardingChatSignature([
+      onboardingState,
+      copy.alert1,
+      copy.alert2,
+      alertStatusText,
+    ]);
+    const shouldAnimate = lastOnboardingChatSignature !== chatSignature;
+    lastOnboardingChatSignature = chatSignature;
+    addAgentMessage(feed, copy.alert1, false, shouldAnimate);
+    addAgentMessage(feed, copy.alert2, true, shouldAnimate);
+    addAgentMessage(feed, alertStatusText, true, shouldAnimate);
     syncOnboardingAlertFromSelectedProfile();
     setAgentActions([
       {
@@ -836,45 +1021,63 @@ function renderOnboardingChat() {
         keywords: currentLanguage === "pt-br"
           ? ["concluir", "finalizar", "setup", "alerta"]
           : ["finish", "setup", "alert", "save"],
-        onClick: async () => {
-          const name = String(qs("onboardAlertName")?.value || "").trim();
-          const watch = onboardWatchKeywords.join(", ");
-          const exclude = onboardExcludeKeywords.join(", ");
-          qs("profileEditorName").value = name;
-          qs("profileEditorPositive").value = watch;
-          qs("profileEditorNegative").value = exclude;
-          qs("profileEditorMin").value = String(globalMonitorFrequency.min);
-          qs("profileEditorMax").value = String(globalMonitorFrequency.max);
-
-          const ok = await saveProfileFromEditor();
-          if (!ok) {
-            appendLog("logGeneral", translate("onboard.create_save_first"), "warn");
-            return;
-          }
-          await setOnboardingState("ready");
-        },
+        onClick: async () => saveOnboardingAlert(),
       },
     ]);
     return;
   }
 
-  addAgentMessage(feed, isMonitorRunning
+  const readyText = isMonitorRunning
     ? translate("onboard.monitoring_active_now")
-    : translate("onboard.ready_to_monitor"),
-  );
+    : translate("onboard.ready_to_monitor");
+  chatSignature = buildOnboardingChatSignature([
+    onboardingState,
+    readyText,
+  ]);
+  const shouldAnimate = lastOnboardingChatSignature !== chatSignature;
+  lastOnboardingChatSignature = chatSignature;
+  addAgentMessage(feed, readyText, false, shouldAnimate);
   setAgentActions([]);
 }
 
 async function loadLanguage() {
   const data = await chrome.storage.local.get([STORAGE_LANGUAGE_KEY]);
-  const value = String(data?.[STORAGE_LANGUAGE_KEY] || "en").toLowerCase();
-  currentLanguage = value === "pt-br" ? "pt-br" : "en";
+  const stored = data?.[STORAGE_LANGUAGE_KEY];
+  const storedNormalized = String(stored || "").toLowerCase();
+  if (SUPPORTED_LANGUAGES.has(storedNormalized)) {
+    currentLanguage = storedNormalized;
+    applyI18n();
+    return;
+  }
+
+  const browserLocales = [
+    ...(Array.isArray(navigator.languages) ? navigator.languages : []),
+    navigator.language || "",
+  ]
+    .map((value) => String(value || "").toLowerCase())
+    .filter(Boolean);
+  const preferMap = [
+    ["pt", "pt-br"],
+    ["es", "es"],
+    ["fr", "fr"],
+  ];
+  const detected =
+    preferMap.find(([prefix]) =>
+      browserLocales.some((locale) => locale.startsWith(prefix)),
+    )?.[1] || "en";
+  currentLanguage = detected;
+  await chrome.storage.local.set({ [STORAGE_LANGUAGE_KEY]: currentLanguage });
   applyI18n();
 }
 
 async function setLanguage(nextLanguage) {
-  currentLanguage = nextLanguage === "pt-br" ? "pt-br" : "en";
+  const normalized = String(nextLanguage || "").toLowerCase();
+  currentLanguage = SUPPORTED_LANGUAGES.has(normalized) ? normalized : "en";
   await chrome.storage.local.set({ [STORAGE_LANGUAGE_KEY]: currentLanguage });
+  rerenderUiAfterLanguageChange();
+}
+
+function rerenderUiAfterLanguageChange() {
   applyI18n();
   renderPlanBanner();
   renderOnboardingChat();
@@ -884,11 +1087,86 @@ async function setLanguage(nextLanguage) {
   updateSelectedGroupCount();
   renderProfileWizard();
   renderHomeInsights();
+  renderGroupsLeaderboard();
+  setLoginStatus(isFacebookConnected, getFacebookStatusLabel());
   setMonitorState(
     isMonitorRunning,
     qs("monitorStatus")?.textContent ||
       (isMonitorRunning ? translate("status.monitoring") : translate("status.stopped")),
   );
+}
+
+function watchStorageUpdates() {
+  chrome.storage.onChanged.addListener((changes, areaName) => {
+    if (areaName !== "local") return;
+    void (async () => {
+      if (changes[STORAGE_LANGUAGE_KEY]) {
+        const next = String(changes[STORAGE_LANGUAGE_KEY].newValue || "").toLowerCase();
+        if (SUPPORTED_LANGUAGES.has(next) && next !== currentLanguage) {
+          currentLanguage = next;
+        }
+        rerenderUiAfterLanguageChange();
+      }
+
+      if (changes[STORAGE_PROFILES_KEY]) {
+        await loadProfiles();
+        updateMonitorProfilePreview();
+        updateProfileKeywordPreview();
+      }
+
+      if (changes[STORAGE_SELECTED_GROUP_IDS_KEY]) {
+        await loadSelectedGroupIds();
+        applyGroupsVisibilityFilter();
+      }
+
+      if (changes[STORAGE_LOADED_GROUPS_KEY]) {
+        lastLoadedGroups.clear();
+        if (qs("groupsList")) qs("groupsList").innerHTML = "";
+        await loadPersistedGroups();
+        applyGroupsVisibilityFilter();
+      }
+
+      if (changes[STORAGE_GLOBAL_FREQUENCY_KEY]) {
+        await loadGlobalMonitorFrequency();
+        updateProfileKeywordPreview();
+      }
+
+      if (changes[STORAGE_NOTIFICATION_SETTINGS_KEY]) {
+        await loadNotificationSettings();
+      }
+
+      if (changes[STORAGE_PLAN_STATE_KEY]) {
+        const nextPlan = changes[STORAGE_PLAN_STATE_KEY]?.newValue;
+        if (nextPlan && typeof nextPlan === "object") {
+          cachedPlanState = nextPlan;
+        } else {
+          cachedPlanState = await loadPlanState();
+        }
+        renderPlanBanner();
+        renderProfileWizard();
+        renderGlobalFrequencyUi();
+        setTrialUpsellVisible(resolvePlanLevel() === "trial");
+      }
+
+      if (changes[STORAGE_LICENSE_SESSION_KEY] || changes[STORAGE_LICENSE_EMAIL_KEY]) {
+        await updateAccountUi();
+        const nextSession = changes[STORAGE_LICENSE_SESSION_KEY]?.newValue;
+        const nextEmail = String(
+          nextSession?.email || changes[STORAGE_LICENSE_EMAIL_KEY]?.newValue || "",
+        ).trim();
+        setAuthGateVisible(resolvePlanLevel() === "blocked" || (!nextSession?.email && !nextEmail));
+        if (!nextSession?.email && !nextSession?.licenseKey && !nextEmail) {
+          nextPlanSyncAt = 0;
+          setTrialUpsellVisible(false);
+        }
+      }
+
+      if (changes[STORAGE_ONBOARDING_STATE_KEY]) {
+        await loadOnboardingState();
+        renderOnboardingChat();
+      }
+    })();
+  });
 }
 
 function formatRemainingTime(ms) {
@@ -904,21 +1182,19 @@ async function loadPlanState() {
   const plan = data?.[STORAGE_PLAN_STATE_KEY];
   if (plan && typeof plan === "object") return plan;
   const defaultPlan = {
-    plan: "trial",
-    trialEnd: Date.now() + 48 * 60 * 60 * 1000,
+    plan: "free",
+    trialEnd: 0,
   };
   await chrome.storage.local.set({ [STORAGE_PLAN_STATE_KEY]: defaultPlan });
   return defaultPlan;
 }
 
 let cachedPlanState = null;
-
 function renderPlanBanner() {
   const banner = qs("planBanner");
   const text = qs("planBannerText");
-  if (!banner || !text || !cachedPlanState) return;
-  const maybeLater = qs("btnPlanMaybeLater");
-  if (maybeLater) maybeLater.style.display = "";
+  const hint = qs("planBannerHint");
+  if (!banner || !text || !hint || !cachedPlanState) return;
 
   banner.classList.remove("show", "warn", "pro", "free");
   const now = Date.now();
@@ -926,32 +1202,24 @@ function renderPlanBanner() {
   const trialEnd = Number(cachedPlanState.trialEnd) || 0;
 
   if (plan === "pro") {
-    banner.classList.add("show", "pro");
-    text.textContent = translate("plan.pro");
+    text.textContent = "";
+    hint.textContent = "";
     setPlanLockVisible(false);
     return;
   }
 
   if (plan === "trial") {
     if (trialEnd > now) {
-      banner.classList.add("show", "warn");
-      text.textContent = translate("plan.trial", {
-        time: formatRemainingTime(trialEnd - now),
-      });
+      text.textContent = "";
+      hint.textContent = "";
       setPlanLockVisible(false);
       return;
     }
-    banner.classList.add("show", "free");
-    text.textContent = translate("plan.expired");
-    return;
   }
 
   banner.classList.add("show", "free");
   text.textContent = translate("plan.expired");
-
-  if (maybeLater) {
-    maybeLater.style.display = "none";
-  }
+  hint.textContent = translate("plan.free_hint");
 
   if (!qs("authGate")?.classList.contains("show")) {
     setPlanLockVisible(true);
@@ -962,23 +1230,71 @@ function getSupabaseConfig() {
   return {
     url: String(SUPABASE_URL || "").trim(),
     anonKey: String(SUPABASE_ANON_KEY || "").trim(),
+    licensePath: String(LICENSE_ACCESS_FUNCTION_PATH || "").trim(),
+    gumroadProductUrl: String(GUMROAD_PRODUCT_URL || "").trim(),
   };
 }
 
-async function getAuthSession() {
-  const data = await chrome.storage.local.get([STORAGE_AUTH_SESSION_KEY]);
-  return data?.[STORAGE_AUTH_SESSION_KEY] || null;
+async function getLicenseSession() {
+  const data = await chrome.storage.local.get([STORAGE_LICENSE_SESSION_KEY]);
+  return data?.[STORAGE_LICENSE_SESSION_KEY] || null;
 }
 
-async function setAuthSession(session) {
-  await chrome.storage.local.set({ [STORAGE_AUTH_SESSION_KEY]: session });
+async function setLicenseSession(session) {
+  await chrome.storage.local.set({ [STORAGE_LICENSE_SESSION_KEY]: session });
 }
 
-async function clearAuthSession() {
+async function clearLicenseSession() {
+  licenseSessionVersion += 1;
+  const session = await getLicenseSession();
+  const deviceId = await getOrCreateDeviceId();
+  if (session?.licenseKey) {
+    try {
+      await callLicenseAccess({
+        action: "release_device",
+        email: session.email || "license@local.invalid",
+        licenseKey: session.licenseKey,
+        deviceId,
+      });
+    } catch (_) {
+      // Best-effort release. Local cleanup should still continue.
+    }
+  }
   await chrome.storage.local.remove([
-    STORAGE_AUTH_SESSION_KEY,
-    STORAGE_AUTH_EMAIL_KEY,
+    STORAGE_LICENSE_SESSION_KEY,
+    STORAGE_LICENSE_EMAIL_KEY,
+    "authSession",
+    "authEmail",
   ]);
+  const next = {
+    plan: "free",
+    trialEnd: 0,
+    purchaseDate: 0,
+    cachedAt: Date.now(),
+    source: "local",
+  };
+  cachedPlanState = next;
+  nextPlanSyncAt = 0;
+  resetAuthGateFields();
+  await chrome.storage.local.set({ [STORAGE_PLAN_STATE_KEY]: next });
+}
+
+async function getOrCreateDeviceId() {
+  const data = await chrome.storage.local.get([STORAGE_DEVICE_ID_KEY]);
+  const existing = String(data?.[STORAGE_DEVICE_ID_KEY] || "").trim();
+  if (existing) return existing;
+  const next =
+    typeof crypto?.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `device-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  await chrome.storage.local.set({ [STORAGE_DEVICE_ID_KEY]: next });
+  return next;
+}
+
+function getDeviceName() {
+  const platform = String(navigator?.platform || "").trim();
+  const language = String(navigator?.language || "").trim();
+  return [platform, language].filter(Boolean).join(" / ") || "Chrome Extension";
 }
 
 function setAuthGateVisible(show) {
@@ -998,144 +1314,157 @@ function appendAuthGateLog(message, type = "info") {
   appendLog("logAuthGate", message, type);
 }
 
-function authHeaders(config, bearer = "") {
-  const headers = {
+function serviceHeaders(config) {
+  return {
     apikey: config.anonKey,
     "Content-Type": "application/json",
   };
-  if (bearer) headers.Authorization = `Bearer ${bearer}`;
-  return headers;
 }
 
-async function sendEmailOtpCode(email, createUser = true) {
-  const config = getSupabaseConfig();
-  if (!config.url || !config.anonKey) {
-    throw new Error(translate("auth.missing_config"));
+function readDateLike(value) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim()) {
+    const asNumber = Number(value);
+    if (Number.isFinite(asNumber) && asNumber > 0) return asNumber;
+    const asDate = new Date(value).getTime();
+    if (Number.isFinite(asDate) && asDate > 0) return asDate;
   }
-  const response = await fetch(`${config.url}/auth/v1/otp`, {
-    method: "POST",
-    headers: authHeaders(config),
-    body: JSON.stringify({
-      email,
-      create_user: createUser,
-      should_create_user: createUser,
-      options: {},
-    }),
-  });
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(text || `OTP request failed (${response.status})`);
-  }
+  return 0;
 }
 
-async function verifyEmailOtpCode(email, code) {
-  const config = getSupabaseConfig();
-  if (!config.url || !config.anonKey) {
-    throw new Error(translate("auth.missing_config"));
-  }
-  const response = await fetch(`${config.url}/auth/v1/verify`, {
-    method: "POST",
-    headers: authHeaders(config),
-    body: JSON.stringify({
-      email,
-      token: code,
-      type: "email",
-    }),
-  });
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(text || `OTP verify failed (${response.status})`);
-  }
-  return await response.json();
+function maskLicenseKey(licenseKey) {
+  const clean = String(licenseKey || "").trim();
+  if (!clean) return "";
+  if (clean.length <= 8) return clean;
+  return `${clean.slice(0, 4)}...${clean.slice(-4)}`;
 }
 
-async function fetchAuthUser(accessToken) {
-  const config = getSupabaseConfig();
-  if (!config.url || !config.anonKey || !accessToken) return null;
-  const response = await fetch(`${config.url}/auth/v1/user`, {
-    method: "GET",
-    headers: authHeaders(config, accessToken),
-  });
-  if (!response.ok) return null;
-  return await response.json();
+function normalizeLicensePlan(rawPlan, trialEnd) {
+  const plan = String(rawPlan || "").trim().toLowerCase();
+  if (["pro", "paid", "active", "lifetime"].includes(plan)) return "pro";
+  if (plan === "trial" && trialEnd > Date.now()) return "trial";
+  return "free";
 }
 
-async function refreshAuthSessionToken(session) {
-  const config = getSupabaseConfig();
-  const refreshToken = String(session?.refreshToken || "").trim();
-  if (!config.url || !config.anonKey || !refreshToken) return null;
-
-  const response = await fetch(`${config.url}/auth/v1/token?grant_type=refresh_token`, {
-    method: "POST",
-    headers: authHeaders(config),
-    body: JSON.stringify({ refresh_token: refreshToken }),
-  });
-  if (!response.ok) return null;
-
-  const data = await response.json().catch(() => ({}));
-  const accessToken = String(data?.access_token || "").trim();
-  if (!accessToken) return null;
-
-  const next = {
-    ...session,
-    accessToken,
-    refreshToken: String(data?.refresh_token || refreshToken).trim(),
-    expiresAt: Number(data?.expires_in || 0)
-      ? Date.now() + Number(data.expires_in) * 1000
-      : Number(session?.expiresAt) || 0,
-    userId: String(data?.user?.id || session?.userId || "").trim(),
-    email: String(data?.user?.email || session?.email || "").trim(),
+function normalizeLicenseState(payload, fallback = {}) {
+  const trialEnd = readDateLike(payload?.trialEnd ?? payload?.trial_end ?? fallback.trialEnd);
+  const purchaseDate = readDateLike(
+    payload?.purchaseDate ?? payload?.purchase_date ?? fallback.purchaseDate,
+  );
+  const email = String(payload?.email || fallback.email || "").trim().toLowerCase();
+  const licenseKey = String(payload?.licenseKey || fallback.licenseKey || "").trim();
+  const plan = normalizeLicensePlan(payload?.plan || payload?.status, trialEnd);
+  return {
+    email,
+    licenseKey,
+    licenseKeyMasked: String(
+      payload?.licenseKeyMasked || payload?.license_key_masked || maskLicenseKey(licenseKey),
+    ).trim(),
+    plan,
+    trialEnd,
+    purchaseDate,
+    deviceId: String(payload?.deviceId || payload?.device_id || fallback.deviceId || "").trim(),
+    deviceName: String(
+      payload?.deviceName || payload?.device_name || fallback.deviceName || "",
+    ).trim(),
     checkedAt: Date.now(),
-  };
-  await setAuthSession(next);
-  return next;
-}
-
-async function ensureActiveAuthSession() {
-  let session = await getAuthSession();
-  if (!session?.accessToken) return null;
-
-  const expiresAt = Number(session?.expiresAt) || 0;
-  const expiresSoon = expiresAt > 0 && expiresAt - Date.now() < 60 * 1000;
-  if (expiresSoon || !session?.userId) {
-    const refreshed = await refreshAuthSessionToken(session);
-    if (refreshed?.accessToken) session = refreshed;
-  }
-  if (!session?.userId) {
-    const ok = await checkAuthSessionFromSupabase();
-    if (!ok) return null;
-    session = await getAuthSession();
-  }
-  return session?.accessToken ? session : null;
-}
-
-async function fetchPlanFromCloud(userId, accessToken) {
-  const config = getSupabaseConfig();
-  if (!config.url || !config.anonKey || !userId || !accessToken) return null;
-  const url = new URL(`${config.url}/rest/v1/users`);
-  url.searchParams.set("id", `eq.${userId}`);
-  url.searchParams.set("select", "plan,trial_end,purchase_date,updated_at");
-  url.searchParams.set("limit", "1");
-  const response = await fetch(url.toString(), {
-    method: "GET",
-    headers: {
-      ...authHeaders(config, accessToken),
-      Prefer: "return=representation",
-    },
-  });
-  if (!response.ok) return null;
-  const rows = await response.json();
-  const row = Array.isArray(rows) ? rows[0] : null;
-  if (!row) return null;
-  const next = {
-    plan: row.plan || "free",
-    trialEnd: row.trial_end ? new Date(row.trial_end).getTime() : 0,
-    purchaseDate: row.purchase_date ? new Date(row.purchase_date).getTime() : 0,
-    cachedAt: Date.now(),
     source: "supabase",
   };
-  await chrome.storage.local.set({ [STORAGE_PLAN_STATE_KEY]: next });
+}
+
+async function persistLicenseState(payload, fallback = {}, requestVersion = licenseSessionVersion) {
+  const next = normalizeLicenseState(payload, fallback);
+  if (!isCurrentLicenseSessionRequest(requestVersion)) {
+    return next;
+  }
+  await chrome.storage.local.set({
+    [STORAGE_LICENSE_SESSION_KEY]: next,
+    [STORAGE_LICENSE_EMAIL_KEY]: next.email || fallback.email || "",
+    [STORAGE_PLAN_STATE_KEY]: {
+      plan: next.plan,
+      trialEnd: next.trialEnd,
+      purchaseDate: next.purchaseDate,
+      cachedAt: Date.now(),
+      source: next.source,
+    },
+  });
+  cachedPlanState = {
+    plan: next.plan,
+    trialEnd: next.trialEnd,
+    purchaseDate: next.purchaseDate,
+    cachedAt: Date.now(),
+    source: next.source,
+  };
   return next;
+}
+
+async function callLicenseAccess(body) {
+  const config = getSupabaseConfig();
+  if (!config.url || !config.anonKey || !config.licensePath) {
+    throw new Error(translate("auth.missing_config"));
+  }
+  const response = await fetch(`${config.url}${config.licensePath}`, {
+    method: "POST",
+    headers: serviceHeaders(config),
+    body: JSON.stringify(body),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const message = String(payload?.error || payload?.message || "").trim();
+    throw new Error(message || `License request failed (${response.status})`);
+  }
+  return payload;
+}
+
+async function activateLicense(licenseKey) {
+  const requestVersion = beginLicenseSessionRequest(true);
+  const deviceId = await getOrCreateDeviceId();
+  const deviceName = getDeviceName();
+  const payload = await callLicenseAccess({
+    action: "activate",
+    email: "license@local.invalid",
+    licenseKey,
+    deviceId,
+    deviceName,
+  });
+  return await persistLicenseState(payload, { licenseKey, deviceId, deviceName }, requestVersion);
+}
+
+async function startLicenseTrial(email) {
+  const requestVersion = beginLicenseSessionRequest(true);
+  const deviceId = await getOrCreateDeviceId();
+  const deviceName = getDeviceName();
+  const payload = await callLicenseAccess({
+    action: "start_trial",
+    email,
+    deviceId,
+    deviceName,
+    trialDays: 1,
+    trialDurationMs: LICENSE_TRIAL_DURATION_MS,
+  });
+  return await persistLicenseState(payload, {
+    email,
+    trialEnd: Date.now() + LICENSE_TRIAL_DURATION_MS,
+    deviceId,
+    deviceName,
+  }, requestVersion);
+}
+
+async function refreshLicenseState(session) {
+  const requestVersion = beginLicenseSessionRequest(false);
+  const licenseKey = String(session?.licenseKey || "").trim();
+  const email = String(session?.email || "").trim().toLowerCase();
+  const deviceId = await getOrCreateDeviceId();
+  const deviceName = getDeviceName();
+  if (!licenseKey && !email) return null;
+  const payload = await callLicenseAccess({
+    action: "status",
+    email,
+    licenseKey,
+    deviceId,
+    deviceName,
+  });
+  return await persistLicenseState(payload, { email, licenseKey, deviceId, deviceName }, requestVersion);
 }
 
 function isPlanCacheFresh(state) {
@@ -1284,11 +1613,22 @@ function getFilteredLeads() {
   return filtered;
 }
 
-function setLoginStatus(ok, label) {
+function getFacebookStatusLabel() {
+  if (!isFacebookConnected) {
+    return translate("status.not_logged");
+  }
+  if (lastFacebookUserId) {
+    return `${translate("status.logged")}: ${lastFacebookUserId}`;
+  }
+  return translate("status.logged");
+}
+
+function setLoginStatus(ok, label = "") {
   isFacebookConnected = !!ok;
+  if (!ok) lastFacebookUserId = "";
   const el = qs("loginStatus");
   const dotColor = ok ? "var(--green)" : "#ff8800";
-  el.innerHTML = `<span class="status-dot" style="background:${dotColor}"></span> ${label}`;
+  el.innerHTML = `<span class="status-dot" style="background:${dotColor}"></span> ${label || getFacebookStatusLabel()}`;
   const checkBtn = qs("btnCheckLoginHero");
   const hint = qs("loginHint");
   if (checkBtn) checkBtn.style.display = ok ? "none" : "inline-flex";
@@ -1298,8 +1638,8 @@ function setLoginStatus(ok, label) {
   if (footerDot) footerDot.style.background = ok ? "var(--green)" : "#ff8800";
   if (footerText)
     footerText.textContent = ok
-      ? "Facebook connected"
-      : "Facebook disconnected";
+      ? translate("status.fb_connected")
+      : translate("status.fb_disconnected");
   if (!ok && !isMonitorRunning) setOrbState("fb-disconnected");
   if (ok && !isMonitorRunning) setOrbState("idle");
 }
@@ -1470,6 +1810,34 @@ function classifyMonitorError(rawError) {
   return "generic";
 }
 
+function applyMonitorConnectionIssue(issue) {
+  const kind = typeof issue === "string"
+    ? classifyMonitorError(issue)
+    : String(issue?.kind || "").trim() || classifyMonitorError(issue?.message || "");
+
+  if (kind === "fb_tab_missing") {
+    setLoginStatus(false, translate("status.not_logged"));
+    setOrbState("fb-disconnected");
+    qs("monitorStatus").textContent = translate("status.fb_tab_missing");
+    qs("monitorStatus").style.color = "#ffb066";
+    qs("monitorNextRun").textContent = translate("status.open_facebook_hint");
+    syncHomeNextScanLabel();
+    return true;
+  }
+
+  if (kind === "fb_login_required") {
+    setLoginStatus(false, translate("status.not_logged"));
+    setOrbState("fb-disconnected");
+    qs("monitorStatus").textContent = translate("status.fb_login_required");
+    qs("monitorStatus").style.color = "#ffb066";
+    qs("monitorNextRun").textContent = translate("status.open_facebook_hint");
+    syncHomeNextScanLabel();
+    return true;
+  }
+
+  return false;
+}
+
 function updateSelectedGroupCount() {
   const selectedCount = qs("selectedGroupCount");
   if (selectedCount) {
@@ -1614,6 +1982,41 @@ function renderHomeInsights() {
   trendMeta.textContent = `${max} max/day • ${lastLabel.count} today`;
 }
 
+function renderGroupsLeaderboard() {
+  const list = qs("groupsTopLeads");
+  if (!list) return;
+  list.innerHTML = "";
+
+  const byGroup = new Map();
+  leadsHistory.forEach((lead) => {
+    const name = String(lead?.group_name || "").trim();
+    if (!name) return;
+    byGroup.set(name, (byGroup.get(name) || 0) + 1);
+  });
+
+  const topGroups = Array.from(byGroup.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6);
+
+  if (!topGroups.length) {
+    const empty = document.createElement("div");
+    empty.className = "muted";
+    empty.textContent = translate("groups.top_performers_empty");
+    list.appendChild(empty);
+    return;
+  }
+
+  topGroups.forEach(([name, count], index) => {
+    const row = document.createElement("div");
+    row.className = "leaderboard-row";
+    row.innerHTML =
+      `<div class="leaderboard-rank">${index + 1}</div>` +
+      `<div class="leaderboard-name">${name}</div>` +
+      `<div class="leaderboard-value">${translate("groups.top_performers_leads", { count })}</div>`;
+    list.appendChild(row);
+  });
+}
+
 function applyGroupsVisibilityFilter() {
   const searchTerm = String(qs("groupsSearch")?.value || "")
     .trim()
@@ -1649,6 +2052,7 @@ function applyGroupsVisibilityFilter() {
     }
   }
   renderOnboardingGroupsList();
+  renderGroupsLeaderboard();
 }
 
 async function loadSelectedGroupIds() {
@@ -1694,6 +2098,7 @@ async function loadPersistedGroups() {
       count: selectedGroupIds.size,
     });
   }
+  renderGroupsLeaderboard();
 }
 
 function fallbackAvatarDataUri() {
@@ -2063,6 +2468,7 @@ async function refreshLeadsHistory() {
     }
     renderLeads();
     renderHomeInsights();
+    renderGroupsLeaderboard();
   });
 }
 
@@ -2192,6 +2598,7 @@ function setupOnboardingWorkspaceActions() {
   const loadBtn = qs("btnOnboardLoadGroups");
   const selectBtn = qs("btnOnboardSelectVisible");
   const clearBtn = qs("btnOnboardClearGroups");
+  const saveAlertBtn = qs("btnOnboardSaveAlert");
   const searchInput = qs("onboardGroupsSearch");
 
   if (loadBtn) {
@@ -2273,6 +2680,21 @@ function setupOnboardingWorkspaceActions() {
     });
   });
 
+  if (saveAlertBtn) {
+    saveAlertBtn.addEventListener("click", () => {
+      void runButtonTask(
+        {
+          buttonId: "btnOnboardSaveAlert",
+          actionKey: "onboardSaveAlert",
+          logId: "logGeneral",
+        },
+        async () => {
+          await saveOnboardingAlert();
+        },
+      );
+    });
+  }
+
   qs("btnOpenSettingsFrequency")?.addEventListener("click", () => {
     activateTab("settings");
     qs("globalFrequencySelect")?.focus();
@@ -2327,6 +2749,31 @@ function profileKeywordsSummary(profile) {
   const pos = (profile.positiveKeywords || []).length;
   const neg = (profile.negativeKeywords || []).length;
   return `${pos} ${translate("kw.watch_for").toLowerCase()} · ${neg} ${translate("kw.exclude_words").toLowerCase()}`;
+}
+
+function buildProfileKeywordChip(value, type) {
+  const chip = document.createElement("span");
+  chip.className = `profile-chip ${type}`;
+  chip.textContent = value;
+  return chip;
+}
+
+function buildProfileKeywordList(values, type, emptyText) {
+  const wrap = document.createElement("div");
+  wrap.className = "profile-keyword-list";
+  const normalized = Array.isArray(values)
+    ? values.map((value) => String(value || "").trim()).filter(Boolean)
+    : [];
+
+  if (!normalized.length) {
+    wrap.appendChild(buildProfileKeywordChip(emptyText, "empty"));
+    return wrap;
+  }
+
+  normalized.forEach((value) => {
+    wrap.appendChild(buildProfileKeywordChip(value, type));
+  });
+  return wrap;
 }
 
 function setProfileBuilderOpen(open) {
@@ -2429,7 +2876,7 @@ function applyWizardPlanLocks() {
     if (isBlocked && proOnly) {
       const badge = document.createElement("span");
       badge.className = "lock-badge";
-      badge.textContent = "Pro";
+      badge.textContent = translate("btn.upgrade");
       title.appendChild(badge);
     }
   });
@@ -2458,18 +2905,18 @@ function updateProfileSummaryCard() {
 function getDefaultFrequencyForPlan() {
   const level = resolvePlanLevel();
   if (level === "blocked") return { min: 15, max: 20 };
-  return { min: 5, max: 10 };
+  return { min: 3, max: 8 };
 }
 
 function frequencyPairFromString(value) {
   const [minRaw, maxRaw] = String(value || "").split("-");
-  const min = Number(minRaw) || 5;
-  const max = Number(maxRaw) || 10;
+  const min = Number(minRaw) || 3;
+  const max = Number(maxRaw) || 8;
   return { min, max };
 }
 
 function frequencyPairToString(min, max) {
-  return `${Number(min) || 5}-${Number(max) || 10}`;
+  return `${Number(min) || 3}-${Number(max) || 8}`;
 }
 
 async function loadGlobalMonitorFrequency() {
@@ -2477,8 +2924,8 @@ async function loadGlobalMonitorFrequency() {
   const saved = data?.[STORAGE_GLOBAL_FREQUENCY_KEY];
   if (saved && typeof saved === "object") {
     globalMonitorFrequency = {
-      min: Number(saved.min) || 5,
-      max: Number(saved.max) || 10,
+      min: Number(saved.min) || 3,
+      max: Number(saved.max) || 8,
     };
   } else {
     globalMonitorFrequency = getDefaultFrequencyForPlan();
@@ -2491,8 +2938,8 @@ async function loadGlobalMonitorFrequency() {
 
 async function persistGlobalMonitorFrequency(next) {
   globalMonitorFrequency = {
-    min: Number(next?.min) || 5,
-    max: Number(next?.max) || 10,
+    min: Number(next?.min) || 3,
+    max: Number(next?.max) || 8,
   };
   await chrome.storage.local.set({
     [STORAGE_GLOBAL_FREQUENCY_KEY]: globalMonitorFrequency,
@@ -2722,30 +3169,49 @@ function renderProfiles() {
       const excludeList = Array.isArray(profile.negativeKeywords)
         ? profile.negativeKeywords
         : [];
-      const watchPreview = watchList.length
-        ? watchList.slice(0, 5).join(", ")
-        : translate("profiles.all_posts");
-      const excludePreview = excludeList.length
-        ? excludeList.slice(0, 5).join(", ")
-        : translate("common.none");
       const item = document.createElement("details");
       item.className = `profile-item ${profile.id === selectedProfileId ? "active" : ""}`;
       item.open = profile.id === selectedProfileId;
       item.innerHTML =
         `<summary>` +
         `<div class="profile-item-head">` +
+        `<div class="profile-item-summary">` +
         `<div class="title">${profile.name}</div>` +
         `<div class="meta">${profileKeywordsSummary(profile)}</div>` +
         `</div>` +
-        `</summary>` +
-        `<div class="profile-item-body">` +
-        `<div class="muted"><strong>${translate("kw.watch_for")}:</strong> ${watchPreview}</div>` +
-        `<div class="muted"><strong>${translate("kw.exclude_words")}:</strong> ${excludePreview}</div>` +
+        `</div>` +
+        `</summary>`;
+
+      const body = document.createElement("div");
+      body.className = "profile-item-body";
+
+      const watchBlock = document.createElement("div");
+      watchBlock.className = "profile-keyword-block";
+      watchBlock.innerHTML = `<div class="profile-keyword-label">${translate("kw.watch_for")}</div>`;
+      watchBlock.appendChild(
+        buildProfileKeywordList(watchList, "watch", translate("profiles.all_posts")),
+      );
+
+      const excludeBlock = document.createElement("div");
+      excludeBlock.className = "profile-keyword-block";
+      excludeBlock.innerHTML = `<div class="profile-keyword-label">${translate("kw.exclude_words")}</div>`;
+      excludeBlock.appendChild(
+        buildProfileKeywordList(excludeList, "exclude", translate("common.none")),
+      );
+
+      const footer = document.createElement("div");
+      footer.className = "profile-card-footer";
+      footer.innerHTML =
+        `<div class="meta">${translate("groups.selected_count", { count: selectedGroupIds.size })}</div>` +
         `<div class="profile-item-actions">` +
         `<button class="btn btn-gray" type="button" data-action="edit">${translate("btn.edit")}</button>` +
         `<button class="btn btn-red" type="button" data-action="delete">${translate("btn.delete")}</button>` +
-        `</div>` +
         `</div>`;
+
+      body.appendChild(watchBlock);
+      body.appendChild(excludeBlock);
+      body.appendChild(footer);
+      item.appendChild(body);
       item.querySelector('[data-action="edit"]')?.addEventListener("click", (event) => {
         event.preventDefault();
         event.stopPropagation();
@@ -3297,22 +3763,17 @@ chrome.runtime.onMessage.addListener((message) => {
   }
 
   if (message?.type === "monitorError") {
-    const kind = classifyMonitorError(message.error);
-    if (kind === "fb_tab_missing") {
-      setOrbState("fb-disconnected");
-      qs("monitorStatus").textContent = translate("status.fb_tab_missing");
-      qs("monitorStatus").style.color = "#ffb066";
-      qs("monitorNextRun").textContent = translate("status.open_facebook_hint");
-      syncHomeNextScanLabel();
-      appendLog("logPosts", translate("log.monitor_fb_tab_missing"), "warn");
-      appendLog("logPosts", translate("log.monitor_fb_action_open"), "info");
-    } else if (kind === "fb_login_required") {
-      setOrbState("fb-disconnected");
-      qs("monitorStatus").textContent = translate("status.fb_login_required");
-      qs("monitorStatus").style.color = "#ffb066";
-      qs("monitorNextRun").textContent = translate("status.open_facebook_hint");
-      syncHomeNextScanLabel();
-      appendLog("logPosts", translate("log.monitor_fb_login_required"), "warn");
+    const handledConnectionIssue = applyMonitorConnectionIssue({
+      kind: message.issueKind,
+      message: message.error,
+    });
+    if (handledConnectionIssue) {
+      const kind = String(message.issueKind || "").trim() || classifyMonitorError(message.error);
+      if (kind === "fb_tab_missing") {
+        appendLog("logPosts", translate("log.monitor_fb_tab_missing"), "warn");
+      } else {
+        appendLog("logPosts", translate("log.monitor_fb_login_required"), "warn");
+      }
       appendLog("logPosts", translate("log.monitor_fb_action_open"), "info");
     } else {
       setOrbState("error");
@@ -3371,6 +3832,7 @@ setupSidebarTooltips();
 setupOnboardingWorkspaceActions();
 setupProfileActions();
 renderProfileWizard();
+watchStorageUpdates();
 chrome.runtime.sendMessage({ type: "panelOpened" }, () => {
   // no-op: background enforces single extension tab and may close this tab.
 });
@@ -3386,6 +3848,7 @@ qs("btnCheckLoginHero")?.addEventListener("click", () => {
 
 chrome.runtime.sendMessage({ type: "checkLogin" }, (response) => {
   if (response?.loggedIn) {
+    lastFacebookUserId = String(response.userId || "").trim();
     setLoginStatus(true, `${translate("status.logged")}: ${response.userId}`);
     appendLog("logAuth", translate("log.logged_as_user", { userId: response.userId }), "ok");
   } else {
@@ -3400,6 +3863,7 @@ qs("btnCheckLogin").addEventListener("click", () => {
   chrome.runtime.sendMessage({ type: "checkLogin" }, (response) => {
     setButtonLoading("btnCheckLogin", false);
     if (response?.loggedIn) {
+      lastFacebookUserId = String(response.userId || "").trim();
       setLoginStatus(true, `${translate("status.logged")}: ${response.userId}`);
       appendLog("logAuth", translate("log.user_id_short", { userId: response.userId }), "ok");
     } else {
@@ -3631,145 +4095,114 @@ qs("btnStartMonitor").addEventListener("click", () => {
 });
 
 async function updateAccountUi() {
-  const session = await getAuthSession();
+  const session = await getLicenseSession();
   const accountStatus = qs("accountStatus");
   if (!accountStatus) return;
-  if (session?.email) {
-    accountStatus.textContent = translate("auth.connected", {
-      email: session.email,
+  if (session?.email || session?.licenseKeyMasked) {
+    const level = resolvePlanLevel();
+    const stateKey =
+      level === "pro"
+        ? "account.license_active"
+        : level === "trial"
+          ? "account.trial_active"
+          : "account.license_pending";
+    accountStatus.textContent = translate(stateKey, {
+      email: session.email || session.licenseKeyMasked || translate("common.none"),
+      key: session.licenseKeyMasked || translate("common.none"),
     });
   } else {
-    accountStatus.textContent = translate("account.not_signed_in");
+    accountStatus.textContent = translate("account.no_license");
   }
 }
 
 async function maybeRefreshPlanFromCloud(force = false) {
-  const session = await getAuthSession();
-  if (!session?.accessToken || !session?.userId) return;
-
-  const now = Date.now();
-  if (!force && now < nextPlanSyncAt) return;
-  if (!force && cachedPlanState && isPlanCacheFresh(cachedPlanState)) {
-    nextPlanSyncAt = now + PLAN_SYNC_INTERVAL_MS;
-    return;
+  if (activePlanRefreshPromise) {
+    return await activePlanRefreshPromise;
   }
 
-  try {
-    const fresh = await fetchPlanFromCloud(session.userId, session.accessToken);
-    if (fresh) {
-      cachedPlanState = fresh;
+  activePlanRefreshPromise = (async () => {
+    const session = await getLicenseSession();
+    if (!session?.email && !session?.licenseKey) return;
+
+    const now = Date.now();
+    if (!force && now < nextPlanSyncAt) return;
+    if (!force && cachedPlanState && isPlanCacheFresh(cachedPlanState)) {
       nextPlanSyncAt = now + PLAN_SYNC_INTERVAL_MS;
-    } else {
+      return;
+    }
+
+    try {
+      const fresh = await refreshLicenseState(session);
+      if (fresh) {
+        cachedPlanState = {
+          plan: fresh.plan,
+          trialEnd: fresh.trialEnd,
+          purchaseDate: fresh.purchaseDate,
+          cachedAt: Date.now(),
+          source: fresh.source,
+        };
+        nextPlanSyncAt = now + PLAN_SYNC_INTERVAL_MS;
+      } else {
+        nextPlanSyncAt = now + PLAN_SYNC_FAILURE_BACKOFF_MS;
+      }
+    } catch (_) {
       nextPlanSyncAt = now + PLAN_SYNC_FAILURE_BACKOFF_MS;
     }
-  } catch (_) {
-    nextPlanSyncAt = now + PLAN_SYNC_FAILURE_BACKOFF_MS;
-  }
 
-  renderPlanBanner();
-  renderProfileWizard();
-  renderGlobalFrequencyUi();
-}
+    renderPlanBanner();
+    renderProfileWizard();
+    renderGlobalFrequencyUi();
+  })();
 
-function stopPostCheckoutPlanWatch(logFinished = false) {
-  if (!postCheckoutPlanTimer) return;
-  clearInterval(postCheckoutPlanTimer);
-  postCheckoutPlanTimer = null;
-  if (logFinished) {
-    appendLog("logGeneral", translate("msg.payment_watch_finished"), "info");
+  try {
+    return await activePlanRefreshPromise;
+  } finally {
+    activePlanRefreshPromise = null;
   }
 }
 
-async function checkPaymentStatusNow(logNoChange = true) {
-  appendLog("logGeneral", translate("msg.payment_checking"), "info");
+async function refreshLicenseStatusNow(logNoChange = true) {
+  appendLog("logGeneral", translate("msg.license_checking"), "info");
   const before = resolvePlanLevel();
   await maybeRefreshPlanFromCloud(true);
   const after = resolvePlanLevel();
   if (after === "pro" && before !== "pro") {
-    appendLog("logGeneral", translate("msg.payment_confirmed"), "ok");
+    appendLog("logGeneral", translate("msg.license_confirmed"), "ok");
+    return true;
+  }
+  if (after === "trial" && before !== "trial") {
+    appendLog("logGeneral", translate("msg.trial_started"), "ok");
     return true;
   }
   if (logNoChange) {
-    appendLog("logGeneral", translate("msg.payment_status_refreshed"), "info");
+    appendLog("logGeneral", translate("msg.license_status_refreshed"), "info");
   }
-  return after === "pro";
+  return after === "pro" || after === "trial";
 }
 
-function startPostCheckoutPlanWatch() {
-  stopPostCheckoutPlanWatch(false);
-  const startedAt = Date.now();
-  appendLog("logGeneral", translate("msg.payment_watch_started"), "info");
-  void checkPaymentStatusNow(false).then((isPro) => {
-    if (isPro) {
-      stopPostCheckoutPlanWatch(false);
-    }
-  });
-  postCheckoutPlanTimer = setInterval(async () => {
-    if (Date.now() - startedAt >= POST_CHECKOUT_PLAN_WINDOW_MS) {
-      stopPostCheckoutPlanWatch(true);
-      return;
-    }
-    const isPro = await checkPaymentStatusNow(false);
-    if (isPro) {
-      stopPostCheckoutPlanWatch(false);
-    }
-  }, POST_CHECKOUT_PLAN_INTERVAL_MS);
-}
-
-async function createStripeCheckoutSession() {
+function getGumroadCheckoutUrl() {
   const config = getSupabaseConfig();
-  if (!config.url || !config.anonKey) {
-    throw new Error(translate("auth.missing_config"));
+  if (!/^https?:\/\//i.test(config.gumroadProductUrl)) {
+    throw new Error(translate("msg.license_buy_unavailable"));
   }
-
-  let session = await ensureActiveAuthSession();
-  if (!session?.accessToken) throw new Error(translate("msg.upgrade_signin_required"));
-
-  const callCheckout = async (token) =>
-    await fetch(`${config.url}/functions/v1/create-checkout-session`, {
-      method: "POST",
-      headers: authHeaders(config, token),
-      body: JSON.stringify({}),
-    });
-
-  let response = await callCheckout(session.accessToken);
-  let payload = await response.json().catch(() => ({}));
-
-  if (response.status === 401) {
-    const refreshed = await refreshAuthSessionToken(session);
-    if (refreshed?.accessToken) {
-      session = refreshed;
-      response = await callCheckout(session.accessToken);
-      payload = await response.json().catch(() => ({}));
-    }
-  }
-
-  if (!response.ok) {
-    const msg = String(payload?.error || payload?.message || "").trim();
-    throw new Error(msg || `Checkout request failed (${response.status})`);
-  }
-  const checkoutUrl = String(payload?.checkout_url || "").trim();
-  if (!/^https?:\/\//i.test(checkoutUrl)) {
-    throw new Error("Invalid checkout URL returned by billing service.");
-  }
-  return checkoutUrl;
+  return config.gumroadProductUrl;
 }
 
 async function resetWorkspaceForChangedEmail(nextEmail) {
   const normalizedNext = String(nextEmail || "").trim().toLowerCase();
   if (!normalizedNext) return false;
 
-  const session = await getAuthSession();
-  const stored = await chrome.storage.local.get([STORAGE_AUTH_EMAIL_KEY]);
+  const session = await getLicenseSession();
+  const stored = await chrome.storage.local.get([STORAGE_LICENSE_EMAIL_KEY]);
   const previousEmail = String(
-    session?.email || stored?.[STORAGE_AUTH_EMAIL_KEY] || "",
+    session?.email || stored?.[STORAGE_LICENSE_EMAIL_KEY] || "",
   )
     .trim()
     .toLowerCase();
 
   if (!previousEmail || previousEmail === normalizedNext) return false;
 
-  await clearAuthSession();
+  await clearLicenseSession();
   chrome.runtime.sendMessage({ type: "stopPostMonitor" }, () => {});
   await chrome.storage.local.remove([
     STORAGE_SELECTED_GROUP_IDS_KEY,
@@ -3805,15 +4238,71 @@ async function resetWorkspaceForChangedEmail(nextEmail) {
   renderProfiles();
   renderLeads();
   renderHomeInsights();
+  renderGroupsLeaderboard();
   resetProfileEditorDraft();
   renderGlobalFrequencyUi();
   applyNotificationSettingsToUi(notificationSettings);
   await setOnboardingState("welcome");
+  await chrome.storage.local.set({
+    [STORAGE_PLAN_STATE_KEY]: {
+      plan: "free",
+      trialEnd: 0,
+      purchaseDate: 0,
+      cachedAt: Date.now(),
+      source: "local",
+    },
+  });
+  cachedPlanState = {
+    plan: "free",
+    trialEnd: 0,
+    purchaseDate: 0,
+    cachedAt: Date.now(),
+    source: "local",
+  };
   appendLog("logGeneral", "Account changed. Local workspace reset.", "warn");
   return true;
 }
 
-async function handleAuthContinue() {
+async function handleLicenseActivation() {
+  if (!isTermsAccepted) {
+    appendAuthGateLog(translate("auth.terms_required"), "warn");
+    return;
+  }
+  setAuthMode("license");
+  const licenseKey = String(qs("authCode")?.value || "").trim();
+  if (licenseKey.length < 8) {
+    appendAuthGateLog(translate("auth.invalid_license_key"), "warn");
+    return;
+  }
+  try {
+    appendAuthGateLog(translate("auth.checking"), "info");
+    const session = await activateLicense(licenseKey);
+    await resetWorkspaceForChangedEmail(session.email || "");
+    setTrialUpsellVisible(false);
+    renderPlanBanner();
+    renderProfileWizard();
+    renderGlobalFrequencyUi();
+    setAuthGateVisible(resolvePlanLevel() === "blocked");
+    await updateAccountUi();
+    appendAuthGateLog(translate("auth.license_activated"), "ok");
+    appendLog(
+      "logGeneral",
+      translate("auth.connected", {
+        email: session.email || session.licenseKeyMasked || "license",
+      }),
+      "ok",
+    );
+  } catch (err) {
+    appendAuthGateLog(extractUiErrorMessage(err), "err");
+  }
+}
+
+async function handleTrialStart() {
+  if (!isTermsAccepted) {
+    appendAuthGateLog(translate("auth.terms_required"), "warn");
+    return;
+  }
+  setAuthMode("trial");
   const email = String(qs("authEmail")?.value || "")
     .trim()
     .toLowerCase();
@@ -3823,83 +4312,54 @@ async function handleAuthContinue() {
   }
   await resetWorkspaceForChangedEmail(email);
   try {
-    // OTP path for both new and existing users.
-    await sendEmailOtpCode(email, true);
-    await chrome.storage.local.set({ [STORAGE_AUTH_EMAIL_KEY]: email });
-    appendAuthGateLog(translate("auth.magic_sent"), "ok");
-    qs("authWaitRow").style.display = "flex";
-    if (qs("authCode")) qs("authCode").value = "";
-    qs("btnAuthResend").disabled = true;
-    setTimeout(() => {
-      qs("btnAuthResend").disabled = false;
-    }, 60000);
+    appendAuthGateLog(translate("auth.checking"), "info");
+    const session = await startLicenseTrial(email);
+    setTrialUpsellVisible(true);
+    renderPlanBanner();
+    renderProfileWizard();
+    renderGlobalFrequencyUi();
+    setAuthGateVisible(resolvePlanLevel() === "blocked");
+    await updateAccountUi();
+    appendAuthGateLog(translate("auth.trial_started"), "ok");
+    appendLog(
+      "logGeneral",
+      translate("auth.connected", { email: session.email || email }),
+      "ok",
+    );
   } catch (err) {
     appendAuthGateLog(extractUiErrorMessage(err), "err");
   }
 }
 
-async function checkAuthSessionFromSupabase() {
-  const session = await getAuthSession();
-  if (!session?.accessToken) return false;
-  appendAuthGateLog(translate("auth.checking"), "info");
-  const user = await fetchAuthUser(session.accessToken);
-  if (!user?.id) return false;
-
-  const nextSession = {
-    ...session,
-    userId: user.id,
-    email: user.email || session.email || "",
-    checkedAt: Date.now(),
-  };
-  await setAuthSession(nextSession);
-  setAuthGateVisible(false);
-  await updateAccountUi();
-  await maybeRefreshPlanFromCloud(true);
-  appendLog(
-    "logGeneral",
-    translate("auth.connected", { email: nextSession.email || "user" }),
-    "ok",
-  );
-  return true;
-}
-
 async function bootstrapAuthGate() {
-  const hash = String(window.location.hash || "");
-  if (hash.includes("access_token=")) {
-    const params = new URLSearchParams(hash.replace(/^#/, ""));
-    const accessToken = params.get("access_token") || "";
-    const refreshToken = params.get("refresh_token") || "";
-    const expiresIn = Number(params.get("expires_in") || 0);
-    if (accessToken) {
-      await setAuthSession({
-        accessToken,
-        refreshToken,
-        expiresAt: expiresIn ? Date.now() + expiresIn * 1000 : 0,
-      });
-      history.replaceState(null, "", window.location.pathname);
-    }
-  }
-
-  const session = await getAuthSession();
+  const session = await getLicenseSession();
   if (session?.email) {
     qs("authEmail").value = session.email;
   } else {
-    const data = await chrome.storage.local.get([STORAGE_AUTH_EMAIL_KEY]);
-    qs("authEmail").value = String(data?.[STORAGE_AUTH_EMAIL_KEY] || "");
+    const data = await chrome.storage.local.get([STORAGE_LICENSE_EMAIL_KEY]);
+    qs("authEmail").value = String(data?.[STORAGE_LICENSE_EMAIL_KEY] || "");
   }
+  if (session?.licenseKey) {
+    qs("authCode").value = session.licenseKey;
+  }
+  setAuthMode(session?.licenseKey ? "license" : session?.email ? "trial" : "");
+  setTrialUpsellVisible(resolvePlanLevel() === "trial");
 
-  if (!session?.accessToken) {
-    if (session?.authMode === "local_trial" && session?.email) {
-      setAuthGateVisible(false);
-      await updateAccountUi();
-      return;
-    }
+  if (!session?.email && !session?.licenseKey) {
     setAuthGateVisible(true);
+    syncAuthTermsUi();
     return;
   }
 
-  const ok = await checkAuthSessionFromSupabase();
-  setAuthGateVisible(!ok);
+  try {
+    await maybeRefreshPlanFromCloud(true);
+  } catch (_) {
+    // Keep the last known local state when the refresh fails.
+  }
+
+  setAuthGateVisible(resolvePlanLevel() === "blocked");
+  await updateAccountUi();
+  syncAuthTermsUi();
 }
 
 qs("btnStopMonitor").addEventListener("click", () => {
@@ -3953,6 +4413,7 @@ function clearLeadHistoryFromUi() {
       leadsHistory = [];
       renderLeads();
       renderHomeInsights();
+      renderGroupsLeaderboard();
       appendLog("logGeneral", translate("msg.history_cleared"), "ok");
     } else {
       appendLog(
@@ -3979,32 +4440,14 @@ qs("btnPlanUpgrade").addEventListener("click", () => {
       errorKey: "msg.upgrade_failed",
     },
     async () => {
-      const checkoutUrl = await createStripeCheckoutSession();
-      await chrome.tabs.create({ url: checkoutUrl });
-      startPostCheckoutPlanWatch();
-      appendLog("logGeneral", translate("msg.upgrade_opening"), "ok");
+      await chrome.tabs.create({ url: getGumroadCheckoutUrl() });
+      appendLog("logGeneral", translate("msg.license_buy_opening"), "ok");
     },
   );
 });
 
-qs("btnPlanRefresh").addEventListener("click", () => {
-  void runButtonTask(
-    {
-      buttonId: "btnPlanRefresh",
-      actionKey: "planRefresh",
-      busyText: `⏳ ${translate("common.checking")}`,
-      logId: "logGeneral",
-    },
-    async () => {
-      await checkPaymentStatusNow(true);
-    },
-  );
-});
-
-qs("btnPlanMaybeLater").addEventListener("click", () => {
-  if (resolvePlanLevel() === "blocked") return;
-  const banner = qs("planBanner");
-  if (banner) banner.classList.remove("show");
+qs("btnPlanOpenSettings").addEventListener("click", () => {
+  activateTab("settings");
 });
 
 qs("btnPlanLockUpgrade").addEventListener("click", () => {
@@ -4015,13 +4458,17 @@ qs("btnPlanLockSignOut").addEventListener("click", () => {
   qs("btnSignOut").click();
 });
 
+qs("btnPlanClearLicense").addEventListener("click", () => {
+  qs("btnSignOut").click();
+});
+
 qs("btnSignOut").addEventListener("click", () => {
   void runButtonTask(
     { buttonId: "btnSignOut", actionKey: "signOut", logId: "logGeneral" },
     async () => {
-      stopPostCheckoutPlanWatch(false);
-      await clearAuthSession();
+      await clearLicenseSession();
       await updateAccountUi();
+      renderPlanBanner();
       setAuthGateVisible(true);
       appendLog("logGeneral", translate("msg.signed_out"), "warn");
     },
@@ -4158,103 +4605,74 @@ qs("btnTestTelegram")?.addEventListener("click", () => {
   );
 });
 
-qs("btnAuthContinue").addEventListener("click", () => {
+qs("btnAuthBuyLicense")?.addEventListener("click", () => {
   void runButtonTask(
-    { buttonId: "btnAuthContinue", actionKey: "authContinue", logId: "logAuthGate" },
+    {
+      buttonId: "btnAuthBuyLicense",
+      actionKey: "authBuyLicense",
+      logId: "logAuthGate",
+      errorKey: "msg.upgrade_failed",
+    },
     async () => {
-      await handleAuthContinue();
+      await chrome.tabs.create({ url: getGumroadCheckoutUrl() });
+      appendAuthGateLog(translate("msg.license_buy_opening"), "ok");
     },
   );
 });
 
+qs("btnDashboardTrialBuy")?.addEventListener("click", () => {
+  qs("btnAuthBuyLicense")?.click();
+});
+
+qs("btnAuthModeLicense")?.addEventListener("click", () => {
+  setAuthMode("license");
+  qs("authCode")?.focus();
+});
+
+qs("btnAuthModeTrial")?.addEventListener("click", () => {
+  setAuthMode("trial");
+  qs("authEmail")?.focus();
+});
+
 qs("btnAuthResend").addEventListener("click", () => {
-  void runExclusiveAction("authResend", async () => {
-    const email = String(qs("authEmail").value || "")
-      .trim()
-      .toLowerCase();
-    if (!email) return;
-    const btn = qs("btnAuthResend");
-    if (btn) {
-      if (!btn.dataset.label) btn.dataset.label = btn.textContent || "";
-      btn.disabled = true;
-      btn.textContent = `⏳ ${translate("common.checking")}`;
-    }
-    try {
-      await sendEmailOtpCode(email, true);
-      appendAuthGateLog(translate("auth.magic_sent"), "ok");
-      if (qs("authCode")) qs("authCode").value = "";
-      if (btn) btn.textContent = btn.dataset.label || "Resend";
-      setTimeout(() => {
-        if (btn) btn.disabled = false;
-      }, 60000);
-    } catch (err) {
-      if (btn) {
-        btn.disabled = false;
-        btn.textContent = btn.dataset.label || btn.textContent;
-      }
-      appendAuthGateLog(extractUiErrorMessage(err), "err");
-    }
-  });
+  void runButtonTask(
+    {
+      buttonId: "btnAuthResend",
+      actionKey: "authStartTrial",
+      logId: "logAuthGate",
+      errorKey: "msg.action_failed",
+    },
+    async () => {
+      await handleTrialStart();
+    },
+  );
 });
 
 qs("btnAuthVerifyCode").addEventListener("click", () => {
   void runButtonTask(
     { buttonId: "btnAuthVerifyCode", actionKey: "authVerifyCode", logId: "logAuthGate", errorKey: "msg.action_failed" },
     async () => {
-      const email = String(qs("authEmail")?.value || "")
-        .trim()
-        .toLowerCase();
-      const code = String(qs("authCode")?.value || "").trim();
-
-      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
-        appendAuthGateLog(translate("auth.invalid_email"), "warn");
-        return;
-      }
-      if (!/^\d{6}$/.test(code)) {
-        appendAuthGateLog(translate("auth.invalid_code"), "warn");
-        return;
-      }
-
-      appendAuthGateLog(translate("auth.checking"), "info");
-      const data = await verifyEmailOtpCode(email, code);
-      const accessToken =
-        String(data?.access_token || data?.session?.access_token || "").trim();
-      const refreshToken =
-        String(data?.refresh_token || data?.session?.refresh_token || "").trim();
-      const expiresIn = Number(
-        data?.expires_in || data?.session?.expires_in || 0,
-      );
-      const userId = String(data?.user?.id || data?.session?.user?.id || "").trim();
-      const userEmail = String(data?.user?.email || email).trim();
-      await resetWorkspaceForChangedEmail(userEmail || email);
-
-      if (!accessToken) {
-        throw new Error(translate("auth.code_verify_failed"));
-      }
-
-      await setAuthSession({
-        accessToken,
-        refreshToken,
-        expiresAt: expiresIn ? Date.now() + expiresIn * 1000 : 0,
-        userId,
-        email: userEmail || email,
-        checkedAt: Date.now(),
-      });
-
-      setAuthGateVisible(false);
-      await updateAccountUi();
-      await maybeRefreshPlanFromCloud(true);
-      appendLog(
-        "logGeneral",
-        translate("auth.connected", { email: userEmail || email }),
-        "ok",
-      );
+      await handleLicenseActivation();
     },
   );
 });
 
-qs("btnAuthChangeEmail").addEventListener("click", () => {
-  qs("authWaitRow").style.display = "none";
+qs("authTermsAccepted")?.addEventListener("change", async (event) => {
+  await setTermsAccepted(!!event.target?.checked);
+});
+
+qs("btnAuthViewTerms")?.addEventListener("click", (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+  toggleTermsOverlay(true);
+});
+
+qs("btnCloseTerms")?.addEventListener("click", () => {
+  toggleTermsOverlay(false);
+});
+
+qs("termsOverlay")?.addEventListener("click", (event) => {
+  if (event.target?.id === "termsOverlay") toggleTermsOverlay(false);
 });
 
 qs("languageSelect").addEventListener("change", async (event) => {
@@ -4288,8 +4706,10 @@ qsa(".settings-freq-card").forEach((card) => {
     }
 
     if (pair.min === 3) {
+      if (pair.max !== 8) {
       const confirmed = window.confirm(translate("settings.freq_confirm_3_5"));
       if (!confirmed) return;
+      }
     }
 
     if (pair.min === 1) {
@@ -4326,13 +4746,13 @@ qsa(".settings-freq-card").forEach((card) => {
 
 (async () => {
   await loadLanguage();
+  await loadTermsAcceptanceState();
   await loadOnboardingState();
   await loadGuidedTipsPreference();
   cachedPlanState = await loadPlanState();
   renderPlanBanner();
   await updateAccountUi();
   await bootstrapAuthGate();
-  await maybeRefreshPlanFromCloud(true);
   await loadGlobalMonitorFrequency();
   await loadNotificationSettings();
   await loadSleepScheduleUi();
@@ -4362,6 +4782,9 @@ qsa(".settings-freq-card").forEach((card) => {
           response.running ? translate("status.monitoring") : translate("status.stopped"),
         );
         setSleepBannerVisible(false);
+      }
+      if (response.connectionIssue) {
+        applyMonitorConnectionIssue(response.connectionIssue);
       }
     } else {
       setMonitorState(false, translate("status.stopped"));

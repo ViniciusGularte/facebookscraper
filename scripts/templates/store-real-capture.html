@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GrabClientsNow - Real Capture</title>
+  <style>
+    :root {
+      --bg: #050e0a;
+      --cyan: #00e5cc;
+      --overlay: rgba(5, 14, 10, 0.2);
+      --text: #effef8;
+      --muted: #c7efe0;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; }
+    body {
+      font-family: "DM Sans", "Segoe UI", sans-serif;
+      background: radial-gradient(1200px 500px at 85% -10%, #00ff8820 0%, transparent 62%), var(--bg);
+    }
+
+    .stage { position: relative; width: 100vw; height: 100vh; overflow: hidden; }
+    .frame {
+      position: absolute;
+      inset: 0;
+      border: 1px solid #1e3a28;
+      background: #000;
+    }
+
+    iframe {
+      width: 100%;
+      height: 100%;
+      border: 0;
+      display: block;
+      background: #000;
+    }
+
+    .veil {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(5, 14, 10, 0) 0%, var(--overlay) 100%);
+      pointer-events: none;
+    }
+
+    .caption {
+      position: absolute;
+      left: 18px;
+      right: 18px;
+      bottom: 16px;
+      border: 1px solid rgba(0, 229, 204, 0.32);
+      border-radius: 14px;
+      background: linear-gradient(180deg, rgba(3, 15, 10, 0.82) 0%, rgba(2, 10, 8, 0.96) 100%);
+      padding: 11px 14px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      pointer-events: none;
+      box-shadow: 0 12px 24px rgba(0, 0, 0, 0.35);
+    }
+
+    .cap-badge {
+      border: 1px solid rgba(0, 229, 204, 0.4);
+      border-radius: 999px;
+      padding: 3px 8px;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.03em;
+      color: #d7fff6;
+      background: rgba(3, 28, 21, 0.8);
+      white-space: nowrap;
+      text-transform: uppercase;
+    }
+
+    .cap-text {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1.08;
+    }
+
+    .small .caption {
+      left: 8px;
+      right: 8px;
+      bottom: 8px;
+      padding: 5px 7px;
+      gap: 5px;
+      border-radius: 8px;
+    }
+
+    .small .cap-badge { font-size: 8px; padding: 2px 6px; }
+    .small .cap-text { font-size: 11px; }
+    .marquee .caption {
+      left: 26px;
+      right: 26px;
+      bottom: 18px;
+      padding: 10px 14px;
+    }
+
+    .marquee .cap-badge { font-size: 11px; }
+    .marquee .cap-text { font-size: 32px; line-height: 0.95; }
+
+  </style>
+</head>
+<body>
+  <div class="stage" id="stage">
+    <div class="frame"><iframe id="appFrame"></iframe></div>
+    <div class="veil"></div>
+    <div class="caption">
+      <span class="cap-badge" id="capBadge">Feature</span>
+      <span class="cap-text" id="capText">Real UI capture</span>
+    </div>
+  </div>
+
+  <script>
+    const SCENES = {
+      home: {
+        page: 'index',
+        tab: 'home',
+        badge: 'Live Monitoring',
+      text: 'Capture clients first while competitors are still searching.'
+      },
+      groups: {
+        page: 'index',
+        tab: 'groups',
+        badge: 'Group Selection',
+      text: 'Find buyer-intent posts fast and build daily pipeline.'
+      },
+      leads: {
+        page: 'index',
+        tab: 'leads',
+        badge: 'Lead Feed',
+      text: 'Respond first, book more calls, and close faster.'
+      },
+      alerts: {
+        page: 'index',
+        tab: 'profiles',
+        badge: 'Alert Builder',
+      text: 'Target high-intent keywords and remove low-quality noise.'
+      },
+      notifications: {
+        page: 'index',
+        tab: 'notifications',
+        badge: 'Notifications',
+      text: 'Get instant alerts and move before anyone else.'
+      },
+      promoSmall: {
+        page: 'index',
+        tab: 'home',
+        badge: 'Chrome Extension',
+        text: 'Capture clients in real time.',
+        classes: ['small']
+      },
+      marquee: {
+        page: 'index',
+        tab: 'home',
+        badge: 'GrabClientsNow',
+        text: 'Get clients first. Reply before competitors.',
+        classes: ['marquee']
+      }
+    };
+
+    const params = new URLSearchParams(window.location.search);
+    const sceneKey = params.get('scene') || 'home';
+    const scene = SCENES[sceneKey] || SCENES.home;
+
+    const stage = document.getElementById('stage');
+    (scene.classes || []).forEach((c) => stage.classList.add(c));
+
+    document.getElementById('capBadge').textContent = scene.badge;
+    document.getElementById('capText').textContent = scene.text;
+
+    const frame = document.getElementById('appFrame');
+    const root = window.location.pathname.replace(/\/scripts\/templates\/store-real-capture\.html$/, '');
+    frame.src = `file://${root}/dist/index.html`;
+
+    function seedDemoContent(doc) {
+      const orb = doc.getElementById('monitorOrb');
+      if (orb) {
+        orb.classList.remove('idle');
+        orb.classList.add('monitoring');
+      }
+
+      const headline = doc.getElementById('systemStateHeadline');
+      if (headline) headline.textContent = 'Monitoring is ACTIVE';
+
+      const nextScan = doc.getElementById('homeNextScanStatus');
+      if (nextScan) nextScan.textContent = 'Next scan: in 02:14';
+
+      const groupsMonitored = doc.getElementById('homeGroupsMonitored');
+      if (groupsMonitored) groupsMonitored.textContent = 'Checking 48 groups';
+
+      const leadsSummary = doc.getElementById('homeLeadsSummary');
+      if (leadsSummary) leadsSummary.textContent = '27 leads in last 7 days';
+
+      const groupCount = doc.getElementById('groupCount');
+      if (groupCount) groupCount.textContent = '48 groups monitored';
+
+      const groupsSummary = doc.getElementById('groupsSelectionSummary');
+      if (groupsSummary) groupsSummary.textContent = '32 selected groups - 16 unselected';
+
+      const groupsList = doc.getElementById('groupsList');
+      if (groupsList && !groupsList.children.length) {
+        const data = [
+          ['Austin Local Business Network', '124k members'],
+          ['Home Services Marketplace', '52k members'],
+          ['SaaS Founders Exchange', '38k members'],
+          ['Marketing Contractors Hub', '41k members'],
+          ['Real Estate Questions Daily', '59k members'],
+          ['Ecommerce Operators Club', '27k members']
+        ];
+        groupsList.innerHTML = '';
+        data.forEach((g, idx) => {
+          const card = doc.createElement('label');
+          card.className = `group-card ${idx % 2 === 0 ? 'selected' : ''}`;
+          card.innerHTML = `
+            <div class="group-top">
+              <img alt="Group" src="data:image/svg+xml;charset=UTF-8,${encodeURIComponent('<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'64\' height=\'64\'><rect width=\'64\' height=\'64\' fill=\'#0f2015\'/><circle cx=\'32\' cy=\'32\' r=\'18\' fill=\'#00e5cc\' opacity=\'0.35\'/></svg>')}" />
+              <div class="info"><div class="name">${g[0]}</div><div class="meta">${g[1]}</div></div>
+              <input type="checkbox" class="group-select" ${idx % 2 === 0 ? 'checked' : ''} />
+            </div>`;
+          groupsList.appendChild(card);
+        });
+      }
+
+      const leadsList = doc.getElementById('leadsList');
+      if (leadsList && !leadsList.children.length) {
+        const leads = [
+          ['Need a roofing quote this week', 'Austin Local Business Network', '2 min ago'],
+          ['Looking for social media manager', 'Marketing Contractors Hub', '6 min ago'],
+          ['Any recommendation for tax advisor?', 'SaaS Founders Exchange', '11 min ago']
+        ];
+        leadsList.innerHTML = '';
+        leads.forEach((lead) => {
+          const card = doc.createElement('article');
+          card.style.border = '1px solid #1e3a28';
+          card.style.borderRadius = '10px';
+          card.style.padding = '10px';
+          card.style.background = '#0b1911';
+          card.innerHTML = `<div style="font-size:13px;font-weight:700;color:#e8f5ee">${lead[0]}</div><div style="font-size:11px;color:#a7cfba;margin-top:4px">${lead[1]}</div><div style="font-size:11px;color:#00e5cc;margin-top:6px">${lead[2]}</div>`;
+          leadsList.appendChild(card);
+        });
+      }
+
+      const leadsCount = doc.getElementById('leadsCount');
+      if (leadsCount) leadsCount.textContent = '3';
+
+      const profilesList = doc.getElementById('profilesList');
+      if (profilesList && !profilesList.children.length) {
+        profilesList.innerHTML = `<details class="profile-item active" open><summary><div class="profile-item-head"><div><div class="title">Local Service Buyers</div><div class="meta">6 include - 4 exclude - active</div></div></div></summary><div class="profile-item-body"><div class="kw-list"><span class="kw-chip pos">looking for</span><span class="kw-chip pos">recommend</span><span class="kw-chip neg">job offer</span></div></div></details>`;
+      }
+    }
+
+    frame.addEventListener('load', () => {
+      try {
+        const doc = frame.contentDocument;
+        if (!doc) return;
+
+        if (scene.tab) {
+          const tabs = Array.from(doc.querySelectorAll('.tab-btn'));
+          tabs.forEach((el) => el.classList.remove('active'));
+          const activeBtn = doc.querySelector(`.tab-btn[data-tab="${scene.tab}"]`);
+          if (activeBtn) activeBtn.classList.add('active');
+
+          const panels = Array.from(doc.querySelectorAll('.panel'));
+          panels.forEach((el) => el.classList.remove('active'));
+          const activePanel = doc.querySelector(`.panel[data-panel="${scene.tab}"]`);
+          if (activePanel) activePanel.classList.add('active');
+        }
+
+        seedDemoContent(doc);
+      } catch {
+      }
+    });
+  </script>
+</body>
+</html>

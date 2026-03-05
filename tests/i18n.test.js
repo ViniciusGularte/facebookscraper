@@ -5,6 +5,7 @@ import { I18N } from "../src/panel/i18n-dict.js";
 test("i18n has required locales", () => {
   assert.equal(typeof I18N.en, "object");
   assert.equal(typeof I18N["pt-br"], "object");
+  assert.equal(typeof I18N.de, "object");
 });
 
 test("pt-br includes all en keys", () => {
@@ -12,6 +13,14 @@ test("pt-br includes all en keys", () => {
   const ptKeys = new Set(Object.keys(I18N["pt-br"]));
 
   const missing = enKeys.filter((key) => !ptKeys.has(key));
+  assert.deepEqual(missing, []);
+});
+
+test("de includes all en keys", () => {
+  const enKeys = Object.keys(I18N.en);
+  const deKeys = new Set(Object.keys(I18N.de));
+
+  const missing = enKeys.filter((key) => !deKeys.has(key));
   assert.deepEqual(missing, []);
 });
 
@@ -42,12 +51,15 @@ test("i18n has core UX keys in both locales", () => {
 test("i18n values are non-empty strings for shared keys", () => {
   const enKeys = Object.keys(I18N.en);
   const pt = I18N["pt-br"];
+  const de = I18N.de;
 
   for (const key of enKeys) {
     assert.equal(typeof I18N.en[key], "string", `en key ${key} must be string`);
     assert.equal(typeof pt[key], "string", `pt-br key ${key} must be string`);
+    assert.equal(typeof de[key], "string", `de key ${key} must be string`);
     assert.notEqual(I18N.en[key].trim(), "", `en key ${key} must not be empty`);
     assert.notEqual(pt[key].trim(), "", `pt-br key ${key} must not be empty`);
+    assert.notEqual(de[key].trim(), "", `de key ${key} must not be empty`);
   }
 });
 
@@ -64,10 +76,16 @@ test("i18n placeholder tokens are consistent between en and pt-br", () => {
   for (const key of Object.keys(I18N.en)) {
     const enTokens = getTokens(I18N.en[key]);
     const ptTokens = getTokens(I18N["pt-br"][key]);
+    const deTokens = getTokens(I18N.de[key]);
     assert.deepEqual(
       ptTokens,
       enTokens,
       `placeholder mismatch for key: ${key}`,
+    );
+    assert.deepEqual(
+      deTokens,
+      enTokens,
+      `placeholder mismatch for de key: ${key}`,
     );
   }
 });

@@ -11,7 +11,9 @@ const __dirname = path.dirname(__filename);
 const ROOT_DIR = path.resolve(__dirname, "..");
 const DIST_DIR = path.join(ROOT_DIR, "dist");
 
-const SHOULD_OBFUSCATE = process.env.NO_OBFUSCATE !== "1";
+// Chrome Web Store policy expects reviewable source; keep obfuscation OFF by default.
+// Enable only for non-store/internal artifacts with ALLOW_OBFUSCATE=1.
+const SHOULD_OBFUSCATE = process.env.ALLOW_OBFUSCATE === "1";
 const SHOULD_ZIP = process.env.BUILD_ZIP === "1";
 
 const staticFiles = ["manifest.json", "index.html", "groups.html"];
@@ -160,7 +162,7 @@ async function main() {
     log("obfuscating JavaScript...");
     await obfuscateJs();
   } else {
-    log("skipping obfuscation (NO_OBFUSCATE=1)");
+    log("skipping obfuscation (default). Set ALLOW_OBFUSCATE=1 for non-store/internal builds only.");
   }
 
   if (SHOULD_ZIP) {

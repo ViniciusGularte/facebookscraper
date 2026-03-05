@@ -485,8 +485,13 @@ const MONITOR_RUNTIME_STORAGE_KEY = "postMonitorRuntime";
 const SLEEP_SCHEDULE_STORAGE_KEY = "sleepSchedule";
 const NOTIFICATION_SETTINGS_STORAGE_KEY = "notificationSettingsGlobal";
 const NOTIFICATION_CLICK_MAP_KEY = "notificationClickMap";
+const NOTIFICATION_INBOX_STORAGE_KEY = "notificationInbox";
+const NOTIFICATION_COUNTERS_STORAGE_KEY = "notificationCounters";
 const NOTIFICATION_CLICK_MAX_ITEMS = 50;
 const NOTIFICATION_CLICK_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const NOTIFICATION_INBOX_MAX_ITEMS = 200;
+const NOTIFICATION_INBOX_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const MONITOR_CONNECTION_NOTIFICATION_COOLDOWN_MS = 15 * 60 * 1000;
 const TELEGRAM_EDGE_URL =
   "https://hfnwpzglvbzkvhrcwmet.supabase.co/functions/v1/telegram-notify";
 let monitorConfig = {
@@ -497,6 +502,7 @@ let monitorConfig = {
   minMinutes: 3,
   maxMinutes: 7,
 };
+let monitorConnectionIssue = null;
 let isSleepModeActive = false;
 let wasRunningBeforeSleep = false;
 
@@ -510,11 +516,255 @@ function getDefaultNotificationSettings() {
   };
 }
 
+async function getStoredLanguage() {
+  const data = await chrome.storage.local.get(["language"]);
+  const value = String(data?.language || "").toLowerCase();
+  if (["pt-br", "es", "fr"].includes(value)) return value;
+  return "en";
+}
+
+const BACKGROUND_I18N = {
+  en: {
+    "notify.fb_tab_missing_title": "GrabClientsNow: Facebook tab missing",
+    "notify.fb_tab_missing_body":
+      "Monitoring needs a facebook.com tab open in this browser. Reopen Facebook to keep monitoring working.",
+    "notify.fb_login_required_title": "GrabClientsNow: Facebook login required",
+    "notify.fb_login_required_body":
+      "Your Facebook session looks disconnected. Log in again and keep a facebook.com tab open.",
+  },
+  "pt-br": {
+    "notify.fb_tab_missing_title": "GrabClientsNow: aba do Facebook fechada",
+    "notify.fb_tab_missing_body":
+      "O monitoramento precisa de uma aba do facebook.com aberta neste navegador. Reabra o Facebook para continuar.",
+    "notify.fb_login_required_title":
+      "GrabClientsNow: login do Facebook necessário",
+    "notify.fb_login_required_body":
+      "Sua sessão do Facebook parece desconectada. Faça login novamente e mantenha uma aba do facebook.com aberta.",
+  },
+  es: {
+    "notify.fb_tab_missing_title":
+      "GrabClientsNow: falta la pestaña de Facebook",
+    "notify.fb_tab_missing_body":
+      "El monitoreo necesita una pestaña de facebook.com abierta en este navegador. Vuelve a abrir Facebook para continuar.",
+    "notify.fb_login_required_title":
+      "GrabClientsNow: se requiere inicio de sesión en Facebook",
+    "notify.fb_login_required_body":
+      "Tu sesión de Facebook parece desconectada. Inicia sesión de nuevo y mantén una pestaña de facebook.com abierta.",
+  },
+  fr: {
+    "notify.fb_tab_missing_title":
+      "GrabClientsNow : onglet Facebook introuvable",
+    "notify.fb_tab_missing_body":
+      "Le monitoring nécessite un onglet facebook.com ouvert dans ce navigateur. Rouvrez Facebook pour continuer.",
+    "notify.fb_login_required_title":
+      "GrabClientsNow : connexion Facebook requise",
+    "notify.fb_login_required_body":
+      "Votre session Facebook semble déconnectée. Reconnectez-vous et gardez un onglet facebook.com ouvert.",
+  },
+};
+
+async function bgTranslate(key) {
+  const locale = await getStoredLanguage();
+  return (
+    BACKGROUND_I18N[locale]?.[key] ||
+    BACKGROUND_I18N.en[key] ||
+    key
+  );
+}
+
 async function loadNotificationSettings() {
   const data = await chrome.storage.local.get([NOTIFICATION_SETTINGS_STORAGE_KEY]);
   const raw = data?.[NOTIFICATION_SETTINGS_STORAGE_KEY];
   if (!raw || typeof raw !== "object") return getDefaultNotificationSettings();
   return { ...getDefaultNotificationSettings(), ...raw };
+}
+
+function buildNotificationInboxId() {
+  return `notif-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function pruneNotificationInbox(items) {
+  const now = Date.now();
+  const list = (Array.isArray(items) ? items : [])
+    .filter((item) => item && typeof item === "object")
+    .filter((item) => {
+      const createdAt = Number(item.createdAt || 0);
+      return createdAt > 0 && now - createdAt <= NOTIFICATION_INBOX_TTL_MS;
+    })
+    .sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
+
+  return list.slice(0, NOTIFICATION_INBOX_MAX_ITEMS);
+}
+
+function buildNotificationCounters(items) {
+  const inbox = Array.isArray(items) ? items : [];
+  const total = inbox.length;
+  const unread = inbox.filter((item) => !Number(item?.seenAt || 0)).length;
+  return { total, unread };
+}
+
+function resolveActionStatusMeta() {
+  if (isSleepModeActive) {
+    return { label: "Sleep mode", color: "#f59e0b" };
+  }
+  if (isMonitorRunning) {
+    return { label: "Monitoring ON", color: "#16a34a" };
+  }
+  return { label: "Monitoring OFF", color: "#6b7280" };
+}
+
+async function refreshActionUi(counters) {
+  if (!chrome.action?.setBadgeText) return;
+  const unread = Math.max(0, Number(counters?.unread) || 0);
+  const total = Math.max(0, Number(counters?.total) || 0);
+  const text = unread > 99 ? "99+" : unread > 0 ? String(unread) : "";
+  const status = resolveActionStatusMeta();
+
+  await chrome.action.setBadgeBackgroundColor({ color: status.color });
+  await chrome.action.setBadgeText({ text });
+  await chrome.action.setTitle({
+    title:
+      unread > 0
+        ? `GrabClientsNow • ${status.label} • ${unread} unread (${total} total)`
+        : `GrabClientsNow • ${status.label}`,
+  });
+}
+
+async function loadNotificationInboxState() {
+  const data = await chrome.storage.local.get([
+    NOTIFICATION_INBOX_STORAGE_KEY,
+    NOTIFICATION_COUNTERS_STORAGE_KEY,
+  ]);
+  const inbox = pruneNotificationInbox(data?.[NOTIFICATION_INBOX_STORAGE_KEY]);
+  const counters = buildNotificationCounters(inbox);
+
+  const storedCounters = data?.[NOTIFICATION_COUNTERS_STORAGE_KEY];
+  const needsPersistInbox =
+    JSON.stringify(inbox) !==
+    JSON.stringify(
+      Array.isArray(data?.[NOTIFICATION_INBOX_STORAGE_KEY])
+        ? data[NOTIFICATION_INBOX_STORAGE_KEY]
+        : [],
+    );
+  const needsPersistCounters =
+    !storedCounters ||
+    Number(storedCounters.total || 0) !== counters.total ||
+    Number(storedCounters.unread || 0) !== counters.unread;
+
+  if (needsPersistInbox || needsPersistCounters) {
+    await chrome.storage.local.set({
+      [NOTIFICATION_INBOX_STORAGE_KEY]: inbox,
+      [NOTIFICATION_COUNTERS_STORAGE_KEY]: counters,
+    });
+  }
+
+  return { inbox, counters };
+}
+
+async function registerLeadNotificationInboxItem(payload) {
+  const { inbox } = await loadNotificationInboxState();
+  const id = buildNotificationInboxId();
+  const createdAt = Date.now();
+  const nextInbox = pruneNotificationInbox([
+    {
+      id,
+      createdAt,
+      seenAt: 0,
+      leadId: String(payload?.post_url || payload?.detected_at || ""),
+      postUrl: String(payload?.post_url || ""),
+      source: "lead",
+    },
+    ...inbox,
+  ]);
+  const counters = buildNotificationCounters(nextInbox);
+
+  await chrome.storage.local.set({
+    [NOTIFICATION_INBOX_STORAGE_KEY]: nextInbox,
+    [NOTIFICATION_COUNTERS_STORAGE_KEY]: counters,
+  });
+  await refreshActionUi(counters);
+  return id;
+}
+
+async function registerSystemNotificationInboxItem(payload) {
+  const { inbox } = await loadNotificationInboxState();
+  const id = buildNotificationInboxId();
+  const createdAt = Date.now();
+  const nextInbox = pruneNotificationInbox([
+    {
+      id,
+      createdAt,
+      seenAt: 0,
+      source: "system",
+      title: String(payload?.title || "GrabClientsNow"),
+      message: String(payload?.message || "").trim(),
+      issueKind: String(payload?.issueKind || "").trim(),
+      postUrl: String(payload?.url || ""),
+    },
+    ...inbox,
+  ]);
+  const counters = buildNotificationCounters(nextInbox);
+
+  await chrome.storage.local.set({
+    [NOTIFICATION_INBOX_STORAGE_KEY]: nextInbox,
+    [NOTIFICATION_COUNTERS_STORAGE_KEY]: counters,
+  });
+  await refreshActionUi(counters);
+  return id;
+}
+
+async function markNotificationSeenById(notificationId) {
+  if (!notificationId) return { updated: false, counters: { total: 0, unread: 0 } };
+  const { inbox } = await loadNotificationInboxState();
+  let updated = false;
+  const now = Date.now();
+  const nextInbox = inbox.map((item) => {
+    if (String(item?.id || "") !== String(notificationId)) return item;
+    if (Number(item?.seenAt || 0)) return item;
+    updated = true;
+    return { ...item, seenAt: now };
+  });
+  const counters = buildNotificationCounters(nextInbox);
+
+  if (updated) {
+    await chrome.storage.local.set({
+      [NOTIFICATION_INBOX_STORAGE_KEY]: nextInbox,
+      [NOTIFICATION_COUNTERS_STORAGE_KEY]: counters,
+    });
+  }
+  await refreshActionUi(counters);
+  return { updated, counters };
+}
+
+async function markAllNotificationsSeen() {
+  const { inbox } = await loadNotificationInboxState();
+  const now = Date.now();
+  let updated = false;
+  const nextInbox = inbox.map((item) => {
+    if (Number(item?.seenAt || 0)) return item;
+    updated = true;
+    return { ...item, seenAt: now };
+  });
+  const counters = buildNotificationCounters(nextInbox);
+
+  if (updated) {
+    await chrome.storage.local.set({
+      [NOTIFICATION_INBOX_STORAGE_KEY]: nextInbox,
+      [NOTIFICATION_COUNTERS_STORAGE_KEY]: counters,
+    });
+  }
+  await refreshActionUi(counters);
+  return { updated, counters };
+}
+
+async function clearNotificationInboxState() {
+  const counters = { total: 0, unread: 0 };
+  await chrome.storage.local.set({
+    [NOTIFICATION_INBOX_STORAGE_KEY]: [],
+    [NOTIFICATION_COUNTERS_STORAGE_KEY]: counters,
+    [NOTIFICATION_CLICK_MAP_KEY]: {},
+  });
+  await refreshActionUi(counters);
 }
 
 async function postJsonWithTimeout(url, payload, timeoutMs = 10000) {
@@ -534,23 +784,107 @@ async function postJsonWithTimeout(url, payload, timeoutMs = 10000) {
   }
 }
 
-async function sendDesktopLeadNotification(payload) {
+async function sendDesktopLeadNotification(payload, notificationId = "") {
   if (!chrome.notifications?.create) {
     return { ok: false, error: "notifications API unavailable" };
   }
-  const notificationId = `lead-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const id =
+    notificationId || `lead-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const message =
     `${payload?.lead_name || "Lead"} in ${payload?.group || "group"}\n` +
     `${String(payload?.post_text || "").slice(0, 120)}`;
-  await chrome.notifications.create(notificationId, {
+  await chrome.notifications.create(id, {
     type: "basic",
     iconUrl: "assets/icon.png",
     title: "GrabClientsNow",
     message,
     priority: 2,
   });
-  await storeNotificationClickTarget(notificationId, payload?.post_url || "");
+  await storeNotificationClickTarget(id, payload?.post_url || "");
   return { ok: true };
+}
+
+async function sendDesktopSystemNotification(payload, notificationId = "") {
+  if (!chrome.notifications?.create) {
+    return { ok: false, error: "notifications API unavailable" };
+  }
+  const id =
+    notificationId || `system-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  await chrome.notifications.create(id, {
+    type: "basic",
+    iconUrl: "assets/icon.png",
+    title: String(payload?.title || "GrabClientsNow"),
+    message: String(payload?.message || "").slice(0, 220),
+    priority: 2,
+  });
+  await storeNotificationClickTarget(
+    id,
+    payload?.url || chrome.runtime.getURL("index.html"),
+  );
+  return { ok: true };
+}
+
+async function classifyMonitorConnectionIssue(errorMessage) {
+  const text = String(errorMessage || "").toLowerCase();
+  if (
+    text.includes("nenhuma aba do facebook aberta") ||
+    text.includes("sem resposta da aba do facebook") ||
+    text.includes("abra uma aba em facebook.com") ||
+    text.includes("facebook tab was closed")
+  ) {
+    return {
+      kind: "fb_tab_missing",
+      title: await bgTranslate("notify.fb_tab_missing_title"),
+      message: await bgTranslate("notify.fb_tab_missing_body"),
+    };
+  }
+
+  if (
+    text.includes("não foi possível extrair os tokens") ||
+    text.includes("not logged in") ||
+    text.includes("session expired") ||
+    text.includes("sessão expir") ||
+    text.includes("please log in")
+  ) {
+    return {
+      kind: "fb_login_required",
+      title: await bgTranslate("notify.fb_login_required_title"),
+      message: await bgTranslate("notify.fb_login_required_body"),
+    };
+  }
+
+  return null;
+}
+
+async function notifyMonitorConnectionIssue(issue) {
+  if (!issue?.kind) return false;
+  const runtime = await loadMonitorRuntime();
+  const previous = runtime.connectionIssue || null;
+  const now = Date.now();
+  const shouldNotify =
+    !previous ||
+    previous.kind !== issue.kind ||
+    !Number(previous.lastNotifiedAt || 0) ||
+    now - Number(previous.lastNotifiedAt || 0) >=
+      MONITOR_CONNECTION_NOTIFICATION_COOLDOWN_MS;
+
+  if (!shouldNotify) return false;
+
+  const inboxId = await registerSystemNotificationInboxItem({
+    title: issue.title,
+    message: issue.message,
+    issueKind: issue.kind,
+    url: chrome.runtime.getURL("index.html"),
+  });
+  await sendDesktopSystemNotification(
+    {
+      title: issue.title,
+      message: issue.message,
+      url: chrome.runtime.getURL("index.html"),
+    },
+    inboxId,
+  );
+  return true;
 }
 
 async function storeNotificationClickTarget(notificationId, url) {
@@ -637,9 +971,16 @@ async function dispatchLeadNotifications(matches, profileName) {
   if (!Array.isArray(matches) || matches.length === 0) return;
   const settings = await loadNotificationSettings();
   const payload = buildLeadNotificationPayload(matches[0], profileName);
+  const hasAnyEnabledChannel =
+    !!settings.notifyBrowser ||
+    !!(settings.notifyWebhook && settings.webhookUrl) ||
+    !!(settings.notifyTelegram && settings.telegramChatId);
+  if (!hasAnyEnabledChannel) return;
+
+  const inboxId = await registerLeadNotificationInboxItem(payload);
 
   if (settings.notifyBrowser) {
-    const result = await sendDesktopLeadNotification(payload);
+    const result = await sendDesktopLeadNotification(payload, inboxId);
     if (!result.ok) log("[NOTIFY] Desktop failed:", result.error);
   }
   if (settings.notifyWebhook && settings.webhookUrl) {
@@ -708,6 +1049,7 @@ async function saveMonitorRuntime() {
       config: monitorConfig,
       sleepModeActive: isSleepModeActive,
       wasRunningBeforeSleep,
+      connectionIssue: monitorConnectionIssue,
     },
   });
 }
@@ -724,6 +1066,10 @@ async function loadMonitorRuntime() {
     config: runtime.config || null,
     sleepModeActive: !!runtime.sleepModeActive,
     wasRunningBeforeSleep: !!runtime.wasRunningBeforeSleep,
+    connectionIssue:
+      runtime.connectionIssue && typeof runtime.connectionIssue === "object"
+        ? runtime.connectionIssue
+        : null,
   };
 }
 
@@ -825,8 +1171,11 @@ async function stopPostMonitor(notifyUi = true) {
   isMonitorRunning = false;
   isMonitorCycleRunning = false;
   wasRunningBeforeSleep = false;
+  monitorConnectionIssue = null;
   chrome.alarms.clear(MONITOR_ALARM_NAME);
   await saveMonitorRuntime();
+  const { counters } = await loadNotificationInboxState();
+  await refreshActionUi(counters);
 
   if (notifyUi) {
     chrome.runtime.sendMessage({
@@ -863,6 +1212,8 @@ async function applySleepModeTransition() {
       });
     }
     await saveMonitorRuntime();
+    const { counters } = await loadNotificationInboxState();
+    await refreshActionUi(counters);
     return;
   }
 
@@ -878,6 +1229,8 @@ async function applySleepModeTransition() {
       wasRunningBeforeSleep = false;
       isMonitorRunning = true;
       await saveMonitorRuntime();
+      const { counters } = await loadNotificationInboxState();
+      await refreshActionUi(counters);
       chrome.runtime.sendMessage({
         type: "monitorState",
         running: true,
@@ -886,6 +1239,8 @@ async function applySleepModeTransition() {
       return;
     }
     await saveMonitorRuntime();
+    const { counters } = await loadNotificationInboxState();
+    await refreshActionUi(counters);
   }
 }
 
@@ -969,6 +1324,9 @@ async function runPostMonitorCycle() {
       monitorConfig.minMinutes,
       monitorConfig.maxMinutes,
     );
+    if (monitorConnectionIssue) {
+      monitorConnectionIssue = null;
+    }
     chrome.runtime.sendMessage({
       type: "monitorTick",
       running: true,
@@ -982,10 +1340,30 @@ async function runPostMonitorCycle() {
     scheduleNextMonitorAlarm(delayMs);
   } catch (err) {
     const errorMessage = await serializeError(err);
+    const connectionIssue = await classifyMonitorConnectionIssue(errorMessage);
+    const runtime = await loadMonitorRuntime();
+    const previousIssue = runtime.connectionIssue || null;
+    let notified = false;
+    if (connectionIssue) {
+      notified = await notifyMonitorConnectionIssue(connectionIssue);
+      monitorConnectionIssue = {
+        kind: connectionIssue.kind,
+        message: errorMessage,
+        lastDetectedAt: Date.now(),
+        lastNotifiedAt:
+          notified
+            ? Date.now()
+            : Number(previousIssue?.lastNotifiedAt || 0),
+      };
+    } else {
+      monitorConnectionIssue = null;
+    }
+    await saveMonitorRuntime();
     log(`[MONITOR] Erro no ciclo: ${errorMessage}`);
     chrome.runtime.sendMessage({
       type: "monitorError",
       error: errorMessage,
+      issueKind: connectionIssue?.kind || "",
     });
 
     const retryMs = getRandomMonitorDelayMs(3, 5);
@@ -1789,6 +2167,7 @@ chrome.action.onClicked.addListener(async () => {
 
 // Abre o post ao clicar na notificação desktop.
 chrome.notifications?.onClicked?.addListener(async (notificationId) => {
+  await markNotificationSeenById(notificationId);
   const url = await consumeNotificationClickTarget(notificationId);
   if (!url) return;
   await chrome.tabs.create({ url });
@@ -1815,13 +2194,22 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
 
   if (alarm.name === MONITOR_ALARM_NAME) {
     const runtime = await loadMonitorRuntime();
-    if (!runtime.running) return;
+    if (!runtime.running) {
+      isMonitorRunning = false;
+      isSleepModeActive = !!runtime.sleepModeActive;
+      const { counters } = await loadNotificationInboxState();
+      await refreshActionUi(counters);
+      return;
+    }
 
     isMonitorRunning = true;
     monitorWarmupDone = runtime.warmupDone;
     isSleepModeActive = !!runtime.sleepModeActive;
     wasRunningBeforeSleep = !!runtime.wasRunningBeforeSleep;
+    monitorConnectionIssue = runtime.connectionIssue || null;
     if (runtime.config) monitorConfig = runtime.config;
+    const { counters } = await loadNotificationInboxState();
+    await refreshActionUi(counters);
     if (isSleepModeActive) return;
 
     void runPostMonitorCycle();
@@ -1829,6 +2217,9 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
 });
 
 ensureSleepScheduleAlarm();
+void loadNotificationInboxState().then(({ counters }) =>
+  refreshActionUi(counters),
+);
 
 // Handler principal de mensagens
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -2047,11 +2438,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         monitorWarmupDone = false;
         isSleepModeActive = false;
         wasRunningBeforeSleep = false;
+        monitorConnectionIssue = null;
         isMonitorRunning = true;
         await saveMonitorRuntime();
         chrome.alarms.clear(MONITOR_ALARM_NAME);
         ensureSleepScheduleAlarm();
         await applySleepModeTransition();
+        const { counters } = await loadNotificationInboxState();
+        await refreshActionUi(counters);
 
         if (isSleepModeActive) {
           sendResponse({
@@ -2098,6 +2492,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         running: runtime.running || isMonitorRunning,
         sleepModeActive: runtime.sleepModeActive || isSleepModeActive,
         config: runtime.config || monitorConfig,
+        connectionIssue: runtime.connectionIssue || monitorConnectionIssue || null,
       });
     })();
     return true;
@@ -2150,11 +2545,44 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  // ── markNotificationsSeen ────────────────────────────────
+  if (message.type === "markNotificationsSeen") {
+    (async () => {
+      try {
+        const result = await markAllNotificationsSeen();
+        sendResponse({ success: true, counters: result.counters });
+      } catch (err) {
+        sendResponse({
+          success: false,
+          error: err?.message || "Falha ao marcar notificações como vistas.",
+        });
+      }
+    })();
+    return true;
+  }
+
+  // ── getNotificationCounters ──────────────────────────────
+  if (message.type === "getNotificationCounters") {
+    (async () => {
+      try {
+        const { counters } = await loadNotificationInboxState();
+        sendResponse({ success: true, counters });
+      } catch (err) {
+        sendResponse({
+          success: false,
+          error: err?.message || "Falha ao carregar contadores de notificações.",
+        });
+      }
+    })();
+    return true;
+  }
+
   // ── clearLeadHistory ──────────────────────────────────────
   if (message.type === "clearLeadHistory") {
     (async () => {
       try {
         await chrome.storage.local.set({ [LEADS_HISTORY_STORAGE_KEY]: [] });
+        await clearNotificationInboxState();
         sendResponse({ success: true });
       } catch (err) {
         sendResponse({
@@ -2219,8 +2647,24 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const webhookUrl = message.webhookUrl;
 
     const grantPermission = (granted) => sendResponse({ granted });
+    const toOriginPattern = (url) => {
+      try {
+        const parsed = new URL(String(url || ""));
+        if (!["http:", "https:"].includes(parsed.protocol)) return "";
+        return `${parsed.origin}/*`;
+      } catch {
+        return "";
+      }
+    };
+    const originPattern = toOriginPattern(webhookUrl);
 
-    chrome.permissions.contains({ origins: [webhookUrl] }, (alreadyGranted) => {
+    if (!originPattern) {
+      log("Invalid webhook URL");
+      grantPermission(false);
+      return true;
+    }
+
+    chrome.permissions.contains({ origins: [originPattern] }, (alreadyGranted) => {
       if (alreadyGranted) {
         grantPermission(true);
         return;
@@ -2228,27 +2672,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
       log("permission not granted");
 
-      const isValidUrl = (url) => {
-        try {
-          const parsed = new URL(url);
-          return ["http:", "https:"].includes(parsed.protocol);
-        } catch {
-          return false;
-        }
-      };
-
-      if (!isValidUrl(webhookUrl)) {
-        log("Invalid webhook URL");
-        grantPermission(false);
-        return;
-      }
-
-      chrome.permissions.request({ origins: [webhookUrl] }, (granted) => {
+      chrome.permissions.request({ origins: [originPattern] }, (granted) => {
         if (granted) {
-          log(`Permission granted for ${webhookUrl}`);
+          log(`Permission granted for ${originPattern}`);
           grantPermission(true);
         } else {
-          log(`Permission denied for ${webhookUrl}`);
+          log(`Permission denied for ${originPattern}`);
           grantPermission(false);
         }
       });

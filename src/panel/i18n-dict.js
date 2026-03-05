@@ -10,7 +10,18 @@ export const I18N = {
       "Open facebook.com in a tab, log in if needed, then click Start Monitoring again.",
     "status.fb_hint":
       "Facebook not detected. Open a facebook.com tab, log in, then click Recheck.",
-    "btn.upgrade": "Upgrade",
+    "status.fb_required_title": "Monitoring only works with Facebook open",
+    "status.fb_required_item_login":
+      "You must be logged into Facebook in this browser.",
+    "status.fb_required_item_tab":
+      "Keep at least one facebook.com tab open while monitoring runs.",
+    "status.fb_required_item_keep":
+      "If the tab closes or the session expires, monitoring stops until you reconnect.",
+    "status.fb_connected": "Facebook connected",
+    "status.fb_disconnected": "Facebook disconnected",
+    "btn.upgrade": "Buy license",
+    "btn.buy_license": "Buy license",
+    "btn.open_settings": "Settings",
     "btn.maybe_later": "Maybe later",
     "btn.new": "New",
     "btn.edit": "Edit",
@@ -63,6 +74,11 @@ export const I18N = {
     "groups.clear": "Clear",
     "groups.title": "Groups",
     "groups.show_selected_only": "show selected only",
+    "groups.top_performers_title": "Groups bringing more leads",
+    "groups.top_performers_subtitle":
+      "Based on leads already captured by this extension.",
+    "groups.top_performers_empty": "No lead data yet for ranking groups.",
+    "groups.top_performers_leads": "{count} lead(s)",
     "groups.no_match": "No groups match \"{term}\".",
     "groups.no_loaded_auto": "No groups loaded yet. Loading will start automatically.",
     "groups.loaded_count": "Loaded: {count}",
@@ -85,8 +101,15 @@ export const I18N = {
     "onboard.alert_title": "Configure your first alert",
     "onboard.alert_subtitle": "One simple form. No tab switching.",
     "onboard.alert_name_ph": "e.g. Photography clients",
+    "onboard.alert_name_label": "1. Alert name",
+    "onboard.alert_name_hint":
+      "Use a clear internal name so you can find and edit this alert later.",
     "onboard.watch_title": "Watch for (positive keywords)",
+    "onboard.watch_hint":
+      "Add the phrases a buyer would actually type when asking for your service.",
     "onboard.exclude_title": "Exclude words (negative keywords)",
+    "onboard.exclude_hint":
+      "Use this to block noise like jobs, spam, recruiting or selling posts.",
     "onboard.keyword_input_ph": "Type and press Enter or comma",
     "onboard.after_setup_title": "After setup",
     "onboard.after_setup_body":
@@ -142,7 +165,7 @@ export const I18N = {
     "onboard.turn_off_monitoring": "Turn OFF monitoring",
     "onboard.watch_ph": "Watch for words (comma/new line)",
     "onboard.exclude_ph": "Exclude words (comma/new line)",
-    "onboard.freq_default": "Frequency: every 5-10 min",
+    "onboard.freq_default": "Frequency: every 3-8 min",
     "profiles.builder": "Alert Builder",
     "profiles.create_new": "Create New Alert",
     "profiles.builder_simple_title": "Alert setup",
@@ -152,6 +175,8 @@ export const I18N = {
     "profiles.use_exclude": "Use exclude words",
     "profiles.keyword_input_ph": "Type a phrase and press Enter. Example: looking for plumber",
     "profiles.saved": "Saved Alerts",
+    "profiles.saved_hint":
+      "Review all keywords before editing or starting monitoring.",
     "profiles.none_selected": "none selected",
     "profiles.question_name": "What do you want to call this alert?",
     "profiles.watch_ph":
@@ -204,6 +229,30 @@ export const I18N = {
     "help.aff_title": "Affiliate Program",
     "help.aff_body": "Earn 50% commission per sale, no earnings cap.",
     "help.aff_cta": "Join affiliate program",
+    "help.roadmap_title": "Roadmap: Cloud Agent 24/7 (in development)",
+    "help.roadmap_badge": "Coming Soon",
+    "help.roadmap_lead":
+      "We're building the next phase: always-on cloud monitoring, auto-comments and deeper automations.",
+    "help.roadmap_copy":
+      "Not live yet. If this is a priority, click \"I want this\" and share your real use case to help us set roadmap order.",
+    "help.roadmap_item_1": "24/7 cloud notifications (no browser tab required)",
+    "help.roadmap_item_2": "Auto-comment with safety rules",
+    "help.roadmap_item_3": "Automations by profile and keyword intent",
+    "help.roadmap_cta_primary": "I want this",
+    "help.roadmap_cta_secondary": "Suggest feature",
+    "mail.subject.support": "GrabClientsNow Support",
+    "mail.subject.more_channels":
+      "GrabClientsNow - Need more notification channels",
+    "mail.subject.roadmap_interest":
+      "GrabClientsNow - I want cloud roadmap",
+    "mail.subject.roadmap_suggestion":
+      "GrabClientsNow - Roadmap feature suggestion",
+    "mail.subject.feature_suggestion": "GrabClientsNow Feature Suggestion",
+    "mail.subject.partner_inquiry": "Business Partnership Inquiry",
+    "mail.subject.affiliate_join":
+      "Affiliate Program - I want to join",
+    "mail.body.roadmap_interest":
+      "Name:\nUse case:\nMost wanted feature: (24/7 alerts / auto-comment / automations)\nGroups or leads per day:",
     "msg.log_copied": "Technical log copied to clipboard.",
     "msg.action_failed": "Action failed: {error}",
     "msg.log_copy_failed": "Failed to copy technical log: {error}",
@@ -212,26 +261,23 @@ export const I18N = {
     "msg.csv_soon": "CSV export will be enabled in a next phase.",
     "msg.csv_empty": "No leads to export with current filters.",
     "msg.csv_ok": "CSV exported with {count} lead(s).",
-    "msg.signed_out": "Signed out.",
+    "msg.signed_out": "License cleared.",
     "msg.sleep_saved": "Sleep schedule saved.",
     "msg.sleep_save_failed": "Failed to save sleep schedule: {error}",
     "msg.session_not_active":
       "Session not active yet. Click the magic link and try again.",
     "msg.upgrade_soon":
-      "Stripe upgrade flow integration will be enabled in a next phase.",
-    "msg.upgrade_signin_required":
-      "Sign in first to continue with upgrade.",
-    "msg.upgrade_opening":
-      "Opening secure checkout...",
-    "msg.payment_checking": "Checking payment status...",
-    "msg.payment_confirmed": "Payment confirmed. Pro is active.",
-    "msg.payment_status_refreshed": "Plan status refreshed.",
-    "msg.payment_watch_started":
-      "Payment watch started (up to 5 minutes).",
-    "msg.payment_watch_finished":
-      "Payment watch finished. Use Check payment to refresh again.",
+      "License purchase flow will be enabled in a next phase.",
+    "msg.license_buy_unavailable":
+      "Gumroad product URL is not configured yet.",
+    "msg.license_buy_opening":
+      "Opening Gumroad checkout...",
+    "msg.license_checking": "Checking license status...",
+    "msg.license_confirmed": "License confirmed. Pro is active.",
+    "msg.license_status_refreshed": "License status refreshed.",
+    "msg.trial_started": "1-day trial started.",
     "msg.upgrade_failed":
-      "Could not start checkout: {error}",
+      "Could not open license checkout: {error}",
     "status.monitoring": "monitoring...",
     "status.stopped": "stopped",
     "status.starting": "starting...",
@@ -290,7 +336,8 @@ export const I18N = {
     "log.monitor_started": "✅ Monitoring started.",
     "btn.back": "Back",
     "btn.next": "Next",
-    "btn.check_payment": "Check payment",
+    "btn.check_payment": "Refresh license",
+    "btn.refresh_license": "Refresh license",
     "btn.create_alert": "Create Alert",
     "btn.save_changes": "Save Changes",
     "btn.save_alert": "Save Alert",
@@ -327,8 +374,13 @@ export const I18N = {
     "overlay.clear": "Clear",
     "overlay.close": "Close",
     "overlay.empty": "[empty]",
-    "account.not_signed_in": "Not signed in",
-    "account.sign_out": "Sign out",
+    "account.not_signed_in": "No active license",
+    "account.no_license": "No active license",
+    "account.sign_out": "Clear license",
+    "account.clear_license": "Clear license",
+    "account.license_active": "License active: {email}",
+    "account.trial_active": "Trial active: {email}",
+    "account.license_pending": "License requires attention: {email}",
     "settings.sleep_title": "Monitor Sleep Schedule",
     "settings.sleep_note":
       "Sleep schedule pauses monitoring during rest hours to reduce detection risk. Keep this ON for safer account behavior.",
@@ -344,15 +396,15 @@ export const I18N = {
     "settings.frequency_note":
       "One global setting for all alerts. Lower intervals are faster but increase detection risk.",
     "settings.frequency_tip":
-      "Recommended for most accounts: 15-20 min (safest) or 5-10 min (balanced).",
+      "Recommended for most accounts: 15-20 min (safest) or 3-8 min (balanced).",
     "settings.freq_15_20_title": "🕐 Every 15-20 min",
     "settings.freq_15_20_desc": "Most discreet · Safest option",
-    "settings.freq_5_10_title": "✅ Every 5-10 min",
-    "settings.freq_5_10_desc": "Recommended balance · Pro",
+    "settings.freq_3_8_title": "✅ Every 3-8 min",
+    "settings.freq_3_8_desc": "Recommended balance",
     "settings.freq_3_5_title": "🔄 Every 3-5 min",
-    "settings.freq_3_5_desc": "Elevated risk · Pro",
+    "settings.freq_3_5_desc": "Elevated risk",
     "settings.freq_1_3_title": "⚡ Every 1-3 min",
-    "settings.freq_1_3_desc": "Highest risk · Pro",
+    "settings.freq_1_3_desc": "Highest risk",
     "settings.badge_safest": "Safest",
     "settings.badge_recommended": "Recommended",
     "settings.badge_high_risk": "High risk",
@@ -373,7 +425,7 @@ export const I18N = {
       "Send leads to your own app, n8n, Make, Zapier, or internal APIs.",
     "settings.notify_telegram": "📨 Telegram (GrabClientsNow bot)",
     "settings.notify_telegram_desc":
-      "Get lead alerts on mobile through your Telegram bot.",
+      "Get lead alerts on mobile from our Telegram bot.",
     "settings.notify_desktop_title": "Desktop notifications:",
     "settings.notify_desktop_body":
       "Best for instant alerts while you work on this device.",
@@ -414,32 +466,99 @@ export const I18N = {
     "sugg.spam": "spam",
     "sugg.partnership": "partnership",
     "plan.pro": "Pro active. Lifetime access unlocked.",
-    "plan.free": "Access locked. Upgrade to continue.",
+    "plan.free": "Access locked. Activate a license to continue.",
     "plan.trial": "Trial active. Ends in {time}.",
-    "plan.expired": "Trial expired. Upgrade to continue using GrabClientsNow.",
-    "plan.lock_title": "Trial ended",
+    "plan.expired": "Trial expired. Activate a license to continue using GrabClientsNow.",
+    "plan.free_hint":
+      "Need another account? Open Settings or clear your saved license.",
+    "plan.lock_title": "License required",
     "plan.lock_body":
-      "Your trial has ended. Upgrade to Pro to keep monitoring and alerts active.",
+      "Your trial has ended. Activate a Gumroad license to keep monitoring and alerts active.",
     "plan.locked_action":
-      "Trial expired. Upgrade to Pro to use the app.",
+      "Trial expired. Activate a license to use the app.",
     "auth.missing_config":
       "Supabase config missing. Set SUPABASE_URL and SUPABASE_ANON_KEY in panel.js.",
-    "auth.title": "Welcome to GrabClientsNow",
-    "auth.copy": "Enter your email to receive your login code.",
-    "auth.secure_note": "Secure email access",
+    "auth.title": "Activate your GrabClientsNow license",
+    "auth.copy": "Choose how you want to enter. Both options require accepting the Terms of Use.",
+    "auth.secure_note": "Gumroad license access",
+    "auth.mode_license_title": "Activate license",
+    "auth.mode_license_body":
+      "I already bought on Gumroad and want to unlock this device.",
+    "auth.mode_trial_title": "Free trial",
+    "auth.mode_trial_body":
+      "I want to test the extension for 1 day with my email.",
+    "auth.section_access": "Free trial",
+    "auth.section_license": "Activate license",
+    "auth.email_label": "Email",
+    "auth.email_hint":
+      "Used only for the free trial so you can test the extension.",
+    "auth.license_hint":
+      "Paste your Gumroad license key to unlock the extension on this device.",
     "auth.email_ph": "you@email.com",
-    "auth.code_ph": "6-digit code",
-    "auth.continue": "Continue",
-    "auth.verify_code": "Verify code",
-    "auth.resend": "Resend email",
-    "auth.change_email": "Use a different email",
+    "auth.code_ph": "License key",
+    "auth.continue": "Activate",
+    "auth.verify_code": "Activate license",
+    "auth.resend": "Start 1-day trial",
+    "auth.change_email": "Clear",
+    "auth.terms_accept": "I accept the Terms of Use",
+    "auth.terms_accept_prefix": "I have read and accept the",
+    "auth.terms_accept_link": "Terms of Use",
+    "auth.terms_view": "View Terms",
+    "auth.terms_required": "Please accept the Terms of Use to continue.",
+    "auth.terms_title": "Terms of Use",
+    "auth.terms_intro":
+      "These Terms of Use govern your access to and use of GrabClientsNow.",
+    "auth.terms_section_access_title": "1. Access and Eligibility",
+    "auth.terms_section_access_body":
+      "You confirm that you have legal capacity to accept these terms and that your use complies with applicable laws and platform policies.",
+    "auth.terms_section_license_title": "2. License and Allowed Use",
+    "auth.terms_section_license_body":
+      "We grant you a limited, revocable, non-transferable license to use the extension for your internal business workflow.",
+    "auth.terms_section_prohibited_title": "3. Prohibited Conduct",
+    "auth.terms_section_prohibited_item_1":
+      "No unlawful use, abusive automation, or unauthorized access attempts.",
+    "auth.terms_section_prohibited_item_2":
+      "No reverse engineering, reselling, sublicensing, or redistribution without permission.",
+    "auth.terms_section_prohibited_item_3":
+      "No use that violates third-party terms, intellectual property, or privacy rights.",
+    "auth.terms_section_user_data_title": "4. User Responsibility",
+    "auth.terms_section_user_data_body":
+      "You are responsible for your account actions, your configured settings, and any data, messages, or outputs generated from your usage.",
+    "auth.terms_section_service_title": "5. Service Changes",
+    "auth.terms_section_service_body":
+      "Features may be added, modified, limited, or removed at any time to improve reliability, security, or product direction.",
+    "auth.terms_section_liability_title": "6. Warranty and Liability",
+    "auth.terms_section_liability_body":
+      "The service is provided on an \"as is\" and \"as available\" basis, without express or implied warranties, to the fullest extent permitted by law.",
+    "auth.terms_section_termination_title": "7. Suspension and Termination",
+    "auth.terms_section_termination_body":
+      "We may suspend or terminate access if these terms are violated or if continued use creates legal, security, or operational issues.",
+    "auth.terms_section_updates_title": "8. Updates to Terms",
+    "auth.terms_section_updates_body":
+      "We may update these terms over time. Continued use after updates means acceptance of the latest version.",
+    "auth.terms_section_platform_title":
+      "9. Platform Dependencies and Good Practices",
+    "auth.terms_section_platform_body":
+      "Third-party platforms may change rules, limits, or detection systems at any time, which can affect outcomes independently of GrabClientsNow.",
+    "auth.terms_section_platform_item_1":
+      "Avoid abusive behavior, very aggressive intervals, or operational patterns beyond recommended limits.",
+    "auth.terms_section_platform_item_2":
+      "Use mature accounts with real history and normal activity patterns whenever possible.",
+    "auth.terms_section_platform_item_3":
+      "Follow platform policies and adjust your setup when conditions or limits change.",
     "auth.magic_sent":
-      "Code sent. Check your email and enter the 6-digit code.",
-    "auth.checking": "Verifying code...",
-    "auth.connected": "Signed in as {email}.",
+      "License request sent.",
+    "auth.checking": "Checking license...",
+    "auth.connected": "License ready for {email}.",
     "auth.invalid_email": "Enter a valid email address.",
-    "auth.invalid_code": "Enter a valid 6-digit code.",
-    "auth.code_verify_failed": "Could not verify code. Request a new code and try again.",
+    "auth.invalid_code": "Enter a valid license key.",
+    "auth.invalid_license_key": "Enter a valid license key.",
+    "auth.code_verify_failed": "Could not verify the license. Check the key and try again.",
+    "auth.license_activated": "License activated.",
+    "auth.trial_started": "1-day trial activated.",
+    "auth.trial_cta_title": "Your free trial is active",
+    "auth.trial_cta_body":
+      "Secure your license now on Gumroad so you can keep using the extension after the free period ends.",
     "auth.new_user_local": "New email detected. Trial started locally, proceeding to onboarding.",
     "plan.block_alerts": "Free plan allows only 1 alert.",
     "plan.block_groups": "Free plan allows up to 3 groups per alert.",
@@ -458,7 +577,19 @@ export const I18N = {
       "Abra facebook.com em uma aba, faça login se necessário e clique em Iniciar monitoramento novamente.",
     "status.fb_hint":
       "Facebook não detectado. Abra uma aba do facebook.com, faça login e clique em Reverificar.",
-    "btn.upgrade": "Upgrade",
+    "status.fb_required_title":
+      "O monitoramento só funciona com Facebook aberto",
+    "status.fb_required_item_login":
+      "Você precisa estar logado no Facebook neste navegador.",
+    "status.fb_required_item_tab":
+      "Mantenha pelo menos uma aba do facebook.com aberta enquanto o monitoramento roda.",
+    "status.fb_required_item_keep":
+      "Se a aba fechar ou a sessão expirar, o monitoramento para até você reconectar.",
+    "status.fb_connected": "Facebook conectado",
+    "status.fb_disconnected": "Facebook desconectado",
+    "btn.upgrade": "Comprar licença",
+    "btn.buy_license": "Comprar licença",
+    "btn.open_settings": "Configurações",
     "btn.maybe_later": "Depois",
     "btn.new": "Novo",
     "btn.edit": "Editar",
@@ -506,11 +637,27 @@ export const I18N = {
     "groups.load": "Carregar grupos",
     "groups.select_visible": "Selecionar visíveis",
     "groups.clear": "Limpar",
+    "groups.top_performers_title": "Grupos com mais leads",
+    "groups.top_performers_subtitle":
+      "Baseado nos leads que a extensão já capturou.",
+    "groups.top_performers_empty":
+      "Ainda não há leads suficientes para ranquear grupos.",
+    "groups.top_performers_leads": "{count} lead(s)",
     "onboard.alert_title": "Configure seu primeiro alerta",
+    "onboard.alert_subtitle": "Um formulário simples. Sem trocar de aba.",
     "onboard.alert_name_ph": "ex.: Clientes de fotografia",
+    "onboard.alert_name_label": "1. Nome do alerta",
+    "onboard.alert_name_hint":
+      "Use um nome interno claro para achar e editar este alerta depois.",
+    "onboard.watch_title": "Palavras para monitorar",
+    "onboard.watch_hint":
+      "Adicione as frases que um comprador realmente escreveria ao pedir seu serviço.",
+    "onboard.exclude_title": "Palavras para excluir",
+    "onboard.exclude_hint":
+      "Use isso para bloquear ruído como vagas, spam, recrutamento ou posts de venda.",
     "onboard.watch_ph": "Include words (vírgula ou linha)",
     "onboard.exclude_ph": "Exclude words (vírgula ou linha)",
-    "onboard.freq_default": "Frequência: a cada 5-10 min",
+    "onboard.freq_default": "Frequência: a cada 3-8 min",
     "profiles.builder": "Construtor de Alertas",
     "profiles.create_new": "Criar Novo Alerta",
     "profiles.builder_simple_title": "Configuração do alerta",
@@ -520,6 +667,8 @@ export const I18N = {
     "profiles.use_exclude": "Usar palavras de exclusão",
     "profiles.keyword_input_ph": "Digite uma frase e pressione Enter. Exemplo: procurando encanador",
     "profiles.saved": "Alertas Salvos",
+    "profiles.saved_hint":
+      "Revise todas as palavras antes de editar ou iniciar o monitoramento.",
     "profiles.name_label": "Nome do alerta",
     "profiles.watch_label": "Include words",
     "profiles.exclude_label": "Exclude words",
@@ -550,6 +699,32 @@ export const I18N = {
     "help.aff_title": "Programa de Afiliados",
     "help.aff_body": "Ganhe 50% de comissão por venda, sem teto.",
     "help.aff_cta": "Entrar no programa",
+    "help.roadmap_title": "Roadmap: Cloud Agent 24/7 (em desenvolvimento)",
+    "help.roadmap_badge": "Em breve",
+    "help.roadmap_lead":
+      "Estamos construindo a proxima fase: monitoramento continuo na nuvem, auto-comentarios e automacoes mais profundas.",
+    "help.roadmap_copy":
+      "Ainda nao esta disponivel. Se isso e prioridade para voce, clique em \"I want this\" e envie seu caso real para ajudar a definir a ordem do roadmap.",
+    "help.roadmap_item_1": "Notificacoes 24/7 na nuvem (sem aba do navegador aberta)",
+    "help.roadmap_item_2": "Auto-comentario com regras de seguranca",
+    "help.roadmap_item_3": "Automacoes por perfil e intencao de palavra-chave",
+    "help.roadmap_cta_primary": "Quero isso",
+    "help.roadmap_cta_secondary": "Sugerir funcionalidade",
+    "mail.subject.support": "Suporte GrabClientsNow",
+    "mail.subject.more_channels":
+      "GrabClientsNow - Preciso de mais canais de notificacao",
+    "mail.subject.roadmap_interest":
+      "GrabClientsNow - Quero o roadmap cloud",
+    "mail.subject.roadmap_suggestion":
+      "GrabClientsNow - Sugestao de funcionalidade para roadmap",
+    "mail.subject.feature_suggestion":
+      "GrabClientsNow - Sugestao de funcionalidade",
+    "mail.subject.partner_inquiry":
+      "GrabClientsNow - Consulta de parceria comercial",
+    "mail.subject.affiliate_join":
+      "GrabClientsNow - Quero entrar no programa de afiliados",
+    "mail.body.roadmap_interest":
+      "Nome:\nCaso de uso:\nFuncionalidade mais desejada: (alertas 24/7 / auto-comentario / automacoes)\nGrupos ou leads por dia:",
     "msg.log_copied": "Log técnico copiado para a área de transferência.",
     "msg.action_failed": "Ação falhou: {error}",
     "msg.log_copy_failed": "Falha ao copiar log técnico: {error}",
@@ -559,32 +734,99 @@ export const I18N = {
     "msg.csv_empty": "Não há leads para exportar com os filtros atuais.",
     "msg.csv_ok": "CSV exportado com {count} lead(s).",
     "plan.pro": "Pro ativo. Acesso vitalício liberado.",
-    "plan.free": "Acesso bloqueado. Faça upgrade para continuar.",
+    "plan.free": "Acesso bloqueado. Ative uma licença para continuar.",
     "plan.trial": "Trial ativo. Termina em {time}.",
-    "plan.expired": "Trial expirado. Faça upgrade para continuar usando o GrabClientsNow.",
-    "plan.lock_title": "Trial encerrado",
+    "plan.expired": "Trial expirado. Ative uma licença para continuar usando o GrabClientsNow.",
+    "plan.free_hint":
+      "Quer trocar de conta? Abra Configurações ou limpe a licença salva.",
+    "plan.lock_title": "Licença obrigatória",
     "plan.lock_body":
-      "Seu trial terminou. Faça upgrade para Pro para continuar com monitoramento e alertas.",
+      "Seu trial terminou. Ative uma licença Gumroad para continuar com monitoramento e alertas.",
     "plan.locked_action":
-      "Trial expirado. Faça upgrade para Pro para usar o app.",
+      "Trial expirado. Ative uma licença para usar o app.",
     "auth.missing_config":
       "Config do Supabase ausente. Defina SUPABASE_URL e SUPABASE_ANON_KEY no panel.js.",
-    "auth.title": "Bem-vindo ao GrabClientsNow",
-    "auth.copy": "Digite seu e-mail para receber seu código de login.",
-    "auth.secure_note": "Acesso seguro por e-mail",
+    "auth.title": "Ative sua licença GrabClientsNow",
+    "auth.copy": "Escolha como quer entrar. As duas opcoes exigem aceitar os Termos de Uso.",
+    "auth.secure_note": "Acesso por licença Gumroad",
+    "auth.mode_license_title": "Ativar licença",
+    "auth.mode_license_body":
+      "Ja comprei no Gumroad e quero liberar este dispositivo.",
+    "auth.mode_trial_title": "Trial gratuito",
+    "auth.mode_trial_body":
+      "Quero testar a extensao por 1 dia usando meu e-mail.",
+    "auth.section_access": "Trial gratuito",
+    "auth.section_license": "Ativar licença",
+    "auth.email_label": "E-mail",
+    "auth.email_hint":
+      "Usado apenas no trial gratuito para voce testar a extensao.",
+    "auth.license_hint":
+      "Cole sua license key do Gumroad para liberar a extensao neste dispositivo.",
     "auth.email_ph": "voce@email.com",
-    "auth.code_ph": "código de 6 dígitos",
-    "auth.continue": "Continuar",
-    "auth.verify_code": "Verificar código",
-    "auth.resend": "Reenviar e-mail",
-    "auth.change_email": "Usar outro e-mail",
+    "auth.code_ph": "License key",
+    "auth.continue": "Ativar",
+    "auth.verify_code": "Ativar licença",
+    "auth.resend": "Iniciar trial de 1 dia",
+    "auth.change_email": "Limpar",
+    "auth.terms_accept": "Li e aceito os Termos de Uso",
+    "auth.terms_accept_prefix": "Li e aceito os",
+    "auth.terms_accept_link": "Termos de Uso",
+    "auth.terms_view": "Ver termos",
+    "auth.terms_required": "Aceite os Termos de Uso para continuar.",
+    "auth.terms_title": "Termos de Uso",
+    "auth.terms_intro":
+      "Estes Termos de Uso regem o acesso e o uso do GrabClientsNow.",
+    "auth.terms_section_access_title": "1. Acesso e Elegibilidade",
+    "auth.terms_section_access_body":
+      "Voce confirma que possui capacidade legal para aceitar estes termos e que seu uso cumpre as leis aplicaveis e politicas de plataforma.",
+    "auth.terms_section_license_title": "2. Licenca e Uso Permitido",
+    "auth.terms_section_license_body":
+      "Concedemos uma licenca limitada, revogavel e intransferivel para uso da extensao no seu fluxo interno de negocio.",
+    "auth.terms_section_prohibited_title": "3. Condutas Proibidas",
+    "auth.terms_section_prohibited_item_1":
+      "Sem uso ilegal, automacao abusiva ou tentativas de acesso nao autorizado.",
+    "auth.terms_section_prohibited_item_2":
+      "Sem engenharia reversa, revenda, sublicenciamento ou redistribuicao sem permissao.",
+    "auth.terms_section_prohibited_item_3":
+      "Sem uso que viole termos de terceiros, propriedade intelectual ou direitos de privacidade.",
+    "auth.terms_section_user_data_title": "4. Responsabilidade do Usuario",
+    "auth.terms_section_user_data_body":
+      "Voce e responsavel pelas acoes da sua conta, pelas configuracoes aplicadas e por quaisquer dados, mensagens ou saidas geradas no uso.",
+    "auth.terms_section_service_title": "5. Alteracoes de Servico",
+    "auth.terms_section_service_body":
+      "Recursos podem ser adicionados, modificados, limitados ou removidos a qualquer momento para evolucao de confiabilidade, seguranca ou direcao de produto.",
+    "auth.terms_section_liability_title": "6. Garantias e Responsabilidade",
+    "auth.terms_section_liability_body":
+      "O servico e fornecido no formato \"como esta\" e \"conforme disponibilidade\", sem garantias expressas ou implicitas, no limite permitido por lei.",
+    "auth.terms_section_termination_title": "7. Suspensao e Encerramento",
+    "auth.terms_section_termination_body":
+      "Podemos suspender ou encerrar acesso em caso de violacao destes termos ou quando o uso continuo gerar problemas legais, de seguranca ou operacionais.",
+    "auth.terms_section_updates_title": "8. Atualizacoes dos Termos",
+    "auth.terms_section_updates_body":
+      "Podemos atualizar estes termos ao longo do tempo. O uso continuo apos atualizacoes significa aceitacao da versao mais recente.",
+    "auth.terms_section_platform_title":
+      "9. Dependencias de Plataforma e Boas Praticas",
+    "auth.terms_section_platform_body":
+      "Plataformas de terceiros podem mudar regras, limites ou sistemas de deteccao a qualquer momento, o que pode afetar resultados de forma independente do GrabClientsNow.",
+    "auth.terms_section_platform_item_1":
+      "Evite comportamento abusivo, intervalos muito agressivos ou padroes operacionais acima dos limites recomendados.",
+    "auth.terms_section_platform_item_2":
+      "Use contas maduras, com historico real e padroes normais de atividade sempre que possivel.",
+    "auth.terms_section_platform_item_3":
+      "Siga as politicas da plataforma e ajuste sua configuracao quando condicoes ou limites mudarem.",
     "auth.magic_sent":
-      "Código enviado. Verifique seu e-mail e digite o código de 6 dígitos.",
-    "auth.checking": "Verificando código...",
-    "auth.connected": "Conectado como {email}.",
+      "Solicitação de licença enviada.",
+    "auth.checking": "Verificando licença...",
+    "auth.connected": "Licença pronta para {email}.",
     "auth.invalid_email": "Informe um e-mail válido.",
-    "auth.invalid_code": "Digite um código válido de 6 dígitos.",
-    "auth.code_verify_failed": "Não foi possível verificar o código. Peça um novo código e tente novamente.",
+    "auth.invalid_code": "Digite uma license key válida.",
+    "auth.invalid_license_key": "Digite uma license key válida.",
+    "auth.code_verify_failed": "Não foi possível validar a licença. Confira a key e tente novamente.",
+    "auth.license_activated": "Licença ativada.",
+    "auth.trial_started": "Trial de 1 dia ativado.",
+    "auth.trial_cta_title": "Seu trial gratuito esta ativo",
+    "auth.trial_cta_body":
+      "Garanta sua licença agora na Gumroad para continuar usando a extensão quando o período gratuito terminar.",
     "auth.new_user_local": "E-mail novo detectado. Trial iniciado localmente, seguindo para onboarding.",
     "plan.block_alerts": "Plano Free permite apenas 1 alerta.",
     "plan.block_groups": "Plano Free permite até 3 grupos por alerta.",
@@ -616,9 +858,6 @@ export const I18N = {
     "groups.select_group": "Selecionar grupo",
     "groups.fetching": "carregando...",
     "groups.error_short": "erro",
-    "onboard.alert_subtitle": "Um formulário simples. Sem trocar de aba.",
-    "onboard.watch_title": "Include words (palavras positivas)",
-    "onboard.exclude_title": "Exclude words (palavras negativas)",
     "onboard.keyword_input_ph": "Digite e pressione Enter ou vírgula",
     "onboard.after_setup_title": "Depois do setup",
     "onboard.after_setup_body":
@@ -698,26 +937,23 @@ export const I18N = {
     "monitor.idle": "parado",
     "monitor.waiting": "aguardando...",
     "settings.account": "Conta",
-    "msg.signed_out": "Sessão encerrada.",
+    "msg.signed_out": "Licença removida.",
     "msg.sleep_saved": "Sleep schedule salvo.",
     "msg.sleep_save_failed": "Falha ao salvar sleep schedule: {error}",
     "msg.session_not_active":
       "Sessão ainda não está ativa. Clique no link mágico e tente novamente.",
     "msg.upgrade_soon":
-      "Integração de upgrade com Stripe será ligada na próxima fase.",
-    "msg.upgrade_signin_required":
-      "Faça login antes de continuar com o upgrade.",
-    "msg.upgrade_opening":
-      "Abrindo checkout seguro...",
-    "msg.payment_checking": "Verificando status do pagamento...",
-    "msg.payment_confirmed": "Pagamento confirmado. Pro está ativo.",
-    "msg.payment_status_refreshed": "Status do plano atualizado.",
-    "msg.payment_watch_started":
-      "Monitoramento de pagamento iniciado (até 5 minutos).",
-    "msg.payment_watch_finished":
-      "Monitoramento de pagamento finalizado. Use Verificar pagamento para atualizar novamente.",
+      "Fluxo de compra de licença será ligado na próxima fase.",
+    "msg.license_buy_unavailable":
+      "A URL do produto Gumroad ainda não foi configurada.",
+    "msg.license_buy_opening":
+      "Abrindo checkout no Gumroad...",
+    "msg.license_checking": "Verificando status da licença...",
+    "msg.license_confirmed": "Licença confirmada. Pro está ativo.",
+    "msg.license_status_refreshed": "Status da licença atualizado.",
+    "msg.trial_started": "Trial de 1 dia iniciado.",
     "msg.upgrade_failed":
-      "Não foi possível iniciar checkout: {error}",
+      "Não foi possível abrir o checkout da licença: {error}",
     "status.monitoring": "monitorando...",
     "status.stopped": "parado",
     "status.starting": "iniciando...",
@@ -777,7 +1013,8 @@ export const I18N = {
     "log.monitor_started": "✅ Monitoramento iniciado.",
     "btn.back": "Voltar",
     "btn.next": "Próximo",
-    "btn.check_payment": "Verificar pagamento",
+    "btn.check_payment": "Atualizar licença",
+    "btn.refresh_license": "Atualizar licença",
     "btn.create_alert": "Criar Alerta",
     "btn.save_changes": "Salvar Alterações",
     "btn.save_alert": "Salvar alerta",
@@ -814,8 +1051,13 @@ export const I18N = {
     "overlay.clear": "Limpar",
     "overlay.close": "Fechar",
     "overlay.empty": "[vazio]",
-    "account.not_signed_in": "Não conectado",
-    "account.sign_out": "Sair",
+    "account.not_signed_in": "Nenhuma licença ativa",
+    "account.no_license": "Nenhuma licença ativa",
+    "account.sign_out": "Limpar licença",
+    "account.clear_license": "Limpar licença",
+    "account.license_active": "Licença ativa: {email}",
+    "account.trial_active": "Trial ativo: {email}",
+    "account.license_pending": "Licença exige atenção: {email}",
     "settings.sleep_title": "Monitor Sleep Schedule",
     "settings.sleep_note":
       "O sleep schedule pausa o monitoramento nas horas de descanso para reduzir risco de detecção. Deixe ligado para mais segurança.",
@@ -831,15 +1073,15 @@ export const I18N = {
     "settings.frequency_note":
       "Uma configuração global para todos os alertas. Intervalos menores são mais rápidos, mas aumentam o risco.",
     "settings.frequency_tip":
-      "Recomendado para a maioria das contas: 15-20 min (mais seguro) ou 5-10 min (equilibrado).",
+      "Recomendado para a maioria das contas: 15-20 min (mais seguro) ou 3-8 min (equilibrado).",
     "settings.freq_15_20_title": "🕐 A cada 15-20 min",
     "settings.freq_15_20_desc": "Mais discreto · Mais seguro",
-    "settings.freq_5_10_title": "✅ A cada 5-10 min",
-    "settings.freq_5_10_desc": "Equilíbrio recomendado · Pro",
+    "settings.freq_3_8_title": "✅ A cada 3-8 min",
+    "settings.freq_3_8_desc": "Equilíbrio recomendado",
     "settings.freq_3_5_title": "🔄 A cada 3-5 min",
-    "settings.freq_3_5_desc": "Risco elevado · Pro",
+    "settings.freq_3_5_desc": "Risco elevado",
     "settings.freq_1_3_title": "⚡ A cada 1-3 min",
-    "settings.freq_1_3_desc": "Maior risco · Pro",
+    "settings.freq_1_3_desc": "Maior risco",
     "settings.badge_safest": "Mais seguro",
     "settings.badge_recommended": "Recomendado",
     "settings.badge_high_risk": "Risco alto",
@@ -860,7 +1102,7 @@ export const I18N = {
       "Envie leads para seu app, n8n, Make, Zapier ou APIs internas.",
     "settings.notify_telegram": "📨 Telegram (bot GrabClientsNow)",
     "settings.notify_telegram_desc":
-      "Receba alertas de lead no celular através do seu bot do Telegram.",
+      "Receba alertas de lead no celular pelo nosso bot do Telegram.",
     "settings.notify_desktop_title": "Notificações desktop:",
     "settings.notify_desktop_body":
       "Melhor para alertas instantâneos enquanto você trabalha neste dispositivo.",
@@ -902,3 +1144,944 @@ export const I18N = {
     "sugg.partnership": "parceria",
   },
 };
+
+I18N.de = {
+  ...I18N.en,
+  "brand.tagline": "Finde Kunden vor deiner Konkurrenz.",
+  "footer.fb_status": "FB-Status",
+  "status.checking_fb": "Facebook-Sitzung wird geprüft...",
+  "status.fb_tab_missing": "Facebook-Tab nicht gefunden",
+  "status.fb_login_required": "Facebook-Login erforderlich",
+  "status.open_facebook_hint":
+    "Öffne facebook.com in einem Tab, melde dich falls nötig an und klicke dann erneut auf Monitoring starten.",
+  "status.fb_hint":
+    "Facebook nicht erkannt. Öffne einen facebook.com-Tab, melde dich an und klicke dann auf Erneut prüfen.",
+  "status.fb_required_title": "Monitoring funktioniert nur mit geöffnetem Facebook",
+  "status.fb_required_item_login":
+    "Du musst in diesem Browser bei Facebook angemeldet sein.",
+  "status.fb_required_item_tab":
+    "Lass mindestens einen facebook.com-Tab geöffnet, während das Monitoring läuft.",
+  "status.fb_required_item_keep":
+    "Wenn der Tab geschlossen wird oder die Sitzung abläuft, stoppt das Monitoring, bis du dich wieder verbindest.",
+  "status.fb_connected": "Facebook verbunden",
+  "status.fb_disconnected": "Facebook getrennt",
+  "btn.buy_license": "Lizenz kaufen",
+  "btn.open_settings": "Einstellungen",
+  "btn.check_login": "Login prüfen",
+  "btn.fetch_token": "Token abrufen",
+  "btn.all_tokens": "Alle Tokens",
+  "btn.profile_age": "Profilalter",
+  "common.checking": "Wird geprüft...",
+  "common.none": "Keine",
+  "tab.home": "🏠 Start",
+  "tab.groups": "👥 Gruppen",
+  "tab.alerts": "🎯 Alerts",
+  "tab.leads": "📌 Leads",
+  "tab.notifications": "🔔 Benachrichtigungen",
+  "tab.settings": "⚙️ Einstellungen",
+  "tab.help": "❓ Hilfe",
+  "hero.title": "Monitoring-Zentrale",
+  "hero.subtitle":
+    "Direkte Leads aus Facebook-Gruppen. Ohne Firlefanz. Schnell umgesetzt.",
+  "home.guided_setup": "Geführtes Setup",
+  "home.status_title": "Systemstatus",
+  "home.machine_on": "Monitoring ist AN",
+  "home.machine_off": "Monitoring ist AUS",
+  "home.sleep_banner":
+    "🌙 Schlafmodus aktiv. Das Monitoring wird zur konfigurierten Zeit automatisch fortgesetzt.",
+  "home.active_alert": "Aktiver Alert",
+  "home.checking_groups": "{count} Gruppen werden geprüft",
+  "home.next_scan_label": "Nächster Scan: {value}",
+  "home.last_lead_none": "Letzter Lead: noch keiner",
+  "settings.language": "Sprache",
+  "settings.advanced_title": "Erweiterte Einstellungen",
+  "settings.language_hint": "Wird sofort in der gesamten Extension angewendet.",
+  "settings.account": "Konto",
+  "settings.data": "Daten",
+  "settings.debug": "Debug",
+  "settings.diagnostics": "Diagnose",
+  "help.title": "Hilfe & Support",
+  "help.support_title": "Support-Chat",
+  "help.support_body":
+    "Öffne den Live-Chat und füge dein Technikprotokoll hinzu, um schneller Hilfe zu bekommen.",
+  "help.feature_title": "Funktion vorschlagen",
+  "help.feature_body": "Sende deinen Funktionswunsch direkt per E-Mail.",
+  "help.partner_title": "Partnerschaften & Affiliates",
+  "help.partner_body":
+    "Business-Integrationen, White-Label oder Fragen zum Affiliate-Programm.",
+  "help.support_cta": "Live-Chat öffnen",
+  "help.feature_cta": "Vorschlag senden",
+  "help.partner_cta": "Team kontaktieren",
+  "help.aff_title": "Affiliate-Programm",
+  "help.aff_body": "Verdiene 50% Provision pro Verkauf ohne Obergrenze.",
+  "help.aff_cta": "Affiliate-Programm beitreten",
+  "mail.subject.support": "GrabClientsNow Support",
+  "mail.subject.feature_suggestion": "GrabClientsNow Funktionsvorschlag",
+  "mail.subject.partner_inquiry": "Anfrage zu Geschäftspartnerschaft",
+  "msg.log_copied": "Technisches Protokoll in die Zwischenablage kopiert.",
+  "msg.log_copy_failed": "Technisches Protokoll konnte nicht kopiert werden: {error}",
+  "msg.history_cleared": "Lead-Verlauf gelöscht.",
+  "msg.history_clear_failed": "Lead-Verlauf konnte nicht gelöscht werden: {error}",
+  "msg.license_buy_opening": "Gumroad wird geöffnet, um deine Lizenz zu kaufen.",
+  "msg.license_buy_unavailable": "Gumroad-Checkout-URL ist nicht konfiguriert.",
+  "msg.license_checking": "Lizenz wird geprüft...",
+  "msg.license_confirmed": "Lizenz bestätigt.",
+  "msg.license_status_refreshed": "Lizenzstatus aktualisiert.",
+  "msg.signed_out": "Gespeicherte Lizenz gelöscht.",
+  "plan.expired": "Dein Trial ist abgelaufen. Kaufe eine Lizenz, um weiterzumachen.",
+  "plan.free_hint":
+    "Brauchst du ein anderes Konto? Öffne die Einstellungen oder lösche deine gespeicherte Lizenz.",
+  "plan.lock_title": "Lizenz erforderlich",
+  "plan.lock_body":
+    "Dein Trial ist beendet. Aktiviere eine Gumroad-Lizenz, um Monitoring und Alerts weiter zu nutzen.",
+  "plan.locked_action": "Diese Aktion erfordert eine aktive Lizenz oder ein aktives Trial.",
+  "account.no_license": "Keine aktive Lizenz",
+  "account.clear_license": "Lizenz löschen",
+  "account.license_active": "Aktive Lizenz: {email}",
+  "account.trial_active": "Aktives Trial: {email}",
+  "account.license_pending": "Lizenz erfordert Aufmerksamkeit: {email}",
+  "auth.title": "Aktiviere deine GrabClientsNow-Lizenz",
+  "auth.copy":
+    "Wähle, wie du einsteigen willst. Beide Optionen erfordern die Zustimmung zu den Nutzungsbedingungen.",
+  "auth.secure_note": "Zugang per Gumroad-Lizenz",
+  "auth.mode_license_title": "Lizenz aktivieren",
+  "auth.mode_license_body":
+    "Ich habe bereits bei Gumroad gekauft und möchte dieses Gerät freischalten.",
+  "auth.mode_trial_title": "Kostenloses Trial",
+  "auth.mode_trial_body":
+    "Ich möchte die Extension 1 Tag lang mit meiner E-Mail testen.",
+  "auth.section_access": "Kostenloses Trial",
+  "auth.section_license": "Lizenz aktivieren",
+  "auth.email_label": "E-Mail",
+  "auth.email_ph": "du@email.com",
+  "auth.email_hint":
+    "Wird nur für das kostenlose Trial verwendet, damit du die Extension testen kannst.",
+  "auth.code_ph": "Lizenzschlüssel",
+  "auth.verify_code": "Lizenz aktivieren",
+  "auth.license_hint":
+    "Füge deinen Gumroad-Lizenzschlüssel ein, um die Extension auf diesem Gerät freizuschalten.",
+  "auth.resend": "1-Tages-Trial starten",
+  "auth.invalid_email": "Gib eine gültige E-Mail-Adresse ein.",
+  "auth.invalid_license_key": "Gib einen gültigen Lizenzschlüssel ein.",
+  "auth.checking": "Lizenz wird geprüft...",
+  "auth.license_activated": "Lizenz erfolgreich aktiviert.",
+  "auth.trial_started": "1-Tages-Trial aktiviert.",
+  "auth.connected": "Verbunden als {email}",
+  "auth.terms_title": "Nutzungsbedingungen",
+  "auth.terms_intro":
+    "Diese Nutzungsbedingungen regeln deinen Zugriff auf und die Nutzung von GrabClientsNow.",
+  "auth.terms_accept_prefix": "Ich habe gelesen und akzeptiere die",
+  "auth.terms_accept_link": "Nutzungsbedingungen",
+  "auth.terms_required":
+    "Du musst die Nutzungsbedingungen akzeptieren, bevor du fortfahren kannst.",
+  "auth.trial_cta_title": "Dein kostenloses Trial ist aktiv",
+  "auth.trial_cta_body":
+    "Sichere dir jetzt deine Lizenz bei Gumroad, damit du die Extension nach dem kostenlosen Zeitraum weiter nutzen kannst.",
+  "groups.search": "Gruppen suchen...",
+  "groups.load": "Gruppen laden",
+  "groups.load_title": "Gruppen laden",
+  "groups.stop": "Stopp",
+  "groups.select_visible": "Sichtbare auswählen",
+  "groups.clear": "Löschen",
+  "groups.title": "Gruppen",
+  "monitor.start": "Monitoring starten",
+  "monitor.stop": "Monitoring stoppen",
+  "status.monitoring": "Monitoring läuft...",
+  "status.stopped": "gestoppt",
+  "status.checking_now": "Prüfung läuft...",
+  "status.next_check": "nächste Prüfung: ~{mins} Min",
+};
+
+I18N.es = { ...I18N.en };
+Object.assign(I18N.es, {
+  "status.checking_fb": "comprobando sesión de Facebook...",
+  "status.fb_tab_missing": "pestaña de Facebook no encontrada",
+  "status.fb_login_required": "inicio de sesión de Facebook requerido",
+  "status.open_facebook_hint":
+    "Abre facebook.com en una pestaña, inicia sesión si hace falta y luego vuelve a hacer clic en Iniciar monitoreo.",
+  "status.fb_hint":
+    "Facebook no detectado. Abre una pestaña de facebook.com, inicia sesión y luego haz clic en Volver a comprobar.",
+  "status.fb_required_title": "El monitoreo solo funciona con Facebook abierto",
+  "status.fb_required_item_login":
+    "Debes iniciar sesión en Facebook en este navegador.",
+  "status.fb_required_item_tab":
+    "Mantén al menos una pestaña de facebook.com abierta mientras el monitoreo está activo.",
+  "status.fb_required_item_keep":
+    "Si la pestaña se cierra o la sesión expira, el monitoreo se detiene hasta que vuelvas a conectar.",
+  "status.fb_connected": "Facebook conectado",
+  "status.fb_disconnected": "Facebook desconectado",
+  "btn.upgrade": "Comprar licencia",
+  "btn.buy_license": "Comprar licencia",
+  "btn.open_settings": "Configuración",
+  "btn.maybe_later": "Quizás después",
+  "btn.new": "Nuevo",
+  "btn.edit": "Editar",
+  "btn.update": "Actualizar",
+  "btn.delete": "Eliminar",
+  "btn.check_login": "Comprobar inicio",
+  "btn.fetch_token": "Obtener token",
+  "btn.all_tokens": "Todos los tokens",
+  "btn.profile_age": "Edad del perfil",
+  "btn.back": "Atrás",
+  "btn.next": "Siguiente",
+  "btn.check_payment": "Comprobar licencia",
+  "btn.refresh_license": "Actualizar licencia",
+  "btn.create_alert": "Crear alerta",
+  "btn.save_changes": "Guardar cambios",
+  "btn.save_alert": "Guardar alerta",
+  "btn.start_monitoring": "Iniciar monitoreo",
+  "btn.check_login_short": "Revisar Facebook",
+  "btn.try_again": "Intentar de nuevo",
+  "home.top_groups": "Grupos con más leads",
+  "home.weekly_trend": "Tendencia semanal",
+  "home.no_group_data": "Aún no hay datos de leads.",
+  "home.leads_7d": "{count} leads en los últimos 7 días",
+  "home.sleep_banner":
+    "🌙 Modo sueño activo. El monitoreo volverá automáticamente en el horario configurado.",
+  "home.active_alert": "Alerta activa",
+  "home.checking_groups": "Comprobando {count} grupos",
+  "home.next_scan_label": "Próxima revisión: {value}",
+  "home.last_lead_none": "Último lead: ninguno todavía",
+  "home.last_lead_time": "Último lead: hace {time}",
+  "groups.search": "Buscar grupos...",
+  "groups.load": "Cargar grupos",
+  "groups.load_title": "Cargar grupos",
+  "groups.stop": "Detener",
+  "groups.select_visible": "Seleccionar visibles",
+  "groups.clear": "Limpiar",
+  "groups.title": "Grupos",
+  "groups.show_selected_only": "mostrar solo seleccionados",
+  "groups.top_performers_title": "Grupos que generan más leads",
+  "groups.top_performers_subtitle":
+    "Basado en los leads capturados por esta extensión.",
+  "groups.top_performers_empty": "Aún no hay datos para clasificar grupos.",
+  "groups.top_performers_leads": "{count} lead(s)",
+  "groups.no_match": "Ningún grupo coincide con \"{term}\".",
+  "groups.no_loaded_auto": "Todavía no hay grupos cargados. La carga comenzará automáticamente.",
+  "groups.loaded_count": "Cargados: {count}",
+  "groups.selected_count": "Seleccionados: {count}",
+  "groups.visible_count": "{count} visibles",
+  "groups.visible_for_count": "{count} visibles para \"{term}\"",
+  "groups.no_groups_hint": "Parece que no estás en grupos o Facebook aún no los cargó.",
+  "groups.no_visible_filters": "No hay grupos visibles con los filtros actuales.",
+  "groups.none_selected_yet": "Aún no hay grupos seleccionados.",
+  "groups.select_at_least_one": "Selecciona al menos un grupo.",
+  "groups.selected_summary": "{count} seleccionados: {names}",
+  "groups.count": "{count} grupo(s)",
+  "groups.select_group": "Seleccionar grupo",
+  "groups.fetching": "cargando...",
+  "groups.error_short": "error",
+  "groups.monitored_count": "{count} grupos monitoreados",
+  "groups.show_list": "Mostrar lista de grupos",
+  "groups.hide_list": "Ocultar lista de grupos",
+  "groups.loading_groups": "cargando grupos...",
+  "monitor.select_alert": "Selecciona una alerta",
+  "monitor.idle": "inactivo",
+  "monitor.waiting": "esperando...",
+  "status.starting": "iniciando",
+  "status.sleep_mode": "modo sueño",
+  "status.waiting": "esperando...",
+  "status.logged": "Conectado",
+  "status.not_logged": "No conectado",
+  "account.not_signed_in": "Sin licencia guardada",
+  "account.no_license": "Sin licencia activa",
+  "account.sign_out": "Salir",
+  "account.clear_license": "Borrar licencia",
+  "account.license_active": "Licencia activa: {email}",
+  "account.trial_active": "Trial activo: {email}",
+  "account.license_pending": "La licencia requiere atención: {email}",
+  "settings.sleep_title": "Horario de sueño",
+  "settings.frequency_title": "Frecuencia de revisión (global)",
+  "plan.pro": "pro",
+  "plan.free": "gratis",
+  "plan.trial": "Trial activo. Termina en {time}.",
+  "plan.expired": "Tu trial terminó. Compra una licencia para seguir.",
+  "plan.free_hint":
+    "¿Necesitas otra cuenta? Abre Configuración o borra tu licencia guardada.",
+  "plan.lock_title": "Licencia requerida",
+  "plan.lock_body":
+    "Tu trial terminó. Activa una licencia de Gumroad para mantener el monitoreo y las alertas activos.",
+  "plan.locked_action": "Esta acción requiere una licencia activa o un trial activo.",
+  "auth.missing_config": "Falta la configuración de licencia.",
+  "auth.title": "Activa tu licencia de GrabClientsNow",
+  "auth.copy":
+    "Elige cómo quieres entrar. Ambas opciones requieren aceptar los Términos de Uso.",
+  "auth.secure_note": "Acceso por licencia de Gumroad",
+  "auth.mode_license_title": "Activar licencia",
+  "auth.mode_license_body":
+    "Ya compré en Gumroad y quiero desbloquear este dispositivo.",
+  "auth.mode_trial_title": "Trial gratis",
+  "auth.mode_trial_body":
+    "Quiero probar la extensión durante 1 día con mi email.",
+  "auth.section_access": "Trial gratis",
+  "auth.section_license": "Activar licencia",
+  "auth.email_label": "Correo",
+  "auth.email_hint":
+    "Se usa solo para el trial gratis y para que puedas probar la extensión.",
+  "auth.license_hint":
+    "Pega tu license key de Gumroad para desbloquear la extensión en este dispositivo.",
+  "auth.email_ph": "tu@email.com",
+  "auth.code_ph": "license key",
+  "auth.continue": "Continuar",
+  "auth.verify_code": "Activar licencia",
+  "auth.resend": "Iniciar trial de 1 día",
+  "auth.change_email": "Cambiar email",
+  "auth.terms_accept": "Acepto los Términos de Uso",
+  "auth.terms_accept_prefix": "He leído y acepto los",
+  "auth.terms_accept_link": "Términos de Uso",
+  "auth.terms_view": "Ver términos",
+  "auth.terms_required":
+    "Debes aceptar los Términos de Uso antes de continuar.",
+  "auth.terms_title": "Términos de Uso",
+  "auth.terms_intro":
+    "Estos Términos de Uso regulan tu acceso y uso de GrabClientsNow.",
+  "auth.terms_section_access_title": "1. Acceso y elegibilidad",
+  "auth.terms_section_access_body":
+    "Confirmas que tienes capacidad legal para aceptar estos términos y que tu uso cumple con las leyes aplicables y las políticas de las plataformas.",
+  "auth.terms_section_license_title": "2. Licencia y uso permitido",
+  "auth.terms_section_license_body":
+    "Te otorgamos una licencia limitada, revocable e intransferible para usar la extensión en tu flujo interno de trabajo.",
+  "auth.terms_section_prohibited_title": "3. Conducta prohibida",
+  "auth.terms_section_prohibited_item_1":
+    "No se permite uso ilegal, automatización abusiva ni intentos de acceso no autorizados.",
+  "auth.terms_section_prohibited_item_2":
+    "No se permite ingeniería inversa, reventa, sublicencia ni redistribución sin permiso.",
+  "auth.terms_section_prohibited_item_3":
+    "No se permite el uso que viole términos de terceros, propiedad intelectual o derechos de privacidad.",
+  "auth.terms_section_user_data_title": "4. Responsabilidad del usuario",
+  "auth.terms_section_user_data_body":
+    "Eres responsable de las acciones de tu cuenta, tu configuración y cualquier dato, mensaje o salida generado por tu uso.",
+  "auth.terms_section_service_title": "5. Cambios en el servicio",
+  "auth.terms_section_service_body":
+    "Las funciones pueden añadirse, modificarse, limitarse o eliminarse en cualquier momento para mejorar fiabilidad, seguridad o dirección del producto.",
+  "auth.terms_section_liability_title": "6. Garantía y responsabilidad",
+  "auth.terms_section_liability_body":
+    "El servicio se proporciona \"tal cual\" y \"según disponibilidad\", sin garantías expresas o implícitas, en la máxima medida permitida por la ley.",
+  "auth.terms_section_termination_title": "7. Suspensión y terminación",
+  "auth.terms_section_termination_body":
+    "Podemos suspender o terminar el acceso si se incumplen estos términos o si el uso continuado genera riesgos legales, de seguridad u operativos.",
+  "auth.terms_section_updates_title": "8. Actualizaciones de los términos",
+  "auth.terms_section_updates_body":
+    "Podemos actualizar estos términos con el tiempo. El uso continuado después de una actualización significa aceptación de la versión más reciente.",
+  "auth.terms_section_platform_title": "9. Dependencias de la plataforma y buenas prácticas",
+  "auth.terms_section_platform_body":
+    "Las plataformas de terceros pueden cambiar reglas, límites o sistemas de detección en cualquier momento, lo que puede afectar los resultados independientemente de GrabClientsNow.",
+  "auth.terms_section_platform_item_1":
+    "Evita comportamientos abusivos, intervalos muy agresivos o patrones operativos fuera de los límites recomendados.",
+  "auth.terms_section_platform_item_2":
+    "Usa cuentas maduras con historial real y patrones de actividad normales siempre que sea posible.",
+  "auth.terms_section_platform_item_3":
+    "Sigue las políticas de la plataforma y ajusta tu configuración cuando cambien las condiciones o los límites.",
+  "auth.magic_sent": "Código enviado.",
+  "auth.checking": "Comprobando licencia...",
+  "auth.connected": "Conectado como {email}",
+  "auth.invalid_email": "Introduce un email válido.",
+  "auth.invalid_code": "Introduce un código válido.",
+  "auth.invalid_license_key": "Introduce una license key válida.",
+  "auth.code_verify_failed": "No se pudo verificar la licencia.",
+  "auth.license_activated": "Licencia activada con éxito.",
+  "auth.trial_started": "Trial de 1 día activado.",
+  "auth.trial_cta_title": "Tu trial gratis está activo",
+  "auth.trial_cta_body":
+    "Asegura tu licencia ahora en Gumroad para seguir usando la extensión cuando termine el período gratuito.",
+  "auth.new_user_local": "Nuevo usuario local detectado.",
+  "plan.block_alerts": "El plan gratis permite solo 1 alerta.",
+  "plan.block_groups": "El plan gratis permite hasta 20 grupos.",
+  "plan.block_keywords": "El plan gratis permite hasta 3 palabras clave positivas.",
+  "plan.block_frequency": "El plan gratis está limitado a revisiones cada 15-20 minutos.",
+});
+
+I18N.fr = { ...I18N.en };
+Object.assign(I18N.fr, {
+  "status.checking_fb": "vérification de la session Facebook...",
+  "status.fb_tab_missing": "onglet Facebook introuvable",
+  "status.fb_login_required": "connexion Facebook requise",
+  "status.open_facebook_hint":
+    "Ouvrez facebook.com dans un onglet, connectez-vous si nécessaire, puis cliquez de nouveau sur Démarrer le monitoring.",
+  "status.fb_hint":
+    "Facebook non détecté. Ouvrez un onglet facebook.com, connectez-vous, puis cliquez sur Revérifier.",
+  "status.fb_required_title": "Le monitoring fonctionne uniquement avec Facebook ouvert",
+  "status.fb_required_item_login":
+    "Vous devez être connecté à Facebook dans ce navigateur.",
+  "status.fb_required_item_tab":
+    "Gardez au moins un onglet facebook.com ouvert pendant que le monitoring tourne.",
+  "status.fb_required_item_keep":
+    "Si l'onglet se ferme ou si la session expire, le monitoring s'arrête jusqu'à reconnexion.",
+  "status.fb_connected": "Facebook connecté",
+  "status.fb_disconnected": "Facebook déconnecté",
+  "btn.upgrade": "Acheter une licence",
+  "btn.buy_license": "Acheter une licence",
+  "btn.open_settings": "Paramètres",
+  "btn.maybe_later": "Plus tard",
+  "btn.new": "Nouveau",
+  "btn.edit": "Modifier",
+  "btn.update": "Mettre à jour",
+  "btn.delete": "Supprimer",
+  "btn.check_login": "Vérifier la connexion",
+  "btn.fetch_token": "Récupérer le token",
+  "btn.all_tokens": "Tous les tokens",
+  "btn.profile_age": "Âge du profil",
+  "btn.back": "Retour",
+  "btn.next": "Suivant",
+  "btn.check_payment": "Vérifier la licence",
+  "btn.refresh_license": "Actualiser la licence",
+  "btn.create_alert": "Créer une alerte",
+  "btn.save_changes": "Enregistrer les modifications",
+  "btn.save_alert": "Enregistrer l'alerte",
+  "btn.start_monitoring": "Démarrer le monitoring",
+  "btn.check_login_short": "Revérifier Facebook",
+  "btn.try_again": "Réessayer",
+  "home.top_groups": "Groupes qui génèrent le plus de leads",
+  "home.weekly_trend": "Tendance hebdomadaire",
+  "home.no_group_data": "Aucune donnée de lead pour le moment.",
+  "home.leads_7d": "{count} leads sur les 7 derniers jours",
+  "home.sleep_banner":
+    "🌙 Mode sommeil actif. Le monitoring reprendra automatiquement à l'heure configurée.",
+  "home.pause_monitoring": "Mettre en pause",
+  "home.active_alert": "Alerte active",
+  "home.checking_groups": "Vérification de {count} groupes",
+  "home.next_scan_label": "Prochain scan : {value}",
+  "home.last_lead_none": "Dernier lead : aucun pour le moment",
+  "home.last_lead_time": "Dernier lead : il y a {time}",
+  "groups.search": "Rechercher des groupes...",
+  "groups.load": "Charger les groupes",
+  "groups.load_title": "Charger les groupes",
+  "groups.stop": "Arrêter",
+  "groups.select_visible": "Sélectionner les visibles",
+  "groups.clear": "Effacer",
+  "groups.title": "Groupes",
+  "groups.show_selected_only": "afficher uniquement les sélectionnés",
+  "groups.top_performers_title": "Groupes qui apportent le plus de leads",
+  "groups.top_performers_subtitle":
+    "Basé sur les leads déjà capturés par cette extension.",
+  "groups.top_performers_empty":
+    "Aucune donnée de lead disponible pour classer les groupes.",
+  "groups.top_performers_leads": "{count} lead(s)",
+  "groups.no_match": "Aucun groupe ne correspond à \"{term}\".",
+  "groups.no_loaded_auto":
+    "Aucun groupe chargé pour le moment. Le chargement démarrera automatiquement.",
+  "groups.loaded_count": "Chargés : {count}",
+  "groups.selected_count": "Sélectionnés : {count}",
+  "groups.visible_count": "{count} visibles",
+  "groups.visible_for_count": "{count} visibles pour \"{term}\"",
+  "groups.no_groups_hint":
+    "On dirait que vous n'êtes dans aucun groupe, ou que Facebook ne les a pas encore chargés.",
+  "groups.no_visible_filters": "Aucun groupe visible avec les filtres actuels.",
+  "groups.none_selected_yet": "Aucun groupe sélectionné pour le moment.",
+  "groups.select_at_least_one": "Sélectionnez au moins un groupe.",
+  "groups.selected_summary": "{count} sélectionnés : {names}",
+  "groups.count": "{count} groupe(s)",
+  "groups.select_group": "Sélectionner le groupe",
+  "groups.fetching": "chargement...",
+  "groups.error_short": "erreur",
+  "groups.monitored_count": "{count} groupes monitorés",
+  "groups.show_list": "Afficher la liste des groupes",
+  "groups.hide_list": "Masquer la liste des groupes",
+  "groups.loading_groups": "chargement des groupes...",
+  "monitor.select_alert": "Sélectionnez une alerte",
+  "monitor.idle": "inactif",
+  "monitor.waiting": "en attente...",
+  "settings.debug": "Débogage",
+  "status.starting": "démarrage",
+  "status.sleep_mode": "mode sommeil",
+  "status.waiting": "en attente...",
+  "status.logged": "Connecté",
+  "status.not_logged": "Non connecté",
+  "account.not_signed_in": "Aucune licence enregistrée",
+  "account.no_license": "Aucune licence active",
+  "account.sign_out": "Se déconnecter",
+  "account.clear_license": "Effacer la licence",
+  "account.license_active": "Licence active : {email}",
+  "account.trial_active": "Essai actif : {email}",
+  "account.license_pending": "La licence nécessite une attention : {email}",
+  "settings.sleep_title": "Planning de sommeil",
+  "settings.frequency_title": "Fréquence de vérification (globale)",
+  "plan.pro": "pro",
+  "plan.free": "gratuit",
+  "plan.trial": "Essai actif. Se termine dans {time}.",
+  "plan.expired": "Votre essai est terminé. Achetez une licence pour continuer.",
+  "plan.free_hint":
+    "Besoin d'un autre compte ? Ouvrez les paramètres ou effacez votre licence enregistrée.",
+  "plan.lock_title": "Licence requise",
+  "plan.lock_body":
+    "Votre essai est terminé. Activez une licence Gumroad pour garder le monitoring et les alertes actifs.",
+  "plan.locked_action":
+    "Cette action nécessite une licence active ou un essai actif.",
+  "auth.missing_config": "Configuration de licence manquante.",
+  "auth.title": "Activez votre licence GrabClientsNow",
+  "auth.copy":
+    "Choisissez comment vous voulez entrer. Les deux options nécessitent l'acceptation des Conditions d'utilisation.",
+  "auth.secure_note": "Accès par licence Gumroad",
+  "auth.mode_license_title": "Activer la licence",
+  "auth.mode_license_body":
+    "J'ai déjà acheté sur Gumroad et je veux débloquer cet appareil.",
+  "auth.mode_trial_title": "Essai gratuit",
+  "auth.mode_trial_body":
+    "Je veux tester l'extension pendant 1 jour avec mon e-mail.",
+  "auth.section_access": "Essai gratuit",
+  "auth.section_license": "Activer la licence",
+  "auth.email_label": "E-mail",
+  "auth.email_hint":
+    "Utilisé uniquement pour l'essai gratuit afin de tester l'extension.",
+  "auth.license_hint":
+    "Collez votre clé de licence Gumroad pour débloquer l'extension sur cet appareil.",
+  "auth.email_ph": "vous@email.com",
+  "auth.code_ph": "clé de licence",
+  "auth.continue": "Continuer",
+  "auth.verify_code": "Activer la licence",
+  "auth.resend": "Démarrer l'essai de 1 jour",
+  "auth.change_email": "Changer d'e-mail",
+  "auth.terms_accept": "J'accepte les Conditions d'utilisation",
+  "auth.terms_accept_prefix": "J'ai lu et j'accepte les",
+  "auth.terms_accept_link": "Conditions d'utilisation",
+  "auth.terms_view": "Voir les conditions",
+  "auth.terms_required":
+    "Vous devez accepter les Conditions d'utilisation avant de continuer.",
+  "auth.terms_title": "Conditions d'utilisation",
+  "auth.terms_intro":
+    "Ces Conditions d'utilisation régissent votre accès à GrabClientsNow et son utilisation.",
+  "auth.terms_section_access_title": "1. Accès et éligibilité",
+  "auth.terms_section_access_body":
+    "Vous confirmez avoir la capacité légale d'accepter ces conditions et que votre utilisation respecte les lois applicables et les politiques des plateformes.",
+  "auth.terms_section_license_title": "2. Licence et usage autorisé",
+  "auth.terms_section_license_body":
+    "Nous vous accordons une licence limitée, révocable et non transférable pour utiliser l'extension dans votre flux de travail interne.",
+  "auth.terms_section_prohibited_title": "3. Conduite interdite",
+  "auth.terms_section_prohibited_item_1":
+    "Aucune utilisation illégale, automatisation abusive ou tentative d'accès non autorisée.",
+  "auth.terms_section_prohibited_item_2":
+    "Aucune ingénierie inverse, revente, sous-licence ou redistribution sans autorisation.",
+  "auth.terms_section_prohibited_item_3":
+    "Aucune utilisation violant les conditions de tiers, la propriété intellectuelle ou les droits à la vie privée.",
+  "auth.terms_section_user_data_title": "4. Responsabilité de l'utilisateur",
+  "auth.terms_section_user_data_body":
+    "Vous êtes responsable des actions liées à votre compte, de vos paramètres et de toute donnée, message ou sortie généré par votre utilisation.",
+  "auth.terms_section_service_title": "5. Évolutions du service",
+  "auth.terms_section_service_body":
+    "Les fonctionnalités peuvent être ajoutées, modifiées, limitées ou supprimées à tout moment pour améliorer la fiabilité, la sécurité ou l'orientation du produit.",
+  "auth.terms_section_liability_title": "6. Garantie et responsabilité",
+  "auth.terms_section_liability_body":
+    "Le service est fourni \"tel quel\" et \"selon disponibilité\", sans garanties expresses ou implicites, dans les limites maximales autorisées par la loi.",
+  "auth.terms_section_termination_title": "7. Suspension et résiliation",
+  "auth.terms_section_termination_body":
+    "Nous pouvons suspendre ou résilier l'accès si ces conditions sont violées ou si l'utilisation continue crée des risques juridiques, de sécurité ou opérationnels.",
+  "auth.terms_section_updates_title": "8. Mises à jour des conditions",
+  "auth.terms_section_updates_body":
+    "Nous pouvons mettre à jour ces conditions au fil du temps. Continuer à utiliser le service après une mise à jour signifie accepter la version la plus récente.",
+  "auth.terms_section_platform_title":
+    "9. Dépendances de plateforme et bonnes pratiques",
+  "auth.terms_section_platform_body":
+    "Les plateformes tierces peuvent modifier leurs règles, limites ou systèmes de détection à tout moment, ce qui peut affecter les résultats indépendamment de GrabClientsNow.",
+  "auth.terms_section_platform_item_1":
+    "Évitez les comportements abusifs, les intervalles trop agressifs ou les schémas opérationnels au-delà des limites recommandées.",
+  "auth.terms_section_platform_item_2":
+    "Utilisez si possible des comptes matures avec un vrai historique et des schémas d'activité normaux.",
+  "auth.terms_section_platform_item_3":
+    "Respectez les politiques de la plateforme et ajustez votre configuration lorsque les conditions ou les limites changent.",
+  "auth.magic_sent": "Code envoyé.",
+  "auth.checking": "Vérification de la licence...",
+  "auth.connected": "Connecté en tant que {email}",
+  "auth.invalid_email": "Entrez une adresse e-mail valide.",
+  "auth.invalid_code": "Entrez un code valide.",
+  "auth.invalid_license_key": "Entrez une clé de licence valide.",
+  "auth.code_verify_failed": "Impossible de vérifier la licence.",
+  "auth.license_activated": "Licence activée avec succès.",
+  "auth.trial_started": "Essai de 1 jour activé.",
+  "auth.trial_cta_title": "Votre essai gratuit est actif",
+  "auth.trial_cta_body":
+    "Sécurisez votre licence maintenant sur Gumroad pour continuer à utiliser l'extension à la fin de la période gratuite.",
+  "auth.new_user_local": "Nouvel utilisateur local détecté.",
+  "plan.block_alerts": "Le plan gratuit autorise seulement 1 alerte.",
+  "plan.block_groups": "Le plan gratuit autorise jusqu'à 20 groupes.",
+  "plan.block_keywords":
+    "Le plan gratuit autorise jusqu'à 3 mots-clés positifs.",
+  "plan.block_frequency":
+    "Le plan gratuit est limité à des vérifications toutes les 15 à 20 minutes.",
+});
+
+Object.assign(I18N.de, {
+  "btn.upgrade": "Lizenz kaufen",
+  "btn.maybe_later": "Vielleicht später",
+  "btn.new": "Neu",
+  "btn.edit": "Bearbeiten",
+  "btn.update": "Aktualisieren",
+  "btn.delete": "Löschen",
+  "btn.back": "Zurück",
+  "btn.next": "Weiter",
+  "btn.check_payment": "Lizenz prüfen",
+  "btn.refresh_license": "Lizenz aktualisieren",
+  "btn.create_alert": "Alert erstellen",
+  "btn.save_changes": "Änderungen speichern",
+  "btn.save_alert": "Alert speichern",
+  "btn.start_monitoring": "Monitoring starten",
+  "btn.check_login_short": "Facebook prüfen",
+  "btn.try_again": "Erneut versuchen",
+  "home.live_monitoring": "Live-Monitoring",
+  "home.activity_log": "Aktivitätsprotokoll",
+  "home.performance": "Leistungsübersicht",
+  "home.system_idle": "System inaktiv",
+  "home.system_running": "System läuft",
+  "home.top_groups": "Top-Gruppen nach Leads",
+  "home.weekly_trend": "Wochentrend",
+  "home.no_group_data": "Noch keine Lead-Daten vorhanden.",
+  "home.leads_7d": "{count} Leads in den letzten 7 Tagen",
+  "home.pause_monitoring": "Pausieren",
+  "home.start_monitoring_main": "Monitoring starten",
+  "home.last_lead_time": "Letzter Lead: vor {time}",
+  "groups.show_selected_only": "nur ausgewählte anzeigen",
+  "groups.top_performers_title": "Gruppen mit den meisten Leads",
+  "groups.top_performers_subtitle":
+    "Basierend auf den bereits von dieser Extension erfassten Leads.",
+  "groups.top_performers_empty": "Noch keine Lead-Daten für ein Ranking der Gruppen.",
+  "groups.top_performers_leads": "{count} Lead(s)",
+  "groups.no_match": "Keine Gruppen passen zu \"{term}\".",
+  "groups.no_loaded_auto":
+    "Noch keine Gruppen geladen. Das Laden startet automatisch.",
+  "groups.loaded_count": "Geladen: {count}",
+  "groups.selected_count": "Ausgewählt: {count}",
+  "groups.visible_count": "{count} sichtbar",
+  "groups.visible_for_count": "{count} sichtbar für \"{term}\"",
+  "groups.no_groups_hint":
+    "Es sieht so aus, als wärst du in keinen Gruppen oder Facebook hat sie noch nicht geladen.",
+  "groups.no_visible_filters": "Mit den aktuellen Filtern sind keine Gruppen sichtbar.",
+  "groups.none_selected_yet": "Noch keine Gruppen ausgewählt.",
+  "groups.select_at_least_one": "Wähle mindestens eine Gruppe aus.",
+  "groups.selected_summary": "{count} ausgewählt: {names}",
+  "groups.count": "{count} Gruppe(n)",
+  "groups.select_group": "Gruppe auswählen",
+  "groups.fetching": "lädt...",
+  "groups.error_short": "fehler",
+  "groups.monitored_count": "{count} Gruppen überwacht",
+  "groups.show_list": "Gruppenliste anzeigen",
+  "groups.hide_list": "Gruppenliste ausblenden",
+  "groups.loading_groups": "Gruppen werden geladen...",
+  "monitor.select_alert": "Einen Alert auswählen",
+  "monitor.idle": "inaktiv",
+  "monitor.waiting": "wartet...",
+  "settings.debug": "Fehlersuche",
+  "help.roadmap_title": "Roadmap: Cloud Agent 24/7 (in Entwicklung)",
+  "help.roadmap_badge": "Bald verfügbar",
+  "help.roadmap_lead":
+    "Wir entwickeln die nächste Phase: 24/7-Cloud-Monitoring, Auto-Kommentare und tiefere Automatisierungen.",
+  "help.roadmap_copy":
+    "Noch nicht live. Wenn das für dich Priorität hat, klicke auf \"Ich will das\" und teile deinen realen Anwendungsfall, damit wir die Roadmap priorisieren können.",
+  "help.roadmap_item_1": "24/7-Cloud-Benachrichtigungen (kein Browser-Tab nötig)",
+  "help.roadmap_item_2": "Auto-Kommentare mit Sicherheitsregeln",
+  "help.roadmap_item_3": "Automatisierungen nach Profil und Keyword-Absicht",
+  "help.roadmap_cta_primary": "Ich will das",
+  "help.roadmap_cta_secondary": "Funktion vorschlagen",
+  "status.starting": "startet",
+  "status.sleep_mode": "Schlafmodus",
+  "status.waiting": "wartet...",
+  "status.logged": "Eingeloggt",
+  "status.not_logged": "Nicht eingeloggt",
+  "account.not_signed_in": "Keine gespeicherte Lizenz",
+  "account.sign_out": "Abmelden",
+  "settings.sleep_title": "Schlafzeitplan",
+  "settings.frequency_title": "Prüffrequenz (global)",
+  "settings.notifications_title": "Benachrichtigungen (global)",
+  "plan.pro": "pro",
+  "plan.free": "kostenlos",
+  "plan.trial": "Trial aktiv. Endet in {time}.",
+  "auth.missing_config": "Lizenzkonfiguration fehlt.",
+  "auth.continue": "Weiter",
+  "auth.change_email": "E-Mail ändern",
+  "auth.terms_accept": "Ich akzeptiere die Nutzungsbedingungen",
+  "auth.terms_view": "Bedingungen ansehen",
+  "auth.terms_section_access_title": "1. Zugriff und Berechtigung",
+  "auth.terms_section_access_body":
+    "Du bestätigst, dass du rechtlich in der Lage bist, diese Bedingungen zu akzeptieren, und dass deine Nutzung den geltenden Gesetzen und Plattformrichtlinien entspricht.",
+  "auth.terms_section_license_title": "2. Lizenz und erlaubte Nutzung",
+  "auth.terms_section_license_body":
+    "Wir gewähren dir eine begrenzte, widerrufbare und nicht übertragbare Lizenz zur Nutzung der Extension für deinen internen Geschäftsablauf.",
+  "auth.terms_section_prohibited_title": "3. Verbotenes Verhalten",
+  "auth.terms_section_prohibited_item_1":
+    "Keine rechtswidrige Nutzung, missbräuchliche Automatisierung oder unbefugte Zugriffsversuche.",
+  "auth.terms_section_prohibited_item_2":
+    "Kein Reverse Engineering, Weiterverkauf, Unterlizenzierung oder Weiterverteilung ohne Erlaubnis.",
+  "auth.terms_section_prohibited_item_3":
+    "Keine Nutzung, die gegen Bedingungen Dritter, geistiges Eigentum oder Datenschutzrechte verstößt.",
+  "auth.terms_section_user_data_title": "4. Verantwortung des Nutzers",
+  "auth.terms_section_user_data_body":
+    "Du bist verantwortlich für deine Kontoaktionen, deine Einstellungen und alle Daten, Nachrichten oder Ausgaben, die durch deine Nutzung entstehen.",
+  "auth.terms_section_service_title": "5. Änderungen am Dienst",
+  "auth.terms_section_service_body":
+    "Funktionen können jederzeit hinzugefügt, geändert, eingeschränkt oder entfernt werden, um Zuverlässigkeit, Sicherheit oder die Produktentwicklung zu verbessern.",
+  "auth.terms_section_liability_title": "6. Gewährleistung und Haftung",
+  "auth.terms_section_liability_body":
+    "Der Dienst wird \"wie besehen\" und \"wie verfügbar\" bereitgestellt, ohne ausdrückliche oder stillschweigende Garantien, soweit gesetzlich zulässig.",
+  "auth.terms_section_termination_title": "7. Sperrung und Beendigung",
+  "auth.terms_section_termination_body":
+    "Wir können den Zugang sperren oder beenden, wenn diese Bedingungen verletzt werden oder die fortgesetzte Nutzung rechtliche, sicherheitsrelevante oder operative Risiken schafft.",
+  "auth.terms_section_updates_title": "8. Aktualisierungen der Bedingungen",
+  "auth.terms_section_updates_body":
+    "Wir können diese Bedingungen im Laufe der Zeit aktualisieren. Die fortgesetzte Nutzung nach einer Aktualisierung bedeutet Zustimmung zur neuesten Version.",
+  "auth.terms_section_platform_title": "9. Plattformabhängigkeiten und gute Praxis",
+  "auth.terms_section_platform_body":
+    "Drittplattformen können Regeln, Limits oder Erkennungssysteme jederzeit ändern, was die Ergebnisse unabhängig von GrabClientsNow beeinflussen kann.",
+  "auth.terms_section_platform_item_1":
+    "Vermeide missbräuchliches Verhalten, sehr aggressive Intervalle oder Nutzungsmuster außerhalb der empfohlenen Grenzen.",
+  "auth.terms_section_platform_item_2":
+    "Verwende nach Möglichkeit etablierte Konten mit echter Historie und normalen Aktivitätsmustern.",
+  "auth.terms_section_platform_item_3":
+    "Befolge die Plattformrichtlinien und passe dein Setup an, wenn sich Bedingungen oder Limits ändern.",
+  "auth.magic_sent": "Code gesendet.",
+  "auth.invalid_code": "Gib einen gültigen Code ein.",
+  "auth.code_verify_failed": "Die Lizenz konnte nicht verifiziert werden.",
+  "auth.new_user_local": "Neuer lokaler Nutzer erkannt.",
+  "plan.block_alerts": "Der kostenlose Plan erlaubt nur 1 Alert.",
+  "plan.block_groups": "Der kostenlose Plan erlaubt bis zu 20 Gruppen.",
+  "plan.block_keywords":
+    "Der kostenlose Plan erlaubt bis zu 3 positive Schlüsselwörter.",
+  "plan.block_frequency":
+    "Der kostenlose Plan ist auf Prüfungen alle 15-20 Minuten begrenzt.",
+});
+
+I18N.es = {
+  ...(I18N.es || I18N.en),
+  "tab.home": "🏠 Inicio",
+  "tab.groups": "👥 Grupos",
+  "tab.alerts": "🎯 Alertas",
+  "tab.leads": "📌 Leads",
+  "tab.notifications": "🔔 Notificaciones",
+  "tab.settings": "⚙️ Configuración",
+  "tab.help": "❓ Ayuda",
+  "hero.title": "Centro de comando de monitoreo",
+  "hero.subtitle":
+    "Leads directos de grupos de Facebook. Sin ruido. Ejecución rápida.",
+  "home.guided_setup": "Configuración guiada",
+  "home.status_title": "Estado del sistema",
+  "home.live_monitoring": "Monitoreo en vivo",
+  "home.activity_log": "Registro de actividad",
+  "home.performance": "Resumen de rendimiento",
+  "home.system_idle": "Sistema inactivo",
+  "home.system_running": "Sistema en ejecución",
+  "home.machine_on": "Monitoreo ACTIVADO",
+  "home.machine_off": "Monitoreo DESACTIVADO",
+  "home.pause_monitoring": "Pausar",
+  "home.start_monitoring_main": "Iniciar monitoreo",
+  "settings.language": "Idioma",
+  "settings.advanced_title": "Configuración avanzada",
+  "settings.language_hint":
+    "Se aplica de inmediato en toda la interfaz de la extensión.",
+  "settings.account": "Cuenta",
+  "settings.data": "Datos",
+  "settings.debug": "Depuración",
+  "settings.diagnostics": "Diagnóstico",
+  "settings.notifications_title": "Notificaciones (global)",
+  "settings.notifications_note":
+    "Se aplica a todas las alertas. Puedes combinar varios canales.",
+  "settings.notify_browser": "🔔 Notificaciones de escritorio",
+  "settings.notify_browser_desc":
+    "Ideal para alertas instantáneas mientras trabajas en este dispositivo.",
+  "settings.notify_webhook": "🔗 Webhook personalizado",
+  "settings.notify_webhook_desc":
+    "Envía leads a tu app, n8n, Make, Zapier o APIs internas.",
+  "settings.notify_telegram": "📨 Telegram (bot de GrabClientsNow)",
+  "settings.notify_telegram_desc":
+    "Recibe alertas de leads en tu móvil desde nuestro bot de Telegram.",
+  "settings.notify_desktop_title": "Notificaciones de escritorio:",
+  "settings.notify_desktop_body":
+    "Ideal para alertas instantáneas mientras trabajas en este dispositivo.",
+  "settings.notify_telegram_title": "Notificaciones por Telegram:",
+  "settings.notify_telegram_body":
+    "Usa el bot de GrabClientsNow para recibir alertas de leads al instante en Telegram.",
+  "settings.telegram_how_1":
+    "Abre Telegram y busca el bot de GrabClientsNow.",
+  "settings.telegram_how_2": "Envía /start al bot una vez.",
+  "settings.telegram_how_3":
+    "Usa @userinfobot para obtener tu chat_id numérico.",
+  "settings.telegram_how_4":
+    "Pega ese chat_id abajo y haz clic en Probar Telegram.",
+  "settings.notify_webhook_title": "Webhook personalizado:",
+  "settings.notify_webhook_body":
+    "Para usuarios técnicos. Envía leads a tu app, n8n, Make, Zapier o APIs internas.",
+  "settings.telegram_chatid_ph": "chat_id de Telegram (ej.: 123456789)",
+  "settings.webhook_url_ph": "https://tu-webhook.com/endpoint",
+  "settings.test_telegram": "Probar Telegram",
+  "settings.test_webhook": "Probar webhook",
+  "settings.test_desktop": "Probar escritorio",
+  "settings.save_notifications": "Guardar notificaciones",
+  "settings.notify_ask_more": "Pedir más canales",
+  "monitor.start": "Iniciar monitoreo",
+  "monitor.stop": "Detener monitoreo",
+  "help.title": "Ayuda y soporte",
+  "help.support_title": "Chat de soporte",
+  "help.support_body":
+    "Abre el chat en vivo e incluye tu registro técnico para un soporte más rápido.",
+  "help.feature_title": "Sugerir funcionalidad",
+  "help.feature_body":
+    "Comparte tu solicitud de funcionalidad directamente por correo.",
+  "help.partner_title": "Alianzas y afiliados",
+  "help.partner_body":
+    "Integraciones de negocio, white-label o consultas del programa de afiliados.",
+  "help.support_cta": "Abrir chat en vivo",
+  "help.feature_cta": "Enviar sugerencia",
+  "help.partner_cta": "Contactar equipo",
+  "help.aff_title": "Programa de afiliados",
+  "help.aff_body": "Gana 50% de comisión por venta, sin límite de ganancias.",
+  "help.aff_cta": "Unirme al programa",
+  "help.roadmap_title": "Roadmap: Cloud Agent 24/7 (en desarrollo)",
+  "help.roadmap_badge": "Próximamente",
+  "help.roadmap_lead":
+    "Estamos construyendo la próxima fase: monitoreo en la nube 24/7, auto-comentarios y automatizaciones más profundas.",
+  "help.roadmap_copy":
+    "Aún no está disponible. Si esto es prioridad para ti, haz clic en \"I want this\" y comparte tu caso real para ayudarnos a priorizar el roadmap.",
+  "help.roadmap_item_1":
+    "Notificaciones 24/7 en la nube (sin pestaña del navegador)",
+  "help.roadmap_item_2": "Auto-comentario con reglas de seguridad",
+  "help.roadmap_item_3":
+    "Automatizaciones por perfil e intención de palabra clave",
+  "help.roadmap_cta_primary": "Lo quiero",
+  "help.roadmap_cta_secondary": "Sugerir funcionalidad",
+  "mail.subject.support": "Soporte GrabClientsNow",
+  "mail.subject.more_channels":
+    "GrabClientsNow - Necesito más canales de notificación",
+  "mail.subject.roadmap_interest":
+    "GrabClientsNow - Quiero el roadmap cloud",
+  "mail.subject.roadmap_suggestion":
+    "GrabClientsNow - Sugerencia de funcionalidad para roadmap",
+  "mail.subject.feature_suggestion":
+    "GrabClientsNow - Sugerencia de funcionalidad",
+  "mail.subject.partner_inquiry":
+    "GrabClientsNow - Consulta de alianza comercial",
+  "mail.subject.affiliate_join":
+    "GrabClientsNow - Quiero unirme al programa de afiliados",
+  "mail.body.roadmap_interest":
+    "Nombre:\nCaso de uso:\nFuncionalidad más deseada: (alertas 24/7 / auto-comentario / automatizaciones)\nGrupos o leads por día:",
+  "msg.history_cleared": "Historial de leads borrado.",
+  "status.monitoring": "monitoreando...",
+  "status.stopped": "detenido",
+  "status.checking_now": "verificando ahora...",
+  "status.next_check": "siguiente revisión: ~{mins} min",
+};
+
+I18N.fr = {
+  ...(I18N.fr || I18N.en),
+  "tab.home": "🏠 Accueil",
+  "tab.groups": "👥 Groupes",
+  "tab.alerts": "🎯 Alertes",
+  "tab.leads": "📌 Leads",
+  "tab.notifications": "🔔 Notifications",
+  "tab.settings": "⚙️ Paramètres",
+  "tab.help": "❓ Aide",
+  "hero.title": "Centre de commande du monitoring",
+  "hero.subtitle":
+    "Des leads directs depuis les groupes Facebook. Sans bruit. Exécution rapide.",
+  "home.guided_setup": "Configuration guidée",
+  "home.status_title": "État du système",
+  "home.live_monitoring": "Monitoring en direct",
+  "home.activity_log": "Journal d'activité",
+  "home.performance": "Aperçu des performances",
+  "home.system_idle": "Système inactif",
+  "home.system_running": "Système en cours",
+  "home.machine_on": "Monitoring ACTIVÉ",
+  "home.machine_off": "Monitoring DÉSACTIVÉ",
+  "home.pause_monitoring": "Pause",
+  "home.start_monitoring_main": "Démarrer le monitoring",
+  "settings.language": "Langue",
+  "settings.advanced_title": "Paramètres avancés",
+  "settings.language_hint":
+    "S'applique immédiatement à toute l'interface de l'extension.",
+  "settings.account": "Compte",
+  "settings.data": "Données",
+  "settings.debug": "Debug",
+  "settings.diagnostics": "Diagnostic",
+  "settings.notifications_title": "Notifications (globales)",
+  "settings.notifications_note":
+    "S'applique à toutes les alertes. Vous pouvez combiner plusieurs canaux.",
+  "settings.notify_browser": "🔔 Notifications bureau",
+  "settings.notify_browser_desc":
+    "Idéal pour des alertes instantanées pendant que vous travaillez sur cet appareil.",
+  "settings.notify_webhook": "🔗 Webhook personnalisé",
+  "settings.notify_webhook_desc":
+    "Envoyez les leads vers votre app, n8n, Make, Zapier ou vos API internes.",
+  "settings.notify_telegram": "📨 Telegram (bot GrabClientsNow)",
+  "settings.notify_telegram_desc":
+    "Recevez des alertes de leads sur mobile depuis notre bot Telegram.",
+  "settings.notify_desktop_title": "Notifications bureau :",
+  "settings.notify_desktop_body":
+    "Idéal pour des alertes instantanées pendant que vous travaillez sur cet appareil.",
+  "settings.notify_telegram_title": "Notifications Telegram :",
+  "settings.notify_telegram_body":
+    "Utilisez le bot GrabClientsNow pour recevoir des alertes de leads instantanées sur Telegram.",
+  "settings.telegram_how_1":
+    "Ouvrez Telegram et recherchez le bot GrabClientsNow.",
+  "settings.telegram_how_2": "Envoyez /start au bot une fois.",
+  "settings.telegram_how_3":
+    "Utilisez @userinfobot pour récupérer votre chat_id numérique.",
+  "settings.telegram_how_4":
+    "Collez ce chat_id ci-dessous puis cliquez sur Tester Telegram.",
+  "settings.notify_webhook_title": "Webhook personnalisé :",
+  "settings.notify_webhook_body":
+    "Pour les utilisateurs techniques. Envoyez les leads vers votre app, n8n, Make, Zapier ou vos API internes.",
+  "settings.telegram_chatid_ph": "chat_id Telegram (ex. : 123456789)",
+  "settings.webhook_url_ph": "https://votre-webhook.com/endpoint",
+  "settings.test_telegram": "Tester Telegram",
+  "settings.test_webhook": "Tester le webhook",
+  "settings.test_desktop": "Tester le bureau",
+  "settings.save_notifications": "Enregistrer les notifications",
+  "settings.notify_ask_more": "Demander plus de canaux",
+  "monitor.start": "Démarrer le monitoring",
+  "monitor.stop": "Arrêter le monitoring",
+  "help.title": "Aide et support",
+  "help.support_title": "Chat support",
+  "help.support_body":
+    "Ouvrez le chat en direct et incluez votre journal technique pour un support plus rapide.",
+  "help.feature_title": "Suggérer une fonctionnalité",
+  "help.feature_body":
+    "Partagez votre demande de fonctionnalité directement par e-mail.",
+  "help.partner_title": "Partenariats et affiliés",
+  "help.partner_body":
+    "Intégrations business, white-label ou questions sur le programme d'affiliation.",
+  "help.support_cta": "Ouvrir le chat",
+  "help.feature_cta": "Envoyer une suggestion",
+  "help.partner_cta": "Contacter l'équipe",
+  "help.aff_title": "Programme d'affiliation",
+  "help.aff_body": "Gagnez 50% de commission par vente, sans plafond.",
+  "help.aff_cta": "Rejoindre le programme",
+  "help.roadmap_title": "Roadmap: Cloud Agent 24/7 (en développement)",
+  "help.roadmap_badge": "Bientôt disponible",
+  "help.roadmap_lead":
+    "Nous construisons la prochaine étape: monitoring cloud 24/7, auto-commentaires et automatisations plus avancées.",
+  "help.roadmap_copy":
+    "Pas encore disponible. Si c'est prioritaire pour vous, cliquez sur \"I want this\" et partagez votre cas réel pour nous aider à prioriser la roadmap.",
+  "help.roadmap_item_1":
+    "Notifications cloud 24/7 (sans onglet navigateur)",
+  "help.roadmap_item_2": "Auto-commentaire avec règles de sécurité",
+  "help.roadmap_item_3":
+    "Automatisations par profil et intention de mots-clés",
+  "help.roadmap_cta_primary": "Je le veux",
+  "help.roadmap_cta_secondary": "Suggérer une fonctionnalité",
+  "mail.subject.support": "Support GrabClientsNow",
+  "mail.subject.more_channels":
+    "GrabClientsNow - Besoin de plus de canaux de notification",
+  "mail.subject.roadmap_interest":
+    "GrabClientsNow - Je veux la roadmap cloud",
+  "mail.subject.roadmap_suggestion":
+    "GrabClientsNow - Suggestion de fonctionnalité roadmap",
+  "mail.subject.feature_suggestion":
+    "GrabClientsNow - Suggestion de fonctionnalité",
+  "mail.subject.partner_inquiry":
+    "GrabClientsNow - Demande de partenariat commercial",
+  "mail.subject.affiliate_join":
+    "GrabClientsNow - Je veux rejoindre le programme d'affiliation",
+  "mail.body.roadmap_interest":
+    "Nom:\nCas d'usage:\nFonctionnalité la plus souhaitée: (alertes 24/7 / auto-commentaire / automatisations)\nGroupes ou leads par jour:",
+  "msg.history_cleared": "Historique des leads effacé.",
+  "status.monitoring": "monitoring en cours...",
+  "status.stopped": "arrêté",
+  "status.checking_now": "vérification en cours...",
+  "status.next_check": "prochaine vérification: ~{mins} min",
+};
+
+Object.assign(I18N.es, {
+  "groups.top_performers_leads": "{count} contacto(s)",
+  "groups.error_short": "fallo",
+});
+
+Object.assign(I18N.fr, {
+  "home.pause_monitoring": "Mettre en pause",
+  "groups.top_performers_leads": "{count} prospect(s)",
+  "settings.debug": "Débogage",
+});
