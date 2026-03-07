@@ -49,7 +49,7 @@ The extension now uses a license + device flow:
   - `deviceId`
   - optional `deviceName`
   - optional `appVersion`
-  - `trialDays: 1` for the free trial path
+- `trialDays: 2` for the free trial path
 - Expected normalized response fields:
   - `plan`: `pro`, `trial`, or `free`
   - `email`
@@ -103,7 +103,7 @@ npm run grant:license -- --email user@email.com
 Also supported:
 
 ```bash
-npm run grant:license -- --email user@email.com --plan trial --trial-days 1
+npm run grant:license -- --email user@email.com --plan trial --trial-days 2
 npm run grant:license -- --email user@email.com --plan pro --license-key ABCD-1234-EFGH
 npm run grant:license -- --email user@email.com --dry-run
 ```

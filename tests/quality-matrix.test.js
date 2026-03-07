@@ -26,7 +26,7 @@ test("license flow uses supabase edge function for activation and trial", () => 
   assert.match(panelSource, /LICENSE_ACCESS_FUNCTION_PATH/);
   assert.match(panelSource, /action: "activate"/);
   assert.match(panelSource, /action: "start_trial"/);
-  assert.match(panelSource, /trialDays: 1/);
+  assert.match(panelSource, /trialDays: 2/);
 });
 
 test("license persistence and cleanup paths are present", () => {

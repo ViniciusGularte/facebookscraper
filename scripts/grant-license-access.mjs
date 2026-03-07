@@ -54,7 +54,7 @@ function parseArgs(argv) {
   const out = {
     email: "",
     plan: "pro",
-    trialDays: 1,
+    trialDays: 2,
     licenseKey: "",
     revoke: false,
     dryRun: false,
@@ -104,7 +104,7 @@ function printUsage() {
       "Options:",
       "  --email <value>           required",
       "  --plan <pro|trial|free>   default: pro",
-      "  --trial-days <n>          default: 1",
+      "  --trial-days <n>          default: 2",
       "  --license-key <value>     optional manual key for pro",
       "  --revoke                  shortcut for --plan free",
       "  --dry-run                 print payload, do not write",
@@ -159,7 +159,7 @@ async function main() {
     trial_start: args.plan === "trial" ? nowIso : null,
     trial_end:
       args.plan === "trial"
-        ? addDaysIso(Number.isFinite(args.trialDays) ? args.trialDays : 1)
+        ? addDaysIso(Number.isFinite(args.trialDays) ? args.trialDays : 2)
         : null,
     purchase_date: args.plan === "pro" ? nowIso : null,
     gumroad_sale_id: null,

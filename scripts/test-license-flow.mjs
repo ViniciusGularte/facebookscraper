@@ -67,7 +67,7 @@ async function main() {
       email: trialEmail,
       deviceId: trialDeviceId,
       deviceName: "CLI Trial Device",
-      trialDays: 1,
+      trialDays: 2,
     },
   });
   console.log(`   status=${trial.status} payload=${JSON.stringify(trial.payload)}`);

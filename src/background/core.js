@@ -9,6 +9,34 @@
 
 import { repairJson } from "./json-repair.js";
 import { getTabIdsToClose, pickKeepTab } from "./extension-tabs.js";
+import {
+  buildLeadHistoryId,
+  mergeLeadHistory,
+  pruneLeadsHistory,
+} from "./lead-history.js";
+import {
+  classifyMonitorIssueKind,
+  shouldNotifyMonitorIssue,
+} from "./monitor-issues.js";
+import {
+  buildMonitorStateResponse,
+  normalizeMonitorConfig,
+} from "./monitor-state.js";
+import {
+  consumeNotificationClickTarget as consumeClickTargetEntry,
+  pruneNotificationClickMap,
+  upsertNotificationClickTarget,
+} from "./notification-click-map.js";
+import {
+  appendNotificationInboxItem,
+  buildNotificationCounters,
+  pruneNotificationInbox,
+} from "./notification-inbox.js";
+import {
+  getDefaultSleepSchedule,
+  getSleepModeTransition,
+  normalizeSleepSchedule,
+} from "./sleep-schedule.js";
 // ─────────────────────────────────────────────────────────────
 // UTILITÁRIOS GERAIS
 // ─────────────────────────────────────────────────────────────
@@ -583,26 +611,6 @@ function buildNotificationInboxId() {
   return `notif-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function pruneNotificationInbox(items) {
-  const now = Date.now();
-  const list = (Array.isArray(items) ? items : [])
-    .filter((item) => item && typeof item === "object")
-    .filter((item) => {
-      const createdAt = Number(item.createdAt || 0);
-      return createdAt > 0 && now - createdAt <= NOTIFICATION_INBOX_TTL_MS;
-    })
-    .sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
-
-  return list.slice(0, NOTIFICATION_INBOX_MAX_ITEMS);
-}
-
-function buildNotificationCounters(items) {
-  const inbox = Array.isArray(items) ? items : [];
-  const total = inbox.length;
-  const unread = inbox.filter((item) => !Number(item?.seenAt || 0)).length;
-  return { total, unread };
-}
-
 function resolveActionStatusMeta() {
   if (isSleepModeActive) {
     return { label: "Sleep mode", color: "#f59e0b" };
@@ -635,7 +643,10 @@ async function loadNotificationInboxState() {
     NOTIFICATION_INBOX_STORAGE_KEY,
     NOTIFICATION_COUNTERS_STORAGE_KEY,
   ]);
-  const inbox = pruneNotificationInbox(data?.[NOTIFICATION_INBOX_STORAGE_KEY]);
+  const inbox = pruneNotificationInbox(data?.[NOTIFICATION_INBOX_STORAGE_KEY], {
+    ttlMs: NOTIFICATION_INBOX_TTL_MS,
+    maxItems: NOTIFICATION_INBOX_MAX_ITEMS,
+  });
   const counters = buildNotificationCounters(inbox);
 
   const storedCounters = data?.[NOTIFICATION_COUNTERS_STORAGE_KEY];
@@ -664,19 +675,21 @@ async function loadNotificationInboxState() {
 async function registerLeadNotificationInboxItem(payload) {
   const { inbox } = await loadNotificationInboxState();
   const id = buildNotificationInboxId();
-  const createdAt = Date.now();
-  const nextInbox = pruneNotificationInbox([
+  const { inbox: nextInbox, counters } = appendNotificationInboxItem(
+    inbox,
     {
       id,
-      createdAt,
+      createdAt: Date.now(),
       seenAt: 0,
       leadId: String(payload?.post_url || payload?.detected_at || ""),
       postUrl: String(payload?.post_url || ""),
       source: "lead",
     },
-    ...inbox,
-  ]);
-  const counters = buildNotificationCounters(nextInbox);
+    {
+      ttlMs: NOTIFICATION_INBOX_TTL_MS,
+      maxItems: NOTIFICATION_INBOX_MAX_ITEMS,
+    },
+  );
 
   await chrome.storage.local.set({
     [NOTIFICATION_INBOX_STORAGE_KEY]: nextInbox,
@@ -689,11 +702,11 @@ async function registerLeadNotificationInboxItem(payload) {
 async function registerSystemNotificationInboxItem(payload) {
   const { inbox } = await loadNotificationInboxState();
   const id = buildNotificationInboxId();
-  const createdAt = Date.now();
-  const nextInbox = pruneNotificationInbox([
+  const { inbox: nextInbox, counters } = appendNotificationInboxItem(
+    inbox,
     {
       id,
-      createdAt,
+      createdAt: Date.now(),
       seenAt: 0,
       source: "system",
       title: String(payload?.title || "GrabClientsNow"),
@@ -701,9 +714,11 @@ async function registerSystemNotificationInboxItem(payload) {
       issueKind: String(payload?.issueKind || "").trim(),
       postUrl: String(payload?.url || ""),
     },
-    ...inbox,
-  ]);
-  const counters = buildNotificationCounters(nextInbox);
+    {
+      ttlMs: NOTIFICATION_INBOX_TTL_MS,
+      maxItems: NOTIFICATION_INBOX_MAX_ITEMS,
+    },
+  );
 
   await chrome.storage.local.set({
     [NOTIFICATION_INBOX_STORAGE_KEY]: nextInbox,
@@ -825,29 +840,18 @@ async function sendDesktopSystemNotification(payload, notificationId = "") {
 }
 
 async function classifyMonitorConnectionIssue(errorMessage) {
-  const text = String(errorMessage || "").toLowerCase();
-  if (
-    text.includes("nenhuma aba do facebook aberta") ||
-    text.includes("sem resposta da aba do facebook") ||
-    text.includes("abra uma aba em facebook.com") ||
-    text.includes("facebook tab was closed")
-  ) {
+  const kind = classifyMonitorIssueKind(errorMessage);
+  if (kind === "fb_tab_missing") {
     return {
-      kind: "fb_tab_missing",
+      kind,
       title: await bgTranslate("notify.fb_tab_missing_title"),
       message: await bgTranslate("notify.fb_tab_missing_body"),
     };
   }
 
-  if (
-    text.includes("não foi possível extrair os tokens") ||
-    text.includes("not logged in") ||
-    text.includes("session expired") ||
-    text.includes("sessão expir") ||
-    text.includes("please log in")
-  ) {
+  if (kind === "fb_login_required") {
     return {
-      kind: "fb_login_required",
+      kind,
       title: await bgTranslate("notify.fb_login_required_title"),
       message: await bgTranslate("notify.fb_login_required_body"),
     };
@@ -860,13 +864,12 @@ async function notifyMonitorConnectionIssue(issue) {
   if (!issue?.kind) return false;
   const runtime = await loadMonitorRuntime();
   const previous = runtime.connectionIssue || null;
-  const now = Date.now();
-  const shouldNotify =
-    !previous ||
-    previous.kind !== issue.kind ||
-    !Number(previous.lastNotifiedAt || 0) ||
-    now - Number(previous.lastNotifiedAt || 0) >=
-      MONITOR_CONNECTION_NOTIFICATION_COOLDOWN_MS;
+  const shouldNotify = shouldNotifyMonitorIssue(
+    previous,
+    issue.kind,
+    Date.now(),
+    MONITOR_CONNECTION_NOTIFICATION_COOLDOWN_MS,
+  );
 
   if (!shouldNotify) return false;
 
@@ -890,38 +893,31 @@ async function notifyMonitorConnectionIssue(issue) {
 async function storeNotificationClickTarget(notificationId, url) {
   if (!notificationId || !url) return;
   const data = await chrome.storage.local.get([NOTIFICATION_CLICK_MAP_KEY]);
-  const raw = data?.[NOTIFICATION_CLICK_MAP_KEY];
-  const now = Date.now();
-  const map = raw && typeof raw === "object" ? raw : {};
-
-  for (const [key, value] of Object.entries(map)) {
-    const ts = Number(value?.createdAt || 0);
-    if (!ts || now - ts > NOTIFICATION_CLICK_TTL_MS) {
-      delete map[key];
-    }
-  }
-
-  map[notificationId] = { url, createdAt: now };
-  const entries = Object.entries(map);
-  if (entries.length > NOTIFICATION_CLICK_MAX_ITEMS) {
-    entries
-      .sort((a, b) => Number(a[1]?.createdAt || 0) - Number(b[1]?.createdAt || 0))
-      .slice(0, entries.length - NOTIFICATION_CLICK_MAX_ITEMS)
-      .forEach(([key]) => delete map[key]);
-  }
+  const map = upsertNotificationClickTarget(
+    data?.[NOTIFICATION_CLICK_MAP_KEY],
+    notificationId,
+    url,
+    {
+      ttlMs: NOTIFICATION_CLICK_TTL_MS,
+      maxItems: NOTIFICATION_CLICK_MAX_ITEMS,
+    },
+  );
   await chrome.storage.local.set({ [NOTIFICATION_CLICK_MAP_KEY]: map });
 }
 
 async function consumeNotificationClickTarget(notificationId) {
   if (!notificationId) return "";
   const data = await chrome.storage.local.get([NOTIFICATION_CLICK_MAP_KEY]);
-  const raw = data?.[NOTIFICATION_CLICK_MAP_KEY];
-  if (!raw || typeof raw !== "object") return "";
-  const entry = raw[notificationId];
-  if (!entry?.url) return "";
-  delete raw[notificationId];
-  await chrome.storage.local.set({ [NOTIFICATION_CLICK_MAP_KEY]: raw });
-  return entry.url;
+  const { url, map } = consumeClickTargetEntry(
+    data?.[NOTIFICATION_CLICK_MAP_KEY],
+    notificationId,
+    {
+      ttlMs: NOTIFICATION_CLICK_TTL_MS,
+      maxItems: NOTIFICATION_CLICK_MAX_ITEMS,
+    },
+  );
+  await chrome.storage.local.set({ [NOTIFICATION_CLICK_MAP_KEY]: map });
+  return url;
 }
 
 async function sendWebhookLeadNotification(webhookUrl, payload) {
@@ -993,18 +989,6 @@ async function dispatchLeadNotifications(matches, profileName) {
   }
 }
 
-function getDefaultSleepSchedule() {
-  return {
-    enabled: true,
-    startHour: 22,
-    startMinute: 0,
-    endHour: 7,
-    endMinute: 0,
-    days: [1, 2, 3, 4, 5, 6, 0], // Mon..Sun (Date.getDay convention: 0=Sun)
-    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
-  };
-}
-
 async function loadSleepSchedule() {
   const data = await chrome.storage.local.get([SLEEP_SCHEDULE_STORAGE_KEY]);
   const raw = data?.[SLEEP_SCHEDULE_STORAGE_KEY];
@@ -1013,28 +997,11 @@ async function loadSleepSchedule() {
     await chrome.storage.local.set({ [SLEEP_SCHEDULE_STORAGE_KEY]: fallback });
     return fallback;
   }
-  return {
-    ...getDefaultSleepSchedule(),
-    ...raw,
-    days: Array.isArray(raw.days) ? raw.days : getDefaultSleepSchedule().days,
-  };
-}
-
-function isSleepWindowNow(schedule) {
-  if (!schedule?.enabled) return false;
-  const now = new Date();
-  const day = now.getDay();
-  if (!schedule.days.includes(day)) return false;
-
-  const nowMinutes = now.getHours() * 60 + now.getMinutes();
-  const start = Number(schedule.startHour) * 60 + Number(schedule.startMinute);
-  const end = Number(schedule.endHour) * 60 + Number(schedule.endMinute);
-
-  if (start === end) return false;
-  if (start < end) {
-    return nowMinutes >= start && nowMinutes < end;
+  const normalized = normalizeSleepSchedule(raw);
+  if (JSON.stringify(raw) !== JSON.stringify(normalized)) {
+    await chrome.storage.local.set({ [SLEEP_SCHEDULE_STORAGE_KEY]: normalized });
   }
-  return nowMinutes >= start || nowMinutes < end;
+  return normalized;
 }
 
 function ensureSleepScheduleAlarm() {
@@ -1078,56 +1045,22 @@ function scheduleNextMonitorAlarm(delayMs) {
   chrome.alarms.create(MONITOR_ALARM_NAME, { delayInMinutes });
 }
 
-function pruneLeadsHistory(leads) {
-  const now = Date.now();
-  return (Array.isArray(leads) ? leads : []).filter((lead) => {
-    const ts = Number(lead?.detectedAt) || 0;
-    return ts > 0 && now - ts <= LEADS_HISTORY_TTL_MS;
-  });
-}
-
-function buildLeadHistoryId(post, profileName) {
-  const postId = String(post?.post_id || "unknown");
-  const groupId = String(post?.group_id || "unknown");
-  const profile = String(profileName || "default");
-  return `${profile}::${groupId}::${postId}`;
-}
-
 async function saveLeadsToHistory(matches, profileName) {
   const data = await chrome.storage.local.get([LEADS_HISTORY_STORAGE_KEY]);
-  const current = pruneLeadsHistory(data?.[LEADS_HISTORY_STORAGE_KEY]);
-  const byId = new Map(current.map((lead) => [String(lead.id), lead]));
-  const now = Date.now();
-
-  for (const post of Array.isArray(matches) ? matches : []) {
-    const id = buildLeadHistoryId(post, profileName);
-    byId.set(id, {
-      id,
-      detectedAt: now,
-      profileName: profileName || "",
-      group_id: post?.group_id || "",
-      group_name: post?.group_name || "",
-      group_url: post?.group_url || "",
-      poster_name: post?.poster_name || "",
-      user_profile_url: post?.user_profile_url || "",
-      post_id: post?.post_id || "",
-      post_type: post?.post_type || "",
-      post_text: post?.post_text || "",
-      marketplace_text: post?.marketplace_text || "",
-      post_url: post?.post_url || post?.marketplace_listing_url || "",
-    });
-  }
-
-  const merged = Array.from(byId.values()).sort(
-    (a, b) => Number(b.detectedAt) - Number(a.detectedAt),
+  const pruned = mergeLeadHistory(
+    data?.[LEADS_HISTORY_STORAGE_KEY],
+    matches,
+    profileName,
+    { ttlMs: LEADS_HISTORY_TTL_MS },
   );
-  const pruned = pruneLeadsHistory(merged);
   await chrome.storage.local.set({ [LEADS_HISTORY_STORAGE_KEY]: pruned });
 }
 
 async function getLeadsHistory() {
   const data = await chrome.storage.local.get([LEADS_HISTORY_STORAGE_KEY]);
-  const history = pruneLeadsHistory(data?.[LEADS_HISTORY_STORAGE_KEY]);
+  const history = pruneLeadsHistory(data?.[LEADS_HISTORY_STORAGE_KEY], {
+    ttlMs: LEADS_HISTORY_TTL_MS,
+  });
   await chrome.storage.local.set({ [LEADS_HISTORY_STORAGE_KEY]: history });
   return history;
 }
@@ -1187,13 +1120,18 @@ async function stopPostMonitor(notifyUi = true) {
 
 async function applySleepModeTransition() {
   const schedule = await loadSleepSchedule();
-  const shouldSleepNow = isSleepWindowNow(schedule);
+  const transition = getSleepModeTransition({
+    schedule,
+    isSleepModeActive,
+    isMonitorRunning,
+    wasRunningBeforeSleep,
+  });
 
-  if (shouldSleepNow && !isSleepModeActive) {
-    isSleepModeActive = true;
-    if (isMonitorRunning) {
-      wasRunningBeforeSleep = true;
-      isMonitorRunning = false;
+  if (transition.enteredSleep) {
+    isSleepModeActive = transition.nextSleepModeActive;
+    isMonitorRunning = transition.nextMonitorRunning;
+    wasRunningBeforeSleep = transition.nextWasRunningBeforeSleep;
+    if (transition.pauseMonitor) {
       chrome.alarms.clear(MONITOR_ALARM_NAME);
       chrome.runtime.sendMessage({
         type: "monitorSleep",
@@ -1217,17 +1155,17 @@ async function applySleepModeTransition() {
     return;
   }
 
-  if (!shouldSleepNow && isSleepModeActive) {
-    isSleepModeActive = false;
+  if (transition.exitedSleep) {
+    isSleepModeActive = transition.nextSleepModeActive;
+    isMonitorRunning = transition.nextMonitorRunning;
+    wasRunningBeforeSleep = transition.nextWasRunningBeforeSleep;
     chrome.runtime.sendMessage({
       type: "monitorSleep",
       active: false,
       message: "Sleep mode ended.",
     });
 
-    if (wasRunningBeforeSleep) {
-      wasRunningBeforeSleep = false;
-      isMonitorRunning = true;
+    if (transition.resumeMonitor) {
       await saveMonitorRuntime();
       const { counters } = await loadNotificationInboxState();
       await refreshActionUi(counters);
@@ -2420,16 +2358,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 
     const payload = message.payload || {};
-    monitorConfig = {
-      selectedGroupIds: Array.isArray(payload.selectedGroupIds)
-        ? payload.selectedGroupIds.map((v) => String(v))
-        : [],
-      positiveKeywords: normalizeKeywordList(payload.positiveKeywords),
-      negativeKeywords: normalizeKeywordList(payload.negativeKeywords),
-      profileName: String(payload.profileName || "").trim(),
-      minMinutes: Number(payload.minMinutes) || 3,
-      maxMinutes: Number(payload.maxMinutes) || 7,
-    };
+    monitorConfig = normalizeMonitorConfig(payload);
 
     (async () => {
       try {
@@ -2487,13 +2416,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "getPostMonitorState") {
     (async () => {
       const runtime = await loadMonitorRuntime();
-      sendResponse({
-        success: true,
-        running: runtime.running || isMonitorRunning,
-        sleepModeActive: runtime.sleepModeActive || isSleepModeActive,
-        config: runtime.config || monitorConfig,
-        connectionIssue: runtime.connectionIssue || monitorConnectionIssue || null,
-      });
+      sendResponse(buildMonitorStateResponse(runtime, {
+        isMonitorRunning,
+        isSleepModeActive,
+        monitorConfig,
+        monitorConnectionIssue,
+      }));
     })();
     return true;
   }
@@ -2511,10 +2439,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "setSleepSchedule") {
     (async () => {
       try {
-        const next = {
-          ...getDefaultSleepSchedule(),
-          ...(message.schedule || {}),
-        };
+        const next = normalizeSleepSchedule(message.schedule);
         await chrome.storage.local.set({ [SLEEP_SCHEDULE_STORAGE_KEY]: next });
         ensureSleepScheduleAlarm();
         await applySleepModeTransition();

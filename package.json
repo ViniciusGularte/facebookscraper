@@ -13,15 +13,26 @@
     "test:release:local": "RELEASE_TEST_MODE=local node scripts/test-release.mjs",
     "test:release:full": "RELEASE_TEST_MODE=full node scripts/test-release.mjs",
     "generate:store-assets": "node scripts/generate-store-assets.mjs",
+    "generate:gumroad-image": "node scripts/generate-gumroad-image.mjs",
     "grant:license": "node scripts/grant-license-access.mjs",
     "revoke:license": "node scripts/grant-license-access.mjs --revoke",
     "build": "npm run test && node scripts/build.mjs",
     "build:dev": "NO_OBFUSCATE=1 node scripts/build.mjs",
     "pack": "BUILD_ZIP=1 node scripts/build.mjs",
-    "pack:obfuscate": "ALLOW_OBFUSCATE=1 BUILD_ZIP=1 node scripts/build.mjs"
+    "pack:obfuscate": "ALLOW_OBFUSCATE=1 BUILD_ZIP=1 node scripts/build.mjs",
+    "video:studio": "remotion studio remotion/index.jsx",
+    "video:render": "remotion render remotion/index.jsx ExtensionPromo store-assets/video/promo-demo-remotion-1280x800.mp4"
   },
   "devDependencies": {
     "esbuild": "^0.25.0",
     "javascript-obfuscator": "^5.3.0"
+  },
+  "dependencies": {
+    "@remotion/cli": "^4.0.434",
+    "@remotion/media": "^4.0.434",
+    "@remotion/transitions": "^4.0.434",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "remotion": "^4.0.434"
   }
 }

@@ -8,7 +8,7 @@ This Privacy Policy explains how GrabClientsNow ("we", "our", "us") handles info
 
 GrabClientsNow is a browser extension that helps users monitor Facebook groups and organize potential leads.
 
-Contact: withdonebetter@gmail.com
+Contact: grabclientsnow@gmail.com
 
 ## 2. Data we process
 
@@ -91,4 +91,4 @@ We may update this Privacy Policy from time to time. The "Last updated" date at 
 
 For privacy questions or requests, contact:
 
-withdonebetter@gmail.com
+grabclientsnow@gmail.com

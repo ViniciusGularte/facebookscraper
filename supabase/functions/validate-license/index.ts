@@ -11,7 +11,7 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "
 const GUMROAD_ACCESS_TOKEN = Deno.env.get("GUMROAD_ACCESS_TOKEN") || "";
 const GUMROAD_PRODUCT_ID = Deno.env.get("GUMROAD_PRODUCT_ID") || "";
 const GUMROAD_PRODUCT_PERMALINK = Deno.env.get("GUMROAD_PRODUCT_PERMALINK") || "";
-const TRIAL_DURATION_DAYS = Number(Deno.env.get("TRIAL_DURATION_DAYS") || "1");
+const TRIAL_DURATION_DAYS = Number(Deno.env.get("TRIAL_DURATION_DAYS") || "2");
 const DEVICE_STALE_AFTER_HOURS = Number(
   Deno.env.get("DEVICE_STALE_AFTER_HOURS") || "1",
 );

@@ -69,7 +69,7 @@ test(
       email,
       deviceId,
       deviceName: "Trial Test Device",
-      trialDays: 1,
+      trialDays: 2,
     });
     assert.equal(response.status, 200, JSON.stringify(payload));
     assert.equal(String(payload?.email || ""), email);

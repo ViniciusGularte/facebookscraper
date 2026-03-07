@@ -229,30 +229,30 @@ export const I18N = {
     "help.aff_title": "Affiliate Program",
     "help.aff_body": "Earn 50% commission per sale, no earnings cap.",
     "help.aff_cta": "Join affiliate program",
-    "help.roadmap_title": "Roadmap: Cloud Agent 24/7 (in development)",
-    "help.roadmap_badge": "Coming Soon",
+    "help.roadmap_title": "Cloud Version Available",
+    "help.roadmap_badge": "Available now",
     "help.roadmap_lead":
-      "We're building the next phase: always-on cloud monitoring, auto-comments and deeper automations.",
+      "The cloud version is already available on our website as a done-for-you service with 24/7 monitoring, auto-comments and deeper automations.",
     "help.roadmap_copy":
-      "Not live yet. If this is a priority, click \"I want this\" and share your real use case to help us set roadmap order.",
-    "help.roadmap_item_1": "24/7 cloud notifications (no browser tab required)",
+      "If you want us to run everything for you, contact us through the site or by email and we'll show you the done-for-you setup.",
+    "help.roadmap_item_1": "24/7 cloud monitoring without keeping a browser tab open",
     "help.roadmap_item_2": "Auto-comment with safety rules",
     "help.roadmap_item_3": "Automations by profile and keyword intent",
-    "help.roadmap_cta_primary": "I want this",
-    "help.roadmap_cta_secondary": "Suggest feature",
+    "help.roadmap_cta_primary": "I want the cloud version",
+    "help.roadmap_cta_secondary": "Ask a question",
     "mail.subject.support": "GrabClientsNow Support",
     "mail.subject.more_channels":
       "GrabClientsNow - Need more notification channels",
     "mail.subject.roadmap_interest":
-      "GrabClientsNow - I want cloud roadmap",
+      "GrabClientsNow - I want the cloud version",
     "mail.subject.roadmap_suggestion":
-      "GrabClientsNow - Roadmap feature suggestion",
+      "GrabClientsNow - Cloud version question",
     "mail.subject.feature_suggestion": "GrabClientsNow Feature Suggestion",
     "mail.subject.partner_inquiry": "Business Partnership Inquiry",
     "mail.subject.affiliate_join":
       "Affiliate Program - I want to join",
     "mail.body.roadmap_interest":
-      "Name:\nUse case:\nMost wanted feature: (24/7 alerts / auto-comment / automations)\nGroups or leads per day:",
+      "Name:\nUse case:\nWhat do you want us to handle for you? (24/7 monitoring / auto-comment / automations)\nGroups or leads per day:",
     "msg.log_copied": "Technical log copied to clipboard.",
     "msg.action_failed": "Action failed: {error}",
     "msg.log_copy_failed": "Failed to copy technical log: {error}",
@@ -275,7 +275,7 @@ export const I18N = {
     "msg.license_checking": "Checking license status...",
     "msg.license_confirmed": "License confirmed. Pro is active.",
     "msg.license_status_refreshed": "License status refreshed.",
-    "msg.trial_started": "1-day trial started.",
+    "msg.trial_started": "Trial started.",
     "msg.upgrade_failed":
       "Could not open license checkout: {error}",
     "status.monitoring": "monitoring...",
@@ -486,7 +486,7 @@ export const I18N = {
       "I already bought on Gumroad and want to unlock this device.",
     "auth.mode_trial_title": "Free trial",
     "auth.mode_trial_body":
-      "I want to test the extension for 1 day with my email.",
+      "I want to start the trial with my email.",
     "auth.section_access": "Free trial",
     "auth.section_license": "Activate license",
     "auth.email_label": "Email",
@@ -498,7 +498,7 @@ export const I18N = {
     "auth.code_ph": "License key",
     "auth.continue": "Activate",
     "auth.verify_code": "Activate license",
-    "auth.resend": "Start 1-day trial",
+    "auth.resend": "Start trial",
     "auth.change_email": "Clear",
     "auth.terms_accept": "I accept the Terms of Use",
     "auth.terms_accept_prefix": "I have read and accept the",
@@ -555,7 +555,7 @@ export const I18N = {
     "auth.invalid_license_key": "Enter a valid license key.",
     "auth.code_verify_failed": "Could not verify the license. Check the key and try again.",
     "auth.license_activated": "License activated.",
-    "auth.trial_started": "1-day trial activated.",
+    "auth.trial_started": "Trial activated.",
     "auth.trial_cta_title": "Your free trial is active",
     "auth.trial_cta_body":
       "Secure your license now on Gumroad so you can keep using the extension after the free period ends.",
@@ -699,24 +699,24 @@ export const I18N = {
     "help.aff_title": "Programa de Afiliados",
     "help.aff_body": "Ganhe 50% de comissão por venda, sem teto.",
     "help.aff_cta": "Entrar no programa",
-    "help.roadmap_title": "Roadmap: Cloud Agent 24/7 (em desenvolvimento)",
-    "help.roadmap_badge": "Em breve",
+    "help.roadmap_title": "Versao Cloud Disponivel",
+    "help.roadmap_badge": "Disponivel agora",
     "help.roadmap_lead":
-      "Estamos construindo a proxima fase: monitoramento continuo na nuvem, auto-comentarios e automacoes mais profundas.",
+      "A versao cloud ja esta disponivel no site como um servico done-for-you com monitoramento 24/7, auto-comentarios e automacoes mais profundas.",
     "help.roadmap_copy":
-      "Ainda nao esta disponivel. Se isso e prioridade para voce, clique em \"I want this\" e envie seu caso real para ajudar a definir a ordem do roadmap.",
-    "help.roadmap_item_1": "Notificacoes 24/7 na nuvem (sem aba do navegador aberta)",
+      "Se voce quer que a gente opere tudo para voce, fale com a gente pelo site ou por e-mail e mostramos a configuracao done-for-you.",
+    "help.roadmap_item_1": "Monitoramento 24/7 na nuvem sem precisar manter aba aberta",
     "help.roadmap_item_2": "Auto-comentario com regras de seguranca",
     "help.roadmap_item_3": "Automacoes por perfil e intencao de palavra-chave",
-    "help.roadmap_cta_primary": "Quero isso",
-    "help.roadmap_cta_secondary": "Sugerir funcionalidade",
+    "help.roadmap_cta_primary": "Quero a versao cloud",
+    "help.roadmap_cta_secondary": "Tirar duvida",
     "mail.subject.support": "Suporte GrabClientsNow",
     "mail.subject.more_channels":
       "GrabClientsNow - Preciso de mais canais de notificacao",
     "mail.subject.roadmap_interest":
-      "GrabClientsNow - Quero o roadmap cloud",
+      "GrabClientsNow - Quero a versao cloud",
     "mail.subject.roadmap_suggestion":
-      "GrabClientsNow - Sugestao de funcionalidade para roadmap",
+      "GrabClientsNow - Duvida sobre a versao cloud",
     "mail.subject.feature_suggestion":
       "GrabClientsNow - Sugestao de funcionalidade",
     "mail.subject.partner_inquiry":
@@ -724,7 +724,7 @@ export const I18N = {
     "mail.subject.affiliate_join":
       "GrabClientsNow - Quero entrar no programa de afiliados",
     "mail.body.roadmap_interest":
-      "Nome:\nCaso de uso:\nFuncionalidade mais desejada: (alertas 24/7 / auto-comentario / automacoes)\nGrupos ou leads por dia:",
+      "Nome:\nCaso de uso:\nO que voce quer que a gente opere para voce? (monitoramento 24/7 / auto-comentario / automacoes)\nGrupos ou leads por dia:",
     "msg.log_copied": "Log técnico copiado para a área de transferência.",
     "msg.action_failed": "Ação falhou: {error}",
     "msg.log_copy_failed": "Falha ao copiar log técnico: {error}",
@@ -754,7 +754,7 @@ export const I18N = {
       "Ja comprei no Gumroad e quero liberar este dispositivo.",
     "auth.mode_trial_title": "Trial gratuito",
     "auth.mode_trial_body":
-      "Quero testar a extensao por 1 dia usando meu e-mail.",
+      "Quero iniciar o trial usando meu e-mail.",
     "auth.section_access": "Trial gratuito",
     "auth.section_license": "Ativar licença",
     "auth.email_label": "E-mail",
@@ -766,7 +766,7 @@ export const I18N = {
     "auth.code_ph": "License key",
     "auth.continue": "Ativar",
     "auth.verify_code": "Ativar licença",
-    "auth.resend": "Iniciar trial de 1 dia",
+    "auth.resend": "Iniciar trial",
     "auth.change_email": "Limpar",
     "auth.terms_accept": "Li e aceito os Termos de Uso",
     "auth.terms_accept_prefix": "Li e aceito os",
@@ -823,7 +823,7 @@ export const I18N = {
     "auth.invalid_license_key": "Digite uma license key válida.",
     "auth.code_verify_failed": "Não foi possível validar a licença. Confira a key e tente novamente.",
     "auth.license_activated": "Licença ativada.",
-    "auth.trial_started": "Trial de 1 dia ativado.",
+    "auth.trial_started": "Trial ativado.",
     "auth.trial_cta_title": "Seu trial gratuito esta ativo",
     "auth.trial_cta_body":
       "Garanta sua licença agora na Gumroad para continuar usando a extensão quando o período gratuito terminar.",
@@ -951,7 +951,7 @@ export const I18N = {
     "msg.license_checking": "Verificando status da licença...",
     "msg.license_confirmed": "Licença confirmada. Pro está ativo.",
     "msg.license_status_refreshed": "Status da licença atualizado.",
-    "msg.trial_started": "Trial de 1 dia iniciado.",
+    "msg.trial_started": "Trial iniciado.",
     "msg.upgrade_failed":
       "Não foi possível abrir o checkout da licença: {error}",
     "status.monitoring": "monitorando...",
@@ -1249,7 +1249,7 @@ I18N.de = {
     "Ich habe bereits bei Gumroad gekauft und möchte dieses Gerät freischalten.",
   "auth.mode_trial_title": "Kostenloses Trial",
   "auth.mode_trial_body":
-    "Ich möchte die Extension 1 Tag lang mit meiner E-Mail testen.",
+    "Ich mochte das Trial mit meiner E-Mail starten.",
   "auth.section_access": "Kostenloses Trial",
   "auth.section_license": "Lizenz aktivieren",
   "auth.email_label": "E-Mail",
@@ -1260,12 +1260,12 @@ I18N.de = {
   "auth.verify_code": "Lizenz aktivieren",
   "auth.license_hint":
     "Füge deinen Gumroad-Lizenzschlüssel ein, um die Extension auf diesem Gerät freizuschalten.",
-  "auth.resend": "1-Tages-Trial starten",
+  "auth.resend": "Trial starten",
   "auth.invalid_email": "Gib eine gültige E-Mail-Adresse ein.",
   "auth.invalid_license_key": "Gib einen gültigen Lizenzschlüssel ein.",
   "auth.checking": "Lizenz wird geprüft...",
   "auth.license_activated": "Lizenz erfolgreich aktiviert.",
-  "auth.trial_started": "1-Tages-Trial aktiviert.",
+  "auth.trial_started": "Trial aktiviert.",
   "auth.connected": "Verbunden als {email}",
   "auth.terms_title": "Nutzungsbedingungen",
   "auth.terms_intro":
@@ -1412,7 +1412,7 @@ Object.assign(I18N.es, {
     "Ya compré en Gumroad y quiero desbloquear este dispositivo.",
   "auth.mode_trial_title": "Trial gratis",
   "auth.mode_trial_body":
-    "Quiero probar la extensión durante 1 día con mi email.",
+    "Quiero iniciar el trial con mi email.",
   "auth.section_access": "Trial gratis",
   "auth.section_license": "Activar licencia",
   "auth.email_label": "Correo",
@@ -1424,7 +1424,7 @@ Object.assign(I18N.es, {
   "auth.code_ph": "license key",
   "auth.continue": "Continuar",
   "auth.verify_code": "Activar licencia",
-  "auth.resend": "Iniciar trial de 1 día",
+  "auth.resend": "Iniciar trial",
   "auth.change_email": "Cambiar email",
   "auth.terms_accept": "Acepto los Términos de Uso",
   "auth.terms_accept_prefix": "He leído y acepto los",
@@ -1480,7 +1480,7 @@ Object.assign(I18N.es, {
   "auth.invalid_license_key": "Introduce una license key válida.",
   "auth.code_verify_failed": "No se pudo verificar la licencia.",
   "auth.license_activated": "Licencia activada con éxito.",
-  "auth.trial_started": "Trial de 1 día activado.",
+  "auth.trial_started": "Trial activado.",
   "auth.trial_cta_title": "Tu trial gratis está activo",
   "auth.trial_cta_body":
     "Asegura tu licencia ahora en Gumroad para seguir usando la extensión cuando termine el período gratuito.",
@@ -1617,7 +1617,7 @@ Object.assign(I18N.fr, {
     "J'ai déjà acheté sur Gumroad et je veux débloquer cet appareil.",
   "auth.mode_trial_title": "Essai gratuit",
   "auth.mode_trial_body":
-    "Je veux tester l'extension pendant 1 jour avec mon e-mail.",
+    "Je veux demarrer l'essai avec mon e-mail.",
   "auth.section_access": "Essai gratuit",
   "auth.section_license": "Activer la licence",
   "auth.email_label": "E-mail",
@@ -1629,7 +1629,7 @@ Object.assign(I18N.fr, {
   "auth.code_ph": "clé de licence",
   "auth.continue": "Continuer",
   "auth.verify_code": "Activer la licence",
-  "auth.resend": "Démarrer l'essai de 1 jour",
+  "auth.resend": "Demarrer l'essai",
   "auth.change_email": "Changer d'e-mail",
   "auth.terms_accept": "J'accepte les Conditions d'utilisation",
   "auth.terms_accept_prefix": "J'ai lu et j'accepte les",
@@ -1686,7 +1686,7 @@ Object.assign(I18N.fr, {
   "auth.invalid_license_key": "Entrez une clé de licence valide.",
   "auth.code_verify_failed": "Impossible de vérifier la licence.",
   "auth.license_activated": "Licence activée avec succès.",
-  "auth.trial_started": "Essai de 1 jour activé.",
+  "auth.trial_started": "Essai active.",
   "auth.trial_cta_title": "Votre essai gratuit est actif",
   "auth.trial_cta_body":
     "Sécurisez votre licence maintenant sur Gumroad pour continuer à utiliser l'extension à la fin de la période gratuite.",
@@ -1759,17 +1759,17 @@ Object.assign(I18N.de, {
   "monitor.idle": "inaktiv",
   "monitor.waiting": "wartet...",
   "settings.debug": "Fehlersuche",
-  "help.roadmap_title": "Roadmap: Cloud Agent 24/7 (in Entwicklung)",
-  "help.roadmap_badge": "Bald verfügbar",
+  "help.roadmap_title": "Cloud-Version verfugbar",
+  "help.roadmap_badge": "Jetzt verfugbar",
   "help.roadmap_lead":
-    "Wir entwickeln die nächste Phase: 24/7-Cloud-Monitoring, Auto-Kommentare und tiefere Automatisierungen.",
+    "Die Cloud-Version ist bereits auf unserer Website als Done-for-you-Service mit 24/7-Monitoring, Auto-Kommentaren und tieferen Automatisierungen verfugbar.",
   "help.roadmap_copy":
-    "Noch nicht live. Wenn das für dich Priorität hat, klicke auf \"Ich will das\" und teile deinen realen Anwendungsfall, damit wir die Roadmap priorisieren können.",
-  "help.roadmap_item_1": "24/7-Cloud-Benachrichtigungen (kein Browser-Tab nötig)",
+    "Wenn du willst, dass wir alles fur dich betreiben, kontaktiere uns uber die Website oder per E-Mail und wir zeigen dir das Done-for-you-Setup.",
+  "help.roadmap_item_1": "24/7-Cloud-Monitoring ohne offenen Browser-Tab",
   "help.roadmap_item_2": "Auto-Kommentare mit Sicherheitsregeln",
   "help.roadmap_item_3": "Automatisierungen nach Profil und Keyword-Absicht",
-  "help.roadmap_cta_primary": "Ich will das",
-  "help.roadmap_cta_secondary": "Funktion vorschlagen",
+  "help.roadmap_cta_primary": "Ich will die Cloud-Version",
+  "help.roadmap_cta_secondary": "Frage stellen",
   "status.starting": "startet",
   "status.sleep_mode": "Schlafmodus",
   "status.waiting": "wartet...",
@@ -1921,26 +1921,26 @@ I18N.es = {
   "help.aff_title": "Programa de afiliados",
   "help.aff_body": "Gana 50% de comisión por venta, sin límite de ganancias.",
   "help.aff_cta": "Unirme al programa",
-  "help.roadmap_title": "Roadmap: Cloud Agent 24/7 (en desarrollo)",
-  "help.roadmap_badge": "Próximamente",
+  "help.roadmap_title": "Version Cloud Disponible",
+  "help.roadmap_badge": "Disponible ahora",
   "help.roadmap_lead":
-    "Estamos construyendo la próxima fase: monitoreo en la nube 24/7, auto-comentarios y automatizaciones más profundas.",
+    "La version cloud ya esta disponible en nuestro sitio como un servicio done-for-you con monitoreo 24/7, auto-comentarios y automatizaciones mas profundas.",
   "help.roadmap_copy":
-    "Aún no está disponible. Si esto es prioridad para ti, haz clic en \"I want this\" y comparte tu caso real para ayudarnos a priorizar el roadmap.",
+    "Si quieres que operemos todo por ti, contactanos por el sitio o por correo y te mostramos la configuracion done-for-you.",
   "help.roadmap_item_1":
-    "Notificaciones 24/7 en la nube (sin pestaña del navegador)",
+    "Monitoreo cloud 24/7 sin mantener una pestana del navegador abierta",
   "help.roadmap_item_2": "Auto-comentario con reglas de seguridad",
   "help.roadmap_item_3":
     "Automatizaciones por perfil e intención de palabra clave",
-  "help.roadmap_cta_primary": "Lo quiero",
-  "help.roadmap_cta_secondary": "Sugerir funcionalidad",
+  "help.roadmap_cta_primary": "Quiero la version cloud",
+  "help.roadmap_cta_secondary": "Hacer una pregunta",
   "mail.subject.support": "Soporte GrabClientsNow",
   "mail.subject.more_channels":
     "GrabClientsNow - Necesito más canales de notificación",
   "mail.subject.roadmap_interest":
-    "GrabClientsNow - Quiero el roadmap cloud",
+    "GrabClientsNow - Quiero la version cloud",
   "mail.subject.roadmap_suggestion":
-    "GrabClientsNow - Sugerencia de funcionalidad para roadmap",
+    "GrabClientsNow - Consulta sobre la version cloud",
   "mail.subject.feature_suggestion":
     "GrabClientsNow - Sugerencia de funcionalidad",
   "mail.subject.partner_inquiry":
@@ -1948,7 +1948,7 @@ I18N.es = {
   "mail.subject.affiliate_join":
     "GrabClientsNow - Quiero unirme al programa de afiliados",
   "mail.body.roadmap_interest":
-    "Nombre:\nCaso de uso:\nFuncionalidad más deseada: (alertas 24/7 / auto-comentario / automatizaciones)\nGrupos o leads por día:",
+    "Nombre:\nCaso de uso:\nQue quieres que operemos por ti? (monitoreo 24/7 / auto-comentario / automatizaciones)\nGrupos o leads por dia:",
   "msg.history_cleared": "Historial de leads borrado.",
   "status.monitoring": "monitoreando...",
   "status.stopped": "detenido",
@@ -2040,26 +2040,26 @@ I18N.fr = {
   "help.aff_title": "Programme d'affiliation",
   "help.aff_body": "Gagnez 50% de commission par vente, sans plafond.",
   "help.aff_cta": "Rejoindre le programme",
-  "help.roadmap_title": "Roadmap: Cloud Agent 24/7 (en développement)",
-  "help.roadmap_badge": "Bientôt disponible",
+  "help.roadmap_title": "Version Cloud Disponible",
+  "help.roadmap_badge": "Disponible maintenant",
   "help.roadmap_lead":
-    "Nous construisons la prochaine étape: monitoring cloud 24/7, auto-commentaires et automatisations plus avancées.",
+    "La version cloud est deja disponible sur notre site comme service done-for-you avec monitoring 24/7, auto-commentaires et automatisations plus avancees.",
   "help.roadmap_copy":
-    "Pas encore disponible. Si c'est prioritaire pour vous, cliquez sur \"I want this\" et partagez votre cas réel pour nous aider à prioriser la roadmap.",
+    "Si vous voulez que nous gerions tout pour vous, contactez-nous via le site ou par e-mail et nous vous montrerons la configuration done-for-you.",
   "help.roadmap_item_1":
-    "Notifications cloud 24/7 (sans onglet navigateur)",
+    "Monitoring cloud 24/7 sans garder un onglet navigateur ouvert",
   "help.roadmap_item_2": "Auto-commentaire avec règles de sécurité",
   "help.roadmap_item_3":
     "Automatisations par profil et intention de mots-clés",
-  "help.roadmap_cta_primary": "Je le veux",
-  "help.roadmap_cta_secondary": "Suggérer une fonctionnalité",
+  "help.roadmap_cta_primary": "Je veux la version cloud",
+  "help.roadmap_cta_secondary": "Poser une question",
   "mail.subject.support": "Support GrabClientsNow",
   "mail.subject.more_channels":
     "GrabClientsNow - Besoin de plus de canaux de notification",
   "mail.subject.roadmap_interest":
-    "GrabClientsNow - Je veux la roadmap cloud",
+    "GrabClientsNow - Je veux la version cloud",
   "mail.subject.roadmap_suggestion":
-    "GrabClientsNow - Suggestion de fonctionnalité roadmap",
+    "GrabClientsNow - Question sur la version cloud",
   "mail.subject.feature_suggestion":
     "GrabClientsNow - Suggestion de fonctionnalité",
   "mail.subject.partner_inquiry":
@@ -2067,7 +2067,7 @@ I18N.fr = {
   "mail.subject.affiliate_join":
     "GrabClientsNow - Je veux rejoindre le programme d'affiliation",
   "mail.body.roadmap_interest":
-    "Nom:\nCas d'usage:\nFonctionnalité la plus souhaitée: (alertes 24/7 / auto-commentaire / automatisations)\nGroupes ou leads par jour:",
+    "Nom:\nCas d'usage:\nQue voulez-vous que nous gerions pour vous ? (monitoring 24/7 / auto-commentaire / automatisations)\nGroupes ou leads par jour:",
   "msg.history_cleared": "Historique des leads effacé.",
   "status.monitoring": "monitoring en cours...",
   "status.stopped": "arrêté",

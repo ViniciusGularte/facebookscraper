@@ -23,6 +23,16 @@ import {
   ORB_STATES,
 } from "./constants.js";
 import { I18N } from "./i18n-dict.js";
+import { filterLeads } from "./leads-filter.js";
+import {
+  applyWebhookPermissionResult,
+  mergeNotificationSettings,
+} from "./notification-settings.js";
+import { upsertProfile } from "./profile-upsert.js";
+import {
+  buildDefaultNotificationSettings,
+  buildWorkspaceResetState,
+} from "./workspace-reset.js";
 
 let selectedGroupIds = new Set();
 const lastLoadedGroups = new Map();
@@ -62,17 +72,11 @@ let onboardingGroupsProgress = {
 let isCheckingFacebookLogin = false;
 let lastOnboardingChatSignature = "";
 let activePlanRefreshPromise = null;
-let notificationSettings = {
-  notifyBrowser: true,
-  notifyWebhook: false,
-  notifyTelegram: false,
-  webhookUrl: "",
-  telegramChatId: "",
-};
+let notificationSettings = buildDefaultNotificationSettings();
 let currentProfileWizardStep = "name";
 const PLAN_SYNC_INTERVAL_MS = 60000;
 const PLAN_SYNC_FAILURE_BACKOFF_MS = 5 * 60 * 1000;
-const LICENSE_TRIAL_DURATION_MS = 24 * 60 * 60 * 1000;
+const LICENSE_TRIAL_DURATION_MS = 2 * 24 * 60 * 60 * 1000;
 let nextPlanSyncAt = 0;
 let isTermsAccepted = false;
 let authMode = "";
@@ -158,6 +162,23 @@ function setTrialUpsellVisible(show) {
   qs("dashboardTrialCta")?.toggleAttribute("hidden", !show);
 }
 
+function formatTrialRemainingTime(ms) {
+  const totalMinutes = Math.max(1, Math.ceil(ms / (60 * 1000)));
+  const days = Math.floor(totalMinutes / (24 * 60));
+  const hours = Math.floor((totalMinutes % (24 * 60)) / 60);
+  const minutes = totalMinutes % 60;
+
+  if (days > 0) {
+    if (hours > 0) return `${days}d ${hours}h`;
+    return `${days}d`;
+  }
+  if (hours > 0) {
+    if (minutes > 0) return `${hours}h ${minutes}m`;
+    return `${hours}h`;
+  }
+  return `${minutes}m`;
+}
+
 function beginLicenseSessionRequest(exclusive = false) {
   if (exclusive) {
     licenseSessionVersion += 1;
@@ -214,7 +235,7 @@ function translate(key, vars = {}) {
   }, raw);
 }
 
-const SUPPORT_CONTACT_EMAIL = "withdonebetter@gmail.com";
+const SUPPORT_CONTACT_EMAIL = "grabclientsnow@gmail.com";
 
 function buildLocalizedMailto(subjectKey, bodyKey = "") {
   const subject = translate(subjectKey);
@@ -233,7 +254,6 @@ function applyLocalizedMailtoLinks() {
 
   assign("linkGuidedContactSupport", "mail.subject.support");
   assign("btnAskMoreChannels", "mail.subject.more_channels");
-  assign("linkRoadmapPrimary", "mail.subject.roadmap_interest", "mail.body.roadmap_interest");
   assign("linkRoadmapSecondary", "mail.subject.roadmap_suggestion");
   assign("linkHelpFeature", "mail.subject.feature_suggestion");
   assign("linkHelpPartner", "mail.subject.partner_inquiry");
@@ -1194,12 +1214,17 @@ function renderPlanBanner() {
   const banner = qs("planBanner");
   const text = qs("planBannerText");
   const hint = qs("planBannerHint");
+  const trialDuration = qs("dashboardTrialDuration");
   if (!banner || !text || !hint || !cachedPlanState) return;
 
   banner.classList.remove("show", "warn", "pro", "free");
   const now = Date.now();
   const plan = String(cachedPlanState.plan || "free");
   const trialEnd = Number(cachedPlanState.trialEnd) || 0;
+
+  if (trialDuration) {
+    trialDuration.textContent = "";
+  }
 
   if (plan === "pro") {
     text.textContent = "";
@@ -1212,6 +1237,11 @@ function renderPlanBanner() {
     if (trialEnd > now) {
       text.textContent = "";
       hint.textContent = "";
+      if (trialDuration) {
+        trialDuration.textContent = translate("plan.trial", {
+          time: formatTrialRemainingTime(trialEnd - now),
+        });
+      }
       setPlanLockVisible(false);
       return;
     }
@@ -1439,7 +1469,7 @@ async function startLicenseTrial(email) {
     email,
     deviceId,
     deviceName,
-    trialDays: 1,
+    trialDays: 2,
     trialDurationMs: LICENSE_TRIAL_DURATION_MS,
   });
   return await persistLicenseState(payload, {
@@ -1580,37 +1610,14 @@ async function loadSleepScheduleUi() {
 }
 
 function getFilteredLeads() {
-  const profileFilter = qs("leadsProfileFilter")?.value || "";
-  const textFilter = String(qs("leadsTextFilter")?.value || "")
-    .trim()
-    .toLowerCase();
-  const onlySelectedGroups = !!qs("leadsOnlySelectedGroups")?.checked;
-
-  let filtered = [...leadsHistory];
-  if (profileFilter) {
-    filtered = filtered.filter(
-      (lead) => String(lead.profileName || "") === profileFilter,
-    );
-  }
-  if (onlySelectedGroups) {
-    filtered = filtered.filter((lead) =>
-      selectedGroupIds.has(String(lead.group_id || "")),
-    );
-  }
-  if (textFilter) {
-    filtered = filtered.filter((lead) => {
-      const haystack = [
-        lead.group_name,
-        lead.poster_name,
-        lead.post_text,
-        lead.marketplace_text,
-      ]
-        .map((v) => String(v || "").toLowerCase())
-        .join(" ");
-      return haystack.includes(textFilter);
-    });
-  }
-  return filtered;
+  return filterLeads(leadsHistory, {
+    profileFilter: qs("leadsProfileFilter")?.value || "",
+    textFilter: String(qs("leadsTextFilter")?.value || "")
+      .trim()
+      .toLowerCase(),
+    onlySelectedGroups: !!qs("leadsOnlySelectedGroups")?.checked,
+    selectedGroupIds,
+  });
 }
 
 function getFacebookStatusLabel() {
@@ -3034,10 +3041,10 @@ async function loadNotificationSettings() {
 }
 
 async function persistNotificationSettings() {
-  const next = {
-    ...notificationSettings,
-    ...readNotificationSettingsFromUi(),
-  };
+  let next = mergeNotificationSettings(
+    notificationSettings,
+    readNotificationSettingsFromUi(),
+  );
   if (next.notifyWebhook && next.webhookUrl) {
     const granted = await new Promise((resolve) => {
       chrome.runtime.sendMessage(
@@ -3045,9 +3052,10 @@ async function persistNotificationSettings() {
         (response) => resolve(!!response?.granted),
       );
     });
-    if (!granted) {
+    const result = applyWebhookPermissionResult(next, granted);
+    next = result.settings;
+    if (result.permissionDenied) {
       appendLog("logGeneral", "Webhook permission denied.", "err");
-      next.notifyWebhook = false;
       if (qs("notifyWebhook")) qs("notifyWebhook").checked = false;
     }
   }
@@ -3375,44 +3383,25 @@ async function saveProfileFromEditor() {
     return false;
   }
 
-  if (!selectedProfileId) {
-    const duplicate = savedProfiles.find(
-      (p) => String(p.name || "").trim().toLowerCase() === name.toLowerCase(),
-    );
-    if (duplicate) {
-      selectedProfileId = duplicate.id;
-      appendLog(
-        "logGeneral",
-        translate("profiles.duplicate_overwrite", { name: duplicate.name }),
-        "warn",
-      );
-    }
-  }
-
-  if (selectedProfileId) {
-    const idx = savedProfiles.findIndex((p) => p.id === selectedProfileId);
-    if (idx >= 0) {
-      savedProfiles[idx] = {
-        ...savedProfiles[idx],
-        name,
-        positiveKeywords,
-        negativeKeywords,
-        minMinutes,
-        maxMinutes,
-        updatedAt: new Date().toISOString(),
-      };
-    }
-  } else {
-    selectedProfileId = `${Date.now()}`;
-    savedProfiles.push({
-      id: selectedProfileId,
+  const next = upsertProfile({
+    savedProfiles,
+    selectedProfileId,
+    draft: {
       name,
       positiveKeywords,
       negativeKeywords,
       minMinutes,
       maxMinutes,
-      updatedAt: new Date().toISOString(),
-    });
+    },
+  });
+  savedProfiles = next.savedProfiles;
+  selectedProfileId = next.selectedProfileId;
+  if (next.duplicateName) {
+    appendLog(
+      "logGeneral",
+      translate("profiles.duplicate_overwrite", { name: next.duplicateName }),
+      "warn",
+    );
   }
 
   await persistProfiles();
@@ -4085,6 +4074,7 @@ qs("btnStartMonitor").addEventListener("click", () => {
       if (response?.sleeping) {
         setMonitorState(false, translate("status.sleep_mode"));
         setOrbState("paused");
+        setSleepBannerVisible(true, translate("home.sleep_banner"));
         appendLog("logPosts", translate("log.sleep_mode_active"), "warn");
         return;
       }
@@ -4224,14 +4214,9 @@ async function resetWorkspaceForChangedEmail(nextEmail) {
   onboardingState = "welcome";
   onboardingAutoGroupLoadAttempted = false;
   onboardingGroupsProgress = { started: false, lastCount: 0, lastAnnouncedAt: 0 };
-  globalMonitorFrequency = getDefaultFrequencyForPlan();
-  notificationSettings = {
-    notifyBrowser: true,
-    notifyWebhook: false,
-    notifyTelegram: false,
-    webhookUrl: "",
-    telegramChatId: "",
-  };
+  const resetState = buildWorkspaceResetState(getDefaultFrequencyForPlan(), Date.now());
+  globalMonitorFrequency = resetState.globalMonitorFrequency;
+  notificationSettings = resetState.notificationSettings;
 
   if (qs("groupsList")) qs("groupsList").innerHTML = "";
   updateSelectedGroupCount();
@@ -4242,23 +4227,11 @@ async function resetWorkspaceForChangedEmail(nextEmail) {
   resetProfileEditorDraft();
   renderGlobalFrequencyUi();
   applyNotificationSettingsToUi(notificationSettings);
-  await setOnboardingState("welcome");
+  await setOnboardingState(resetState.onboardingState);
   await chrome.storage.local.set({
-    [STORAGE_PLAN_STATE_KEY]: {
-      plan: "free",
-      trialEnd: 0,
-      purchaseDate: 0,
-      cachedAt: Date.now(),
-      source: "local",
-    },
+    [STORAGE_PLAN_STATE_KEY]: resetState.planState,
   });
-  cachedPlanState = {
-    plan: "free",
-    trialEnd: 0,
-    purchaseDate: 0,
-    cachedAt: Date.now(),
-    source: "local",
-  };
+  cachedPlanState = resetState.planState;
   appendLog("logGeneral", "Account changed. Local workspace reset.", "warn");
   return true;
 }
@@ -4773,7 +4746,7 @@ qsa(".settings-freq-card").forEach((card) => {
   chrome.runtime.sendMessage({ type: "getPostMonitorState" }, (response) => {
     if (response?.success) {
       if (response.sleepModeActive) {
-        setMonitorState(false, "sleep mode");
+        setMonitorState(false, translate("status.sleep_mode"));
         setOrbState("paused");
         setSleepBannerVisible(true, translate("home.sleep_banner"));
       } else {

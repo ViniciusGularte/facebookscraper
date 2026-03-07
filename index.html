@@ -2572,6 +2572,7 @@
             <div class="dashboard-trial-cta-copy" data-i18n="auth.trial_cta_body">
               Secure your license now on Gumroad so you can keep using the extension after the free period ends.
             </div>
+            <div class="dashboard-trial-cta-copy" id="dashboardTrialDuration"></div>
           </div>
           <div class="grid">
             <div class="card" id="cardGuidedSetup">
@@ -2701,7 +2702,7 @@
                     <a
                       class="guided-tips-link"
                       id="linkGuidedContactSupport"
-                      href="mailto:withdonebetter@gmail.com?subject=GrabClientsNow%20Support"
+                      href="mailto:grabclientsnow@gmail.com?subject=GrabClientsNow%20Support"
                       data-i18n="onboard.contact_support"
                     >Contact support</a>
                   </div>
@@ -3071,7 +3072,7 @@
               <div class="row" style="margin-top:8px">
                 <button class="btn btn-gray" id="btnTestDesktop" data-i18n="settings.test_desktop">Test desktop</button>
                 <button class="btn btn-green" id="btnSaveNotifications" data-i18n="settings.save_notifications">Save notifications</button>
-                <a class="btn btn-gray" id="btnAskMoreChannels" href="mailto:withdonebetter@gmail.com?subject=GrabClientsNow%20-%20Need%20more%20notification%20channels" data-i18n="settings.notify_ask_more">Ask for more channels</a>
+                <a class="btn btn-gray" id="btnAskMoreChannels" href="mailto:grabclientsnow@gmail.com?subject=GrabClientsNow%20-%20Need%20more%20notification%20channels" data-i18n="settings.notify_ask_more">Ask for more channels</a>
               </div>
             </div>
           </div>
@@ -3082,17 +3083,17 @@
             <h2 data-i18n="help.title">Help & Support</h2>
             <div class="roadmap-card">
               <div class="roadmap-head">
-                <h3 data-i18n="help.roadmap_title">Roadmap: Cloud Agent 24/7 (in development)</h3>
-                <span class="roadmap-badge" data-i18n="help.roadmap_badge">Coming Soon</span>
+                <h3 data-i18n="help.roadmap_title">Cloud Version Available</h3>
+                <span class="roadmap-badge" data-i18n="help.roadmap_badge">Available now</span>
               </div>
               <p class="roadmap-lead" data-i18n="help.roadmap_lead">
-                We're building the next phase: always-on cloud monitoring, auto-comments and deeper automations.
+                The cloud version is already available on our website as a done-for-you service with 24/7 monitoring, auto-comments and deeper automations.
               </p>
               <p class="roadmap-copy" data-i18n="help.roadmap_copy">
-                Not live yet. If this is a priority, click "I want this" and share your real use case to help us set roadmap order.
+                If you want us to run everything for you, contact us through the site or by email and we'll show you the done-for-you setup.
               </p>
               <ul class="roadmap-list">
-                <li data-i18n="help.roadmap_item_1">24/7 cloud notifications (no browser tab required)</li>
+                <li data-i18n="help.roadmap_item_1">24/7 cloud monitoring without keeping a browser tab open</li>
                 <li data-i18n="help.roadmap_item_2">Auto-comment with safety rules</li>
                 <li data-i18n="help.roadmap_item_3">Automations by profile and keyword intent</li>
               </ul>
@@ -3100,13 +3101,15 @@
                 <a
                   class="btn btn-green"
                   id="linkRoadmapPrimary"
-                  href="mailto:withdonebetter@gmail.com?subject=GrabClientsNow%20-%20I%20want%20cloud%20roadmap&body=Name%3A%0AUse%20case%3A%0AMost%20wanted%20feature%3A%20(24%2F7%20alerts%20%2F%20auto-comment%20%2F%20automations)%0AGroups%20or%20leads%20per%20day%3A"
+                  href="https://grabclientsnow.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   data-i18n="help.roadmap_cta_primary"
-                >I want this</a>
+                >I want the cloud version</a>
                 <a
                   class="btn btn-gray"
                   id="linkRoadmapSecondary"
-                  href="mailto:withdonebetter@gmail.com?subject=GrabClientsNow%20-%20Roadmap%20feature%20suggestion"
+                  href="mailto:grabclientsnow@gmail.com?subject=GrabClientsNow%20-%20Cloud%20version%20question"
                   data-i18n="help.roadmap_cta_secondary"
                 >Suggest feature</a>
               </div>
@@ -3120,17 +3123,17 @@
               <div class="support-card">
                 <h3 data-i18n="help.feature_title">Suggest a Feature</h3>
                 <p data-i18n="help.feature_body">Share your feature request directly by email.</p>
-                <a id="linkHelpFeature" href="mailto:withdonebetter@gmail.com?subject=GrabClientsNow%20Feature%20Suggestion" data-i18n="help.feature_cta">Send suggestion</a>
+                <a id="linkHelpFeature" href="mailto:grabclientsnow@gmail.com?subject=GrabClientsNow%20Feature%20Suggestion" data-i18n="help.feature_cta">Send suggestion</a>
               </div>
               <div class="support-card">
                 <h3 data-i18n="help.partner_title">Partnerships & Affiliates</h3>
                 <p data-i18n="help.partner_body">Business integrations, white-label or affiliate program inquiries.</p>
-                <a id="linkHelpPartner" href="mailto:withdonebetter@gmail.com?subject=Business%20Partnership%20Inquiry" data-i18n="help.partner_cta">Contact team</a>
+                <a id="linkHelpPartner" href="mailto:grabclientsnow@gmail.com?subject=Business%20Partnership%20Inquiry" data-i18n="help.partner_cta">Contact team</a>
               </div>
               <div class="support-card">
                 <h3 data-i18n="help.aff_title">Affiliate Program</h3>
                 <p data-i18n="help.aff_body">Earn 50% commission per sale, no earnings cap.</p>
-                <a id="linkHelpAffiliate" href="mailto:withdonebetter@gmail.com?subject=Affiliate%20Program%20-%20I%20want%20to%20join" data-i18n="help.aff_cta">Join affiliate program</a>
+                <a id="linkHelpAffiliate" href="mailto:grabclientsnow@gmail.com?subject=Affiliate%20Program%20-%20I%20want%20to%20join" data-i18n="help.aff_cta">Join affiliate program</a>
               </div>
             </div>
           </div>
@@ -3222,7 +3225,7 @@
               </button>
               <button class="auth-mode-btn" id="btnAuthModeTrial" type="button">
                 <span class="auth-mode-title" data-i18n="auth.mode_trial_title">Free trial</span>
-                <span class="auth-mode-copy" data-i18n="auth.mode_trial_body">I want to test the extension for 1 day with my email.</span>
+                <span class="auth-mode-copy" data-i18n="auth.mode_trial_body">I want to start the trial with my email.</span>
               </button>
             </div>
 
@@ -3242,7 +3245,7 @@
               </label>
               <div class="auth-helper" data-i18n="auth.email_hint">Used only for the free trial so you can test the extension.</div>
               <div class="auth-footer-row">
-                <button class="btn btn-green" id="btnAuthResend" disabled data-i18n="auth.resend">Start 1-day trial</button>
+                <button class="btn btn-green" id="btnAuthResend" disabled data-i18n="auth.resend">Start trial</button>
               </div>
             </div>
 
