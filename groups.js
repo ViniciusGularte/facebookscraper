@@ -22,7 +22,7 @@ function appendLog(text, type = "info") {
 function fallbackImg() {
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40">` +
-    `<rect width="40" height="40" fill="#1f2937"/>` +
+    `<rect width="40" height="40" rx="8" fill="#f5f4f2"/>` +
     `</svg>`;
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }

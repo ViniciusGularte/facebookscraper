@@ -4,97 +4,236 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>FB Groups - Selecao</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;800;900&family=Barlow:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
     <style>
+      :root {
+        --orange: #f5630a;
+        --orange-dark: #c94e00;
+        --orange-pale: #fff3ec;
+        --orange-border: #ffd4b8;
+        --charcoal: #1c1c1c;
+        --gray-dark: #3d3d3d;
+        --gray-mid: #717171;
+        --gray-light: #f5f4f2;
+        --white: #ffffff;
+        --border: #e2ddd8;
+        --green: #16a34a;
+        --red: #dc2626;
+      }
+
       * { box-sizing: border-box; margin: 0; padding: 0; }
       body {
-        font-family: "Segoe UI", Tahoma, sans-serif;
-        background: #0b1220;
-        color: #e5e7eb;
+        font-family: "Barlow", sans-serif;
+        background:
+          radial-gradient(820px 300px at 100% 0%, rgba(245, 99, 10, 0.1) 0%, transparent 56%),
+          var(--gray-light);
+        color: var(--charcoal);
         min-height: 100vh;
-        padding: 20px;
+        padding: 28px 20px;
       }
-      .wrap { max-width: 1200px; margin: 0 auto; }
-      h1 { font-size: 22px; margin-bottom: 12px; }
+
+      button,
+      input {
+        font-family: inherit;
+      }
+
+      .wrap {
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+
+      h1 {
+        font-family: "Barlow Condensed", sans-serif;
+        font-size: 32px;
+        font-weight: 800;
+        line-height: 1;
+        margin-bottom: 8px;
+        color: var(--charcoal);
+      }
+
+      .intro {
+        font-size: 14px;
+        color: var(--gray-mid);
+        margin-bottom: 18px;
+      }
+
       .toolbar {
         display: flex;
         flex-wrap: wrap;
-        gap: 8px;
+        gap: 10px;
         align-items: center;
-        margin-bottom: 12px;
+        margin-bottom: 18px;
+        padding: 16px 18px;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        background: var(--white);
+        box-shadow: 0 1px 4px rgba(0,0,0,0.06);
       }
+
       .btn {
-        border: 0;
-        border-radius: 8px;
-        padding: 9px 14px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 6px;
+        padding: 9px 18px;
         font-size: 13px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
         cursor: pointer;
+        text-decoration: none;
+        border: 0;
         color: #fff;
+        background: var(--orange);
+        transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
       }
-      .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-      .btn-blue { background: #2563eb; }
-      .btn-red { background: #dc2626; }
-      .btn-green { background: #16a34a; }
-      .btn-gray { background: #374151; }
-      .stat { font-size: 13px; color: #93c5fd; }
-      .stat-ok { color: #86efac; }
+
+      .btn:hover {
+        background: var(--orange-dark);
+      }
+
+      .btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .btn-blue,
+      .btn-green {
+        background: var(--orange);
+      }
+
+      .btn-red {
+        background: transparent;
+        border: 1.5px solid var(--red);
+        color: var(--red);
+        letter-spacing: 0;
+        text-transform: none;
+      }
+
+      .btn-red:hover {
+        background: #fef2f2;
+      }
+
+      .btn-gray {
+        background: transparent;
+        border: 1.5px solid var(--charcoal);
+        color: var(--charcoal);
+        letter-spacing: 0;
+        text-transform: none;
+      }
+
+      .btn-gray:hover {
+        background: var(--gray-light);
+      }
+
+      .stat {
+        font-size: 13px;
+        color: var(--gray-mid);
+      }
+
+      .stat-ok {
+        color: var(--green);
+        font-weight: 600;
+      }
+
       #groupsGrid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-        gap: 10px;
-        margin-top: 14px;
+        gap: 12px;
       }
+
       .card {
         display: flex;
         align-items: center;
-        gap: 10px;
-        background: #111827;
-        border: 1px solid #1f2937;
-        border-radius: 10px;
-        padding: 10px;
+        gap: 12px;
+        background: var(--white);
+        border: 1.5px solid var(--border);
+        border-radius: 8px;
+        padding: 12px;
         cursor: pointer;
+        transition: border-color 150ms ease, box-shadow 150ms ease, background 150ms ease;
       }
+
+      .card:hover {
+        border-color: var(--orange);
+        box-shadow: 0 2px 8px rgba(245,99,10,0.12);
+      }
+
       .card.selected {
-        border-color: #22c55e;
-        background: #052e16;
+        border: 2px solid var(--orange);
+        background: #fff8f5;
       }
+
       .card img {
         width: 40px;
         height: 40px;
         border-radius: 8px;
         object-fit: cover;
         flex-shrink: 0;
+        background: var(--gray-light);
+        border: 1px solid var(--border);
       }
+
       .name {
-        font-size: 13px;
+        font-size: 14px;
         font-weight: 600;
-        color: #f8fafc;
+        color: var(--charcoal);
       }
+
       .meta {
-        font-size: 11px;
-        color: #9ca3af;
-        margin-top: 2px;
+        font-size: 12px;
+        color: var(--gray-mid);
+        margin-top: 4px;
       }
+
       #log {
-        margin-top: 14px;
-        background: #020617;
-        border: 1px solid #1e293b;
+        margin-top: 18px;
+        background: var(--white);
+        border: 1px solid var(--border);
         border-radius: 8px;
-        padding: 10px;
+        padding: 12px;
         min-height: 80px;
         max-height: 200px;
         overflow-y: auto;
-        font-family: monospace;
+        font-family: ui-monospace, "SFMono-Regular", monospace;
         font-size: 12px;
+        color: var(--gray-dark);
+        box-shadow: 0 1px 4px rgba(0,0,0,0.06);
       }
+
       .line { margin-bottom: 4px; }
-      .ok { color: #86efac; }
-      .err { color: #fca5a5; }
-      .info { color: #93c5fd; }
+      .ok { color: var(--green); }
+      .err { color: var(--red); }
+      .info { color: var(--orange-dark); }
+
+      @media (max-width: 680px) {
+        body {
+          padding: 18px 14px;
+        }
+
+        h1 {
+          font-size: 28px;
+        }
+
+        .toolbar {
+          padding: 14px;
+        }
+
+        #groupsGrid {
+          grid-template-columns: 1fr;
+        }
+      }
     </style>
   </head>
   <body>
     <div class="wrap">
       <h1>Selecao de Grupos para Notificacao</h1>
+      <p class="intro">Escolha quais grupos entram no monitoramento e mantenha a selecao alinhada com o seu nicho.</p>
       <div class="toolbar">
         <button id="btnStart" class="btn btn-blue">Buscar Grupos</button>
         <button id="btnStop" class="btn btn-red" disabled>Parar Busca</button>

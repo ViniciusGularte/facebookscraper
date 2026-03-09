@@ -14,7 +14,7 @@ export function normalizeMonitorConfig(payload = {}) {
     negativeKeywords: normalizeKeywordList(payload.negativeKeywords),
     profileName: String(payload.profileName || "").trim(),
     minMinutes: Number(payload.minMinutes) || 3,
-    maxMinutes: Number(payload.maxMinutes) || 7,
+    maxMinutes: Number(payload.maxMinutes) || 8,
   };
 }
 

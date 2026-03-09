@@ -10,8 +10,8 @@ export function upsertProfile({
     name: String(draft?.name || "").trim(),
     positiveKeywords: Array.isArray(draft?.positiveKeywords) ? draft.positiveKeywords : [],
     negativeKeywords: Array.isArray(draft?.negativeKeywords) ? draft.negativeKeywords : [],
-    minMinutes: Number(draft?.minMinutes) || 5,
-    maxMinutes: Number(draft?.maxMinutes) || 10,
+    minMinutes: Number(draft?.minMinutes) || 3,
+    maxMinutes: Number(draft?.maxMinutes) || 8,
   };
 
   let nextSelectedProfileId = String(selectedProfileId || "").trim();

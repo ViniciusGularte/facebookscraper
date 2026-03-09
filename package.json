@@ -21,7 +21,7 @@
     "pack": "BUILD_ZIP=1 node scripts/build.mjs",
     "pack:obfuscate": "ALLOW_OBFUSCATE=1 BUILD_ZIP=1 node scripts/build.mjs",
     "video:studio": "remotion studio remotion/index.jsx",
-    "video:render": "remotion render remotion/index.jsx ExtensionPromo store-assets/video/promo-demo-remotion-1280x800.mp4"
+    "video:render": "remotion render remotion/index.jsx ExtensionPromo store-assets/video/promo-video.mp4"
   },
   "devDependencies": {
     "esbuild": "^0.25.0",
@@ -29,6 +29,7 @@
   },
   "dependencies": {
     "@remotion/cli": "^4.0.434",
+    "@remotion/google-fonts": "^4.0.434",
     "@remotion/media": "^4.0.434",
     "@remotion/transitions": "^4.0.434",
     "react": "^19.2.4",

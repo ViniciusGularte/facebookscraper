@@ -3,275 +3,851 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>GrabClientsNow - Real Capture</title>
+  <title>GrabClientsNow Store Assets</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;800;900&family=Barlow:wght@400;500;600;700&display=swap"
+    rel="stylesheet"
+  />
   <style>
     :root {
-      --bg: #050e0a;
-      --cyan: #00e5cc;
-      --overlay: rgba(5, 14, 10, 0.2);
-      --text: #effef8;
-      --muted: #c7efe0;
+      --orange: #f5630a;
+      --orange-dark: #c94e00;
+      --orange-pale: #fff3ec;
+      --charcoal: #1c1c1c;
+      --offwhite: #f5f4f2;
+      --border: #e2ddd8;
+      --gray-dark: #3d3d3d;
+      --gray-mid: #717171;
+      --white: #ffffff;
+      --green: #16a34a;
+      --green-soft: #f0fdf4;
+      --red: #dc2626;
+      --red-soft: #fef2f2;
+      --yellow: #d97706;
+      --yellow-soft: #fffbeb;
+      --shadow: 0 26px 60px rgba(28, 28, 28, 0.14);
+      --font-display: "Barlow Condensed", "Arial Narrow", sans-serif;
+      --font-body: "Barlow", "Segoe UI", sans-serif;
     }
 
     * { box-sizing: border-box; }
-    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; }
-    body {
-      font-family: "DM Sans", "Segoe UI", sans-serif;
-      background: radial-gradient(1200px 500px at 85% -10%, #00ff8820 0%, transparent 62%), var(--bg);
-    }
 
-    .stage { position: relative; width: 100vw; height: 100vh; overflow: hidden; }
-    .frame {
-      position: absolute;
-      inset: 0;
-      border: 1px solid #1e3a28;
+    html,
+    body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
       background: #000;
     }
 
-    iframe {
+    body {
+      font-family: var(--font-body);
+      color: var(--charcoal);
+    }
+
+    .screen {
+      position: relative;
+      width: 1280px;
+      height: 800px;
+      overflow: hidden;
+    }
+
+    .hero-screen {
+      background: var(--orange);
+      color: var(--white);
+    }
+
+    .hero-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      height: calc(100% - 60px);
+      padding: 84px 86px 48px;
+      gap: 48px;
+    }
+
+    .hero-kicker {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.28);
+      background: rgba(255, 255, 255, 0.1);
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .hero-kicker img {
+      width: 20px;
+      height: 20px;
+      display: block;
+      border-radius: 6px;
+    }
+
+    .hero-headline {
+      margin-top: 28px;
+      font-family: var(--font-display);
+      font-size: 88px;
+      line-height: 0.9;
+      letter-spacing: -0.04em;
+      font-weight: 900;
+      white-space: pre-line;
+    }
+
+    .hero-subline {
+      margin-top: 24px;
+      max-width: 480px;
+      font-size: 24px;
+      line-height: 1.26;
+      color: rgba(255, 255, 255, 0.82);
+      white-space: pre-line;
+    }
+
+    .hero-visual {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .hero-visual::before {
+      content: "";
+      position: absolute;
+      width: 520px;
+      height: 520px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0) 72%);
+      filter: blur(8px);
+    }
+
+    .post-card {
+      position: relative;
+      width: 488px;
+      border-radius: 28px;
+      background: var(--white);
+      color: var(--charcoal);
+      box-shadow: var(--shadow);
+      padding: 26px;
+      z-index: 1;
+    }
+
+    .post-card-head {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .avatar {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #d7d7d7 0%, #bdbdbd 100%);
+    }
+
+    .post-author {
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .post-meta {
+      margin-top: 4px;
+      font-size: 14px;
+      color: var(--gray-mid);
+    }
+
+    .post-copy {
+      margin-top: 22px;
+      font-size: 34px;
+      line-height: 1.04;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+    }
+
+    .post-body {
+      margin-top: 16px;
+      font-size: 18px;
+      line-height: 1.4;
+      color: var(--gray-dark);
+    }
+
+    .alert-badge {
+      margin-top: 22px;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 11px 16px;
+      border-radius: 999px;
+      background: var(--orange);
+      color: var(--white);
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+
+    .hero-strip {
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--charcoal);
+      font-family: var(--font-display);
+      font-size: 28px;
+      letter-spacing: 0.02em;
+      font-weight: 700;
+      color: var(--white);
+    }
+
+    .howto-screen,
+    .comparison-screen {
+      background: var(--offwhite);
+    }
+
+    .howto-wrap,
+    .comparison-wrap {
+      width: 100%;
+      height: 100%;
+      padding: 72px 74px;
+    }
+
+    .label {
+      color: var(--orange);
+      font-family: var(--font-display);
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .headline {
+      margin-top: 12px;
+      font-family: var(--font-display);
+      font-size: 68px;
+      line-height: 0.92;
+      letter-spacing: -0.04em;
+      font-weight: 900;
+      color: var(--charcoal);
+      white-space: pre-line;
+    }
+
+    .howto-cards {
+      margin-top: 58px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+    }
+
+    .step-card {
+      position: relative;
+      min-height: 450px;
+      padding: 28px;
+      border-radius: 12px;
+      border: 1.5px solid var(--border);
+      background: var(--white);
+      box-shadow: 0 12px 28px rgba(28, 28, 28, 0.06);
+      overflow: hidden;
+    }
+
+    .step-number {
+      position: absolute;
+      top: 14px;
+      right: 18px;
+      font-family: var(--font-display);
+      font-size: 88px;
+      font-weight: 900;
+      line-height: 1;
+      letter-spacing: -0.04em;
+      color: rgba(245, 99, 10, 0.08);
+    }
+
+    .step-icon {
+      font-size: 34px;
+      line-height: 1;
+    }
+
+    .step-title {
+      margin-top: 20px;
+      font-family: var(--font-display);
+      font-size: 34px;
+      line-height: 0.95;
+      font-weight: 700;
+      color: var(--charcoal);
+    }
+
+    .pill-row {
+      margin-top: 22px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .pill {
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: var(--orange-pale);
+      border: 1px solid #ffd4b8;
+      color: var(--orange-dark);
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .mini-groups {
+      margin-top: 24px;
+      display: grid;
+      gap: 14px;
+    }
+
+    .mini-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px;
+      border-radius: 10px;
+      border: 1.5px solid #ffd4b8;
+      background: #fff8f5;
+    }
+
+    .mini-check {
+      width: 20px;
+      height: 20px;
+      border-radius: 6px;
+      background: var(--orange);
+      position: relative;
+      flex: 0 0 auto;
+    }
+
+    .mini-check::after {
+      content: "";
+      position: absolute;
+      left: 6px;
+      top: 3px;
+      width: 5px;
+      height: 10px;
+      border-right: 2px solid #fff;
+      border-bottom: 2px solid #fff;
+      transform: rotate(38deg);
+    }
+
+    .mini-group strong {
+      display: block;
+      font-size: 16px;
+      color: var(--charcoal);
+    }
+
+    .mini-group span {
+      display: block;
+      margin-top: 4px;
+      font-size: 13px;
+      color: var(--gray-mid);
+    }
+
+    .phone {
+      margin-top: 24px;
+      width: 252px;
+      border-radius: 30px;
+      background: var(--charcoal);
+      padding: 14px 12px 18px;
+      box-shadow: 0 18px 34px rgba(28, 28, 28, 0.16);
+    }
+
+    .phone-notch {
+      width: 110px;
+      height: 18px;
+      margin: 0 auto 14px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.12);
+    }
+
+    .phone-alert {
+      border-radius: 18px;
+      background: var(--white);
+      padding: 16px;
+    }
+
+    .phone-alert-head {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--orange-dark);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .phone-alert-body {
+      margin-top: 10px;
+      font-size: 18px;
+      line-height: 1.2;
+      font-weight: 700;
+      color: var(--charcoal);
+    }
+
+    .phone-alert-meta {
+      margin-top: 10px;
+      font-size: 13px;
+      color: var(--gray-mid);
+    }
+
+    .dashboard-screen {
+      background: var(--charcoal);
+    }
+
+    .dashboard-accent {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: var(--orange);
+    }
+
+    .dashboard-label {
+      position: absolute;
+      top: 48px;
+      width: 100%;
+      text-align: center;
+      font-family: var(--font-display);
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      color: var(--white);
+    }
+
+    .dashboard-shell {
+      position: absolute;
+      left: 50%;
+      top: 120px;
+      transform: translateX(-50%);
+      width: 1040px;
+      height: 620px;
+      padding: 22px;
+      border-radius: 34px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.4);
+    }
+
+    .dashboard-panel {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      border-radius: 26px;
+      overflow: hidden;
+      background: var(--white);
+      box-shadow: 0 32px 80px rgba(0, 0, 0, 0.28);
+    }
+
+    .dashboard-panel iframe {
       width: 100%;
       height: 100%;
       border: 0;
       display: block;
-      background: #000;
     }
 
-    .veil {
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(180deg, rgba(5, 14, 10, 0) 0%, var(--overlay) 100%);
-      pointer-events: none;
+    .comparison-grid {
+      margin-top: 48px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 28px;
     }
 
-    .caption {
-      position: absolute;
-      left: 18px;
-      right: 18px;
-      bottom: 16px;
-      border: 1px solid rgba(0, 229, 204, 0.32);
-      border-radius: 14px;
-      background: linear-gradient(180deg, rgba(3, 15, 10, 0.82) 0%, rgba(2, 10, 8, 0.96) 100%);
-      padding: 11px 14px;
-      display: flex;
-      gap: 10px;
-      align-items: center;
-      pointer-events: none;
-      box-shadow: 0 12px 24px rgba(0, 0, 0, 0.35);
+    .compare-card {
+      min-height: 430px;
+      border-radius: 18px;
+      padding: 28px 28px 26px;
+      background: var(--white);
+      border-left: 4px solid transparent;
+      box-shadow: 0 12px 28px rgba(28, 28, 28, 0.07);
     }
 
-    .cap-badge {
-      border: 1px solid rgba(0, 229, 204, 0.4);
-      border-radius: 999px;
-      padding: 3px 8px;
-      font-size: 10px;
-      font-weight: 800;
-      letter-spacing: 0.03em;
-      color: #d7fff6;
-      background: rgba(3, 28, 21, 0.8);
-      white-space: nowrap;
-      text-transform: uppercase;
+    .compare-card.old {
+      background: var(--red-soft);
+      border-left-color: var(--red);
     }
 
-    .cap-text {
-      font-size: 20px;
+    .compare-card.new {
+      background: var(--orange-pale);
+      border-left-color: var(--orange);
+    }
+
+    .compare-title {
+      font-family: var(--font-display);
+      font-size: 34px;
       font-weight: 700;
-      color: var(--text);
-      line-height: 1.08;
+      color: var(--charcoal);
     }
 
-    .small .caption {
-      left: 8px;
-      right: 8px;
-      bottom: 8px;
-      padding: 5px 7px;
-      gap: 5px;
-      border-radius: 8px;
+    .compare-list {
+      margin: 22px 0 0;
+      padding: 0;
+      list-style: none;
+      display: grid;
+      gap: 16px;
+      font-size: 26px;
+      line-height: 1.2;
+      color: var(--gray-dark);
+      font-weight: 500;
     }
 
-    .small .cap-badge { font-size: 8px; padding: 2px 6px; }
-    .small .cap-text { font-size: 11px; }
-    .marquee .caption {
-      left: 26px;
-      right: 26px;
-      bottom: 18px;
-      padding: 10px 14px;
+    .compare-list li strong {
+      color: var(--charcoal);
     }
 
-    .marquee .cap-badge { font-size: 11px; }
-    .marquee .cap-text { font-size: 32px; line-height: 0.95; }
+    .comparison-cta {
+      position: absolute;
+      left: 74px;
+      right: 74px;
+      bottom: 72px;
+      height: 74px;
+      border-radius: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--orange);
+      color: var(--white);
+      font-family: var(--font-display);
+      font-size: 34px;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+    }
 
+    .social-screen {
+      background: var(--orange);
+      color: var(--white);
+      text-align: center;
+    }
+
+    .social-wrap {
+      width: 100%;
+      height: 100%;
+      padding: 88px 110px 72px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .stars {
+      font-size: 44px;
+      letter-spacing: 0.08em;
+    }
+
+    .quote {
+      max-width: 760px;
+      margin-top: 24px;
+      font-size: 34px;
+      line-height: 1.26;
+      font-weight: 500;
+      white-space: pre-line;
+    }
+
+    .quote-by {
+      margin-top: 18px;
+      font-size: 20px;
+      font-weight: 600;
+      color: rgba(255, 255, 255, 0.74);
+    }
+
+    .trial-card {
+      width: 430px;
+      padding: 28px 28px 24px;
+      border-radius: 22px;
+      background: var(--white);
+      box-shadow: var(--shadow);
+      color: var(--charcoal);
+    }
+
+    .trial-title {
+      font-family: var(--font-display);
+      font-size: 42px;
+      font-weight: 900;
+      line-height: 0.96;
+    }
+
+    .trial-button {
+      margin-top: 22px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 58px;
+      border-radius: 12px;
+      background: var(--charcoal);
+      color: var(--white);
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+
+    .trial-meta {
+      margin-top: 16px;
+      font-size: 14px;
+      color: var(--gray-mid);
+    }
   </style>
 </head>
 <body>
-  <div class="stage" id="stage">
-    <div class="frame"><iframe id="appFrame"></iframe></div>
-    <div class="veil"></div>
-    <div class="caption">
-      <span class="cap-badge" id="capBadge">Feature</span>
-      <span class="cap-text" id="capText">Real UI capture</span>
-    </div>
-  </div>
+  <div id="app"></div>
 
   <script>
-    const SCENES = {
-      home: {
-        page: 'index',
-        tab: 'home',
-        badge: 'Live Monitoring',
-      text: 'Capture clients first while competitors are still searching.'
-      },
-      groups: {
-        page: 'index',
-        tab: 'groups',
-        badge: 'Group Selection',
-      text: 'Find buyer-intent posts fast and build daily pipeline.'
-      },
-      leads: {
-        page: 'index',
-        tab: 'leads',
-        badge: 'Lead Feed',
-      text: 'Respond first, book more calls, and close faster.'
-      },
-      alerts: {
-        page: 'index',
-        tab: 'profiles',
-        badge: 'Alert Builder',
-      text: 'Target high-intent keywords and remove low-quality noise.'
-      },
-      notifications: {
-        page: 'index',
-        tab: 'notifications',
-        badge: 'Notifications',
-      text: 'Get instant alerts and move before anyone else.'
-      },
-      promoSmall: {
-        page: 'index',
-        tab: 'home',
-        badge: 'Chrome Extension',
-        text: 'Capture clients in real time.',
-        classes: ['small']
-      },
-      marquee: {
-        page: 'index',
-        tab: 'home',
-        badge: 'GrabClientsNow',
-        text: 'Get clients first. Reply before competitors.',
-        classes: ['marquee']
-      }
+    const templates = {
+      hero: `
+        <section class="screen hero-screen">
+          <div class="hero-grid">
+            <div>
+              <div class="hero-kicker">
+                <img src="../../assets/icon.png" alt="" />
+                <span>GrabClientsNow</span>
+              </div>
+              <div class="hero-headline">BE FIRST.\nWIN THE JOB.</div>
+              <div class="hero-subline">Get alerted the second someone posts in\nyour local Facebook Group.</div>
+            </div>
+            <div class="hero-visual">
+              <div class="post-card">
+                <div class="post-card-head">
+                  <div class="avatar"></div>
+                  <div>
+                    <div class="post-author">Sarah M.</div>
+                    <div class="post-meta">Local Homeowners Group · 47 seconds ago</div>
+                  </div>
+                </div>
+                <div class="post-copy">Anyone recommend a plumber urgent? No hot water.</div>
+                <div class="post-body">Budget flexible. Need someone today if possible. Comment or DM if available.</div>
+                <div class="alert-badge">⚡ Alert — 47 seconds ago</div>
+              </div>
+            </div>
+          </div>
+          <div class="hero-strip">60 SEC alert · 70%+ close rate · $0 per lead</div>
+        </section>
+      `,
+      howto: `
+        <section class="screen howto-screen">
+          <div class="howto-wrap">
+            <div class="label">How it works</div>
+            <div class="headline">3 Steps. Done.</div>
+            <div class="howto-cards">
+              <article class="step-card">
+                <div class="step-number">01</div>
+                <div class="step-icon">🔑</div>
+                <div class="step-title">Set Your Keywords</div>
+                <div class="pill-row">
+                  <span class="pill">urgent</span>
+                  <span class="pill">recommend</span>
+                  <span class="pill">need</span>
+                  <span class="pill">quote</span>
+                  <span class="pill">near me</span>
+                </div>
+              </article>
+              <article class="step-card">
+                <div class="step-number">02</div>
+                <div class="step-icon">👥</div>
+                <div class="step-title">Pick Your Groups</div>
+                <div class="mini-groups">
+                  <div class="mini-group">
+                    <div class="mini-check"></div>
+                    <div><strong>Tampa Homeowners</strong><span>Selected</span></div>
+                  </div>
+                  <div class="mini-group">
+                    <div class="mini-check"></div>
+                    <div><strong>Florida Contractors</strong><span>Selected</span></div>
+                  </div>
+                  <div class="mini-group">
+                    <div class="mini-check"></div>
+                    <div><strong>Local Referrals</strong><span>Selected</span></div>
+                  </div>
+                </div>
+              </article>
+              <article class="step-card">
+                <div class="step-number">03</div>
+                <div class="step-icon">⚡</div>
+                <div class="step-title">Get Alerted. Reply First.</div>
+                <div class="phone">
+                  <div class="phone-notch"></div>
+                  <div class="phone-alert">
+                    <div class="phone-alert-head">GrabClientsNow</div>
+                    <div class="phone-alert-body">Plumber needed · Tampa FL</div>
+                    <div class="phone-alert-meta">Reply before competitors pile in.</div>
+                  </div>
+                </div>
+              </article>
+            </div>
+          </div>
+        </section>
+      `,
+      dashboard: `
+        <section class="screen dashboard-screen">
+          <div class="dashboard-accent"></div>
+          <div class="dashboard-label">YOUR COMMAND CENTER — ALWAYS WATCHING</div>
+          <div class="dashboard-shell">
+            <div class="dashboard-panel">
+              <iframe id="dashboardFrame" title="GrabClientsNow dashboard"></iframe>
+            </div>
+          </div>
+        </section>
+      `,
+      comparison: `
+        <section class="screen comparison-screen">
+          <div class="comparison-wrap">
+            <div class="headline">Stop Paying $150\nFor Junk Leads.</div>
+            <div class="comparison-grid">
+              <article class="compare-card old">
+                <div class="compare-title">The Old Way</div>
+                <ul class="compare-list">
+                  <li>✗ <strong>$35–$120 per lead</strong> (Thumbtack/Angi)</li>
+                  <li>✗ Shared with 3–8 competitors</li>
+                  <li>✗ 10–20% close rate</li>
+                  <li>✗ Price war before you even talk</li>
+                </ul>
+              </article>
+              <article class="compare-card new">
+                <div class="compare-title">GrabClientsNow</div>
+                <ul class="compare-list">
+                  <li>✓ <strong>$0 per lead</strong></li>
+                  <li>✓ Exclusive — you reply first</li>
+                  <li>✓ 70%+ close rate</li>
+                  <li>✓ They already asked for help</li>
+                </ul>
+              </article>
+            </div>
+            <div class="comparison-cta">From $49 lifetime · Free trial · No card needed</div>
+          </div>
+        </section>
+      `,
+      social: `
+        <section class="screen social-screen">
+          <div class="social-wrap">
+            <div>
+              <div class="stars">★★★★★</div>
+              <div class="quote">Bought the lifetime extension for $49 and in week one\nI closed a $300 job just by commenting first.</div>
+              <div class="quote-by">— Alex L. · HVAC · Tampa, FL</div>
+            </div>
+            <div class="trial-card">
+              <div class="trial-title">Start Free Trial</div>
+              <div class="trial-button">Start Free Trial</div>
+              <div class="trial-meta">No card needed · 7-day refund</div>
+            </div>
+          </div>
+        </section>
+      `,
     };
 
     const params = new URLSearchParams(window.location.search);
-    const sceneKey = params.get('scene') || 'home';
-    const scene = SCENES[sceneKey] || SCENES.home;
+    const scene = params.get("scene") || "hero";
+    document.getElementById("app").innerHTML = templates[scene] || templates.hero;
 
-    const stage = document.getElementById('stage');
-    (scene.classes || []).forEach((c) => stage.classList.add(c));
+    if (scene === "dashboard") {
+      const frame = document.getElementById("dashboardFrame");
+      const root = window.location.pathname.replace(/\/scripts\/templates\/store-real-capture\.html$/, "");
+      frame.src = `file://${root}/dist/index.html`;
 
-    document.getElementById('capBadge').textContent = scene.badge;
-    document.getElementById('capText').textContent = scene.text;
-
-    const frame = document.getElementById('appFrame');
-    const root = window.location.pathname.replace(/\/scripts\/templates\/store-real-capture\.html$/, '');
-    frame.src = `file://${root}/dist/index.html`;
-
-    function seedDemoContent(doc) {
-      const orb = doc.getElementById('monitorOrb');
-      if (orb) {
-        orb.classList.remove('idle');
-        orb.classList.add('monitoring');
-      }
-
-      const headline = doc.getElementById('systemStateHeadline');
-      if (headline) headline.textContent = 'Monitoring is ACTIVE';
-
-      const nextScan = doc.getElementById('homeNextScanStatus');
-      if (nextScan) nextScan.textContent = 'Next scan: in 02:14';
-
-      const groupsMonitored = doc.getElementById('homeGroupsMonitored');
-      if (groupsMonitored) groupsMonitored.textContent = 'Checking 48 groups';
-
-      const leadsSummary = doc.getElementById('homeLeadsSummary');
-      if (leadsSummary) leadsSummary.textContent = '27 leads in last 7 days';
-
-      const groupCount = doc.getElementById('groupCount');
-      if (groupCount) groupCount.textContent = '48 groups monitored';
-
-      const groupsSummary = doc.getElementById('groupsSelectionSummary');
-      if (groupsSummary) groupsSummary.textContent = '32 selected groups - 16 unselected';
-
-      const groupsList = doc.getElementById('groupsList');
-      if (groupsList && !groupsList.children.length) {
-        const data = [
-          ['Austin Local Business Network', '124k members'],
-          ['Home Services Marketplace', '52k members'],
-          ['SaaS Founders Exchange', '38k members'],
-          ['Marketing Contractors Hub', '41k members'],
-          ['Real Estate Questions Daily', '59k members'],
-          ['Ecommerce Operators Club', '27k members']
-        ];
-        groupsList.innerHTML = '';
-        data.forEach((g, idx) => {
-          const card = doc.createElement('label');
-          card.className = `group-card ${idx % 2 === 0 ? 'selected' : ''}`;
-          card.innerHTML = `
-            <div class="group-top">
-              <img alt="Group" src="data:image/svg+xml;charset=UTF-8,${encodeURIComponent('<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'64\' height=\'64\'><rect width=\'64\' height=\'64\' fill=\'#0f2015\'/><circle cx=\'32\' cy=\'32\' r=\'18\' fill=\'#00e5cc\' opacity=\'0.35\'/></svg>')}" />
-              <div class="info"><div class="name">${g[0]}</div><div class="meta">${g[1]}</div></div>
-              <input type="checkbox" class="group-select" ${idx % 2 === 0 ? 'checked' : ''} />
-            </div>`;
-          groupsList.appendChild(card);
-        });
-      }
-
-      const leadsList = doc.getElementById('leadsList');
-      if (leadsList && !leadsList.children.length) {
-        const leads = [
-          ['Need a roofing quote this week', 'Austin Local Business Network', '2 min ago'],
-          ['Looking for social media manager', 'Marketing Contractors Hub', '6 min ago'],
-          ['Any recommendation for tax advisor?', 'SaaS Founders Exchange', '11 min ago']
-        ];
-        leadsList.innerHTML = '';
-        leads.forEach((lead) => {
-          const card = doc.createElement('article');
-          card.style.border = '1px solid #1e3a28';
-          card.style.borderRadius = '10px';
-          card.style.padding = '10px';
-          card.style.background = '#0b1911';
-          card.innerHTML = `<div style="font-size:13px;font-weight:700;color:#e8f5ee">${lead[0]}</div><div style="font-size:11px;color:#a7cfba;margin-top:4px">${lead[1]}</div><div style="font-size:11px;color:#00e5cc;margin-top:6px">${lead[2]}</div>`;
-          leadsList.appendChild(card);
-        });
-      }
-
-      const leadsCount = doc.getElementById('leadsCount');
-      if (leadsCount) leadsCount.textContent = '3';
-
-      const profilesList = doc.getElementById('profilesList');
-      if (profilesList && !profilesList.children.length) {
-        profilesList.innerHTML = `<details class="profile-item active" open><summary><div class="profile-item-head"><div><div class="title">Local Service Buyers</div><div class="meta">6 include - 4 exclude - active</div></div></div></summary><div class="profile-item-body"><div class="kw-list"><span class="kw-chip pos">looking for</span><span class="kw-chip pos">recommend</span><span class="kw-chip neg">job offer</span></div></div></details>`;
-      }
-    }
-
-    frame.addEventListener('load', () => {
-      try {
+      frame.addEventListener("load", () => {
         const doc = frame.contentDocument;
         if (!doc) return;
 
-        if (scene.tab) {
-          const tabs = Array.from(doc.querySelectorAll('.tab-btn'));
-          tabs.forEach((el) => el.classList.remove('active'));
-          const activeBtn = doc.querySelector(`.tab-btn[data-tab="${scene.tab}"]`);
-          if (activeBtn) activeBtn.classList.add('active');
+        doc.querySelectorAll(".tab-btn").forEach((tab) => {
+          const active = tab.dataset.tab === "home";
+          tab.classList.toggle("active", active);
+        });
+        doc.querySelectorAll(".panel").forEach((panel) => {
+          panel.classList.toggle("active", panel.dataset.panel === "home");
+        });
 
-          const panels = Array.from(doc.querySelectorAll('.panel'));
-          panels.forEach((el) => el.classList.remove('active'));
-          const activePanel = doc.querySelector(`.panel[data-panel="${scene.tab}"]`);
-          if (activePanel) activePanel.classList.add('active');
+        const loginStatus = doc.getElementById("loginStatus");
+        if (loginStatus) {
+          loginStatus.classList.remove("disconnected");
+          loginStatus.classList.add("connected");
+          loginStatus.innerHTML = '<span class="status-dot"></span><span>Logged: owner@grabclientsnow.com</span>';
         }
 
-        seedDemoContent(doc);
-      } catch {
-      }
-    });
+        const footer = doc.querySelector(".fb-status");
+        if (footer) footer.dataset.state = "connected";
+
+        const footerText = doc.getElementById("fbFooterText");
+        if (footerText) footerText.textContent = "Facebook connected";
+
+        const orb = doc.getElementById("monitorOrb");
+        if (orb) orb.className = "orb monitoring";
+
+        const heroTitle = doc.querySelector(".hero-copy h2");
+        if (heroTitle) heroTitle.textContent = "Monitoring is ON";
+
+        const heroCopy = doc.querySelector(".hero-copy p");
+        if (heroCopy) heroCopy.textContent = "Watching local buyer-intent posts and ready for the next scan.";
+
+        const requirements = doc.querySelector(".login-requirements");
+        if (requirements) requirements.style.display = "none";
+
+        const loginHint = doc.getElementById("loginHint");
+        if (loginHint) loginHint.style.display = "none";
+
+        const planBanner = doc.getElementById("planBanner");
+        if (planBanner) planBanner.style.display = "none";
+
+        const trialCta = doc.getElementById("dashboardTrialCta");
+        if (trialCta) trialCta.hidden = true;
+
+        const guidedCard = doc.getElementById("cardGuidedSetup");
+        if (guidedCard) {
+          guidedCard.innerHTML =
+            '<h2 style="margin:0;color:#F5630A;font-family:&quot;Barlow Condensed&quot;,&quot;Arial Narrow&quot;,sans-serif;font-size:18px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase">Live stats</h2>' +
+            '<div style="margin-top:18px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px">' +
+            '<div style="padding:16px;border:1px solid #E2DDD8;border-radius:14px;background:#FFF8F5"><div style="font-family:&quot;Barlow Condensed&quot;,&quot;Arial Narrow&quot;,sans-serif;font-size:34px;font-weight:900;line-height:0.95;color:#1C1C1C">777 groups</div><div style="margin-top:8px;font-size:13px;color:#3D3D3D">Groups monitored</div></div>' +
+            '<div style="padding:16px;border:1px solid #E2DDD8;border-radius:14px;background:#FFFFFF"><div style="font-family:&quot;Barlow Condensed&quot;,&quot;Arial Narrow&quot;,sans-serif;font-size:34px;font-weight:900;line-height:0.95;color:#1C1C1C">4 min</div><div style="margin-top:8px;font-size:13px;color:#3D3D3D">Next scan</div></div>' +
+            '<div style="padding:16px;border:1px solid #E2DDD8;border-radius:14px;background:#F0FDF4"><div style="font-family:&quot;Barlow Condensed&quot;,&quot;Arial Narrow&quot;,sans-serif;font-size:34px;font-weight:900;line-height:0.95;color:#16A34A">0 leads</div><div style="margin-top:8px;font-size:13px;color:#3D3D3D">This week</div></div>' +
+            '</div>';
+        }
+
+        const groups = doc.getElementById("homeGroupsMonitored");
+        if (groups) groups.textContent = "777 groups";
+
+        const nextScan = doc.getElementById("homeNextScanStatus");
+        if (nextScan) {
+          nextScan.textContent = "4 min";
+          nextScan.classList.remove("compact");
+        }
+
+        const lastLead = doc.getElementById("homeLastLead");
+        if (lastLead) lastLead.textContent = "Last lead: none yet";
+
+        const leadsSummary = doc.getElementById("homeLeadsSummary");
+        if (leadsSummary) leadsSummary.textContent = "0";
+
+        const systemStatus = doc.getElementById("homeSystemStatus");
+        if (systemStatus) systemStatus.textContent = "Monitoring live";
+
+        const systemHeadline = doc.getElementById("systemStateHeadline");
+        if (systemHeadline) {
+          systemHeadline.textContent = "Monitoring is ON";
+          systemHeadline.classList.add("on");
+        }
+
+        const sleepBanner = doc.getElementById("sleepModeBanner");
+        if (sleepBanner) sleepBanner.style.display = "none";
+
+        const topGroups = doc.getElementById("homeTopGroups");
+        if (topGroups) {
+          topGroups.innerHTML =
+            '<div class="insights-row"><span>777 groups</span><strong>Monitored now</strong></div>' +
+            '<div class="insights-row"><span>Next scan</span><strong>4 min</strong></div>' +
+            '<div class="insights-row"><span>Leads this week</span><strong>0</strong></div>';
+        }
+
+        const trendMeta = doc.getElementById("homeTrendMeta");
+        if (trendMeta) trendMeta.textContent = "System live, Facebook connected, alert profile ready.";
+
+        const trendChart = doc.getElementById("homeTrendChart");
+        if (trendChart) {
+          trendChart.innerHTML =
+            '<polyline fill="none" stroke="#F5630A" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" points="12,110 70,104 128,92 186,88 244,80 302,66 348,40" />' +
+            '<polyline fill="none" stroke="#FFD4B8" stroke-width="18" stroke-linecap="round" stroke-linejoin="round" opacity="0.45" points="12,110 70,104 128,92 186,88 244,80 302,66 348,40" />';
+        }
+
+        const primaryButton = doc.getElementById("btnMainMonitorToggle");
+        if (primaryButton) primaryButton.textContent = "Pause monitoring";
+      });
+    }
   </script>
 </body>
 </html>

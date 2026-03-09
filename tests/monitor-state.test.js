@@ -20,7 +20,7 @@ test("normalizeMonitorConfig normalizes ids, trims profile and lowercases keywor
   assert.deepEqual(config.negativeKeywords, ["selling", "job"]);
   assert.equal(config.profileName, "Local Leads");
   assert.equal(config.minMinutes, 5);
-  assert.equal(config.maxMinutes, 7);
+  assert.equal(config.maxMinutes, 8);
 });
 
 test("buildMonitorStateResponse prefers persisted runtime and falls back to live state", () => {

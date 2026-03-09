@@ -7,8 +7,8 @@ export const RemotionRoot = () => {
       <Composition
         id="ExtensionPromo"
         component={ExtensionPromoVideo}
-        width={1280}
-        height={800}
+        width={1920}
+        height={1080}
         fps={30}
         durationInFrames={TOTAL_FRAMES}
       />

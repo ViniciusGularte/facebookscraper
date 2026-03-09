@@ -3,523 +3,196 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>GrabClientsNow Store Assets</title>
+  <title>GrabClientsNow Store Promo</title>
   <style>
     :root {
-      --bg-1: #0f172a;
-      --bg-2: #111827;
-      --bg-3: #1f2937;
-      --accent: #f59e0b;
-      --accent-2: #38bdf8;
-      --ok: #34d399;
-      --text: #f8fafc;
-      --muted: #cbd5e1;
-      --card: rgba(255, 255, 255, 0.08);
-      --border: rgba(255, 255, 255, 0.18);
+      --charcoal: #1c1c1c;
+      --orange: #f5630a;
+      --muted: #717171;
+      --muted-2: #9ca3af;
+      --divider: #333333;
+      --danger: #dc2626;
+      --price-old: #555555;
+      --white: #ffffff;
+      --font-display: "Barlow Condensed", "Liberation Sans Narrow", "Arial Narrow", "DejaVu Sans Condensed", sans-serif;
+      --font-body: "Barlow", "DejaVu Sans", "Segoe UI", sans-serif;
     }
 
-    * { box-sizing: border-box; }
+    * {
+      box-sizing: border-box;
+    }
 
+    html,
     body {
       margin: 0;
-      width: 100vw;
-      height: 100vh;
-      font-family: "DejaVu Sans", "Segoe UI", sans-serif;
-      color: var(--text);
-      background:
-        radial-gradient(circle at 12% 8%, rgba(245, 158, 11, 0.30), transparent 42%),
-        radial-gradient(circle at 92% 82%, rgba(56, 189, 248, 0.30), transparent 44%),
-        linear-gradient(130deg, var(--bg-1), var(--bg-2) 60%, var(--bg-3));
+      width: 1400px;
+      height: 560px;
       overflow: hidden;
+      background: var(--charcoal);
     }
 
-    .grain {
-      position: absolute;
-      inset: 0;
-      opacity: 0.06;
-      background-image:
-        repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.28) 0, rgba(255, 255, 255, 0.28) 1px, transparent 1px, transparent 4px),
-        repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.18) 0, rgba(255, 255, 255, 0.18) 1px, transparent 1px, transparent 5px);
-      pointer-events: none;
-    }
-
-    .frame {
+    body {
       position: relative;
-      width: 100%;
-      height: 100%;
+      font-family: var(--font-body);
+      color: var(--white);
+    }
+
+    .main {
+      position: absolute;
+      top: 0;
+      right: 0;
+      bottom: 72px;
+      left: 0;
+      z-index: 1;
+    }
+
+    .left-block,
+    .right-block {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
       display: grid;
-      grid-template-rows: auto 1fr;
-      gap: 18px;
-      padding: 36px;
+      align-content: center;
+      z-index: 2;
     }
 
-    .top {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 20px;
+    .left-block {
+      left: 100px;
+      width: 560px;
     }
 
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      min-width: 0;
+    .right-block {
+      left: 760px;
+      width: 540px;
     }
 
-    .logo {
-      width: 44px;
-      height: 44px;
-      border-radius: 12px;
-      background: linear-gradient(150deg, #f59e0b, #ef4444);
-      color: #111827;
-      display: grid;
-      place-items: center;
-      font-weight: 800;
-      font-size: 20px;
-      box-shadow: 0 10px 25px rgba(239, 68, 68, 0.28);
-      flex: 0 0 auto;
+    .eyebrow {
+      font-family: var(--font-display);
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
     }
 
-    .brand-copy h1 {
-      margin: 0;
-      font-size: 30px;
-      line-height: 1;
-      letter-spacing: 0.2px;
-      white-space: nowrap;
+    .eyebrow.left {
+      color: var(--orange);
     }
 
-    .brand-copy p {
-      margin: 6px 0 0;
-      color: var(--muted);
-      font-size: 15px;
+    .eyebrow.right {
+      color: var(--muted-2);
     }
 
-    .badge {
-      border: 1px solid rgba(255, 255, 255, 0.36);
-      background: rgba(15, 23, 42, 0.65);
+    .old-price {
+      position: relative;
+      width: max-content;
+      margin-top: 14px;
+      font-family: var(--font-display);
+      font-size: 96px;
+      font-weight: 900;
+      line-height: 0.92;
+      color: var(--price-old);
+    }
+
+    .old-price::after {
+      content: "";
+      position: absolute;
+      left: -0.02em;
+      right: -0.03em;
+      top: 52%;
+      height: 4px;
       border-radius: 999px;
-      padding: 10px 15px;
-      font-weight: 700;
-      font-size: 13px;
-      letter-spacing: 0.4px;
-      color: #fef3c7;
-      white-space: nowrap;
+      background: var(--danger);
+      transform: translateY(-50%) rotate(-2deg);
     }
 
-    .content {
-      display: grid;
-      grid-template-columns: 1.05fr 0.95fr;
-      gap: 22px;
-      min-height: 0;
-    }
-
-    .left,
-    .right {
-      border: 1px solid var(--border);
-      background: var(--card);
-      border-radius: 24px;
-      backdrop-filter: blur(2px);
-      min-height: 0;
-    }
-
-    .left {
-      padding: 24px;
-      display: grid;
-      grid-template-rows: auto auto 1fr;
-      gap: 18px;
-    }
-
-    .metric-grid {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 12px;
-    }
-
-    .metric {
-      background: rgba(255, 255, 255, 0.08);
-      border: 1px solid rgba(255, 255, 255, 0.15);
-      border-radius: 14px;
-      padding: 10px 12px;
-    }
-
-    .metric .k {
-      font-size: 24px;
-      font-weight: 700;
-      line-height: 1;
-    }
-
-    .metric .l {
-      margin-top: 6px;
+    .old-sub {
+      margin-top: 8px;
+      font-size: 16px;
+      font-weight: 500;
       color: var(--muted);
-      font-size: 12px;
-      letter-spacing: 0.1px;
     }
 
-    .headline {
-      font-size: 38px;
-      line-height: 1.08;
-      font-weight: 800;
-      margin: 0;
-      letter-spacing: 0.1px;
+    .new-price {
+      margin-top: 12px;
+      font-family: var(--font-display);
+      font-size: 160px;
+      font-weight: 900;
+      line-height: 1;
+      color: var(--orange);
     }
 
-    .headline .accent {
-      color: #fde68a;
-    }
-
-    .lead {
-      margin: 10px 0 0;
-      max-width: 92%;
+    .new-sub {
+      margin-top: 8px;
       font-size: 18px;
-      color: var(--muted);
-      line-height: 1.35;
+      font-weight: 500;
+      color: var(--white);
     }
 
-    .pill-row {
+    .divider {
+      position: absolute;
+      top: 80px;
+      bottom: 80px;
+      left: 700px;
+      width: 1px;
+      background: var(--divider);
+      z-index: 2;
+    }
+
+    .bottom-strip {
+      position: absolute;
+      right: 0;
+      bottom: 0;
+      left: 0;
+      height: 72px;
       display: flex;
-      flex-wrap: wrap;
-      gap: 9px;
-      align-content: flex-start;
-    }
-
-    .pill {
-      border: 1px solid rgba(56, 189, 248, 0.45);
-      background: rgba(56, 189, 248, 0.14);
-      color: #e0f2fe;
-      font-weight: 600;
-      padding: 8px 11px;
-      border-radius: 999px;
-      font-size: 13px;
-    }
-
-    .right {
-      padding: 18px;
-      display: grid;
-      grid-template-rows: auto 1fr auto;
-      gap: 14px;
-    }
-
-    .feed-head {
-      display: flex;
-      justify-content: space-between;
       align-items: center;
-      font-size: 13px;
-      color: var(--muted);
-    }
-
-    .feed-title {
-      font-size: 17px;
+      justify-content: center;
+      gap: 16px;
+      padding: 0 36px;
+      background: var(--orange);
+      color: var(--white);
+      font-family: var(--font-display);
+      font-size: 20px;
       font-weight: 700;
-      color: #f8fafc;
-    }
-
-    .feed-list {
-      display: grid;
-      gap: 10px;
-      align-content: start;
-    }
-
-    .item {
-      border: 1px solid rgba(255, 255, 255, 0.13);
-      border-left: 4px solid var(--accent-2);
-      background: rgba(15, 23, 42, 0.55);
-      border-radius: 11px;
-      padding: 10px;
-      display: grid;
-      gap: 4px;
-    }
-
-    .item .title {
-      font-size: 14px;
-      font-weight: 700;
-      color: #e2e8f0;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      text-align: center;
       white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      z-index: 3;
     }
 
-    .item .meta {
-      font-size: 12px;
-      color: #94a3b8;
+    .bottom-strip .brand {
+      font-weight: 900;
     }
 
-    .item .status {
-      font-size: 12px;
-      font-weight: 700;
-      color: var(--ok);
+    .dot {
+      opacity: 0.86;
     }
-
-    .cta {
-      border-top: 1px solid rgba(255, 255, 255, 0.13);
-      padding-top: 12px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 14px;
-    }
-
-    .cta .button {
-      background: linear-gradient(120deg, #f59e0b, #ef4444);
-      border-radius: 10px;
-      color: #fff;
-      font-weight: 700;
-      padding: 10px 14px;
-      letter-spacing: 0.2px;
-    }
-
-    .subtle { color: #cbd5e1; }
-
-    .wide-layout .content {
-      grid-template-columns: 1fr;
-    }
-
-    .wide-layout .left {
-      min-height: 0;
-    }
-
-    .wide-layout .right {
-      display: none;
-    }
-
-    .small-layout .top {
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-
-    .small-layout .brand-copy h1 { font-size: 23px; }
-    .small-layout .brand-copy p { font-size: 12px; margin-top: 4px; }
-    .small-layout .badge { font-size: 10px; padding: 7px 10px; }
-    .small-layout .frame { padding: 22px; gap: 12px; }
-    .small-layout .content { grid-template-columns: 1fr; gap: 12px; }
-    .small-layout .left { padding: 14px; gap: 12px; }
-    .small-layout .headline { font-size: 25px; }
-    .small-layout .lead { font-size: 13px; max-width: 100%; }
-    .small-layout .pill-row { gap: 6px; }
-    .small-layout .pill { font-size: 10px; padding: 5px 8px; }
-    .small-layout .right { padding: 10px; gap: 8px; }
-    .small-layout .feed-title { font-size: 13px; }
-    .small-layout .item .title { font-size: 11px; }
-    .small-layout .item .meta,
-    .small-layout .item .status,
-    .small-layout .cta { font-size: 10px; }
-    .small-layout .metric-grid { gap: 8px; }
-    .small-layout .metric { padding: 7px; }
-    .small-layout .metric .k { font-size: 16px; }
-    .small-layout .metric .l { font-size: 9px; margin-top: 4px; }
-
-    .scene-single .right { display: none; }
-    .scene-single .content { grid-template-columns: 1fr; }
-    .scene-single .left { gap: 14px; }
   </style>
 </head>
 <body>
-  <div class="grain"></div>
-  <div class="frame" id="frame">
-    <div class="top">
-      <div class="brand">
-        <div class="logo">G</div>
-        <div class="brand-copy">
-          <h1 id="title">GrabClientsNow</h1>
-          <p id="subtitle">Monitor Facebook groups and capture leads in real time</p>
-        </div>
-      </div>
-      <div class="badge" id="badge">Chrome Extension</div>
-    </div>
+  <main class="main">
+    <section class="left-block">
+      <div class="eyebrow left">WHILE YOUR COMPETITOR PAYS</div>
+      <div class="old-price">$150</div>
+      <div class="old-sub">per lead on Thumbtack</div>
+    </section>
 
-    <div class="content">
-      <div class="left">
-        <div class="metric-grid" id="metrics"></div>
+    <div class="divider"></div>
 
-        <div>
-          <h2 class="headline" id="headline"></h2>
-          <p class="lead" id="lead"></p>
-        </div>
+    <section class="right-block">
+      <div class="eyebrow right">YOU PAY</div>
+      <div class="new-price">$0</div>
+      <div class="new-sub">per lead · forever</div>
+    </section>
+  </main>
 
-        <div class="pill-row" id="pills"></div>
-      </div>
-
-      <div class="right" id="feedWrap">
-        <div class="feed-head">
-          <span class="feed-title" id="feedTitle">Live lead feed</span>
-          <span id="feedMeta">Updated every few seconds</span>
-        </div>
-        <div class="feed-list" id="feed"></div>
-        <div class="cta">
-          <span class="subtle" id="ctaText">Works on any niche group strategy</span>
-          <span class="button" id="ctaButton">Start Capturing Leads</span>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <script>
-    const scenarios = {
-      dashboard: {
-        badge: 'Chrome Extension',
-        headline: 'Turn group activity into <span class="accent">qualified leads</span> in minutes',
-        lead: 'Track posts from your target Facebook groups, detect buying intent, and save opportunities before competitors react.',
-        metrics: [
-          ['347', 'Leads captured this week'],
-          ['12 sec', 'Average detection time'],
-          ['18', 'Groups monitored live']
-        ],
-        pills: ['Real-time detection', 'Lead-ready signals', 'No spreadsheets', 'Built for outreach teams'],
-        feedTitle: 'Live lead feed',
-        feedMeta: 'Updated every few seconds',
-        ctaText: 'Use during prospecting sessions',
-        ctaButton: 'Start Capturing Leads',
-        items: [
-          ['Need a roofing quote this week in Austin', 'Home Services Buyers • 1 min ago', 'Intent detected: High'],
-          ['Looking for CRM migration specialist', 'SaaS Founders Group • 2 min ago', 'Intent detected: Medium'],
-          ['Any recommendation for local tax advisor?', 'Freelancers Hub • 4 min ago', 'Intent detected: High'],
-          ['Searching bilingual virtual assistant', 'Startup Operators • 6 min ago', 'Intent detected: Medium']
-        ]
-      },
-      alerts: {
-        badge: 'Lead Alerts',
-        headline: 'Get notified when high-intent posts appear in your target groups',
-        lead: 'Stop refreshing feeds manually. Receive fresh opportunities in one stream and act first.',
-        metrics: [
-          ['94%', 'Alert relevance score'],
-          ['5x', 'Faster first response'],
-          ['0', 'Missed hot leads']
-        ],
-        pills: ['Instant prioritization', 'Intent confidence', 'Fast outbound workflow', 'Scale across niches'],
-        feedTitle: 'Priority alerts',
-        feedMeta: 'Top opportunities ranked',
-        ctaText: 'Designed for speed-to-lead teams',
-        ctaButton: 'Activate Alerts',
-        items: [
-          ['Need urgent website redesign this month', 'Local Business Owners • 30 sec ago', 'Priority: Critical'],
-          ['Who can run Meta Ads for dentists?', 'Agency Hunters • 90 sec ago', 'Priority: High'],
-          ['Seeking moving company in Dallas', 'Community Deals • 2 min ago', 'Priority: High'],
-          ['Need bookkeeping for e-commerce store', 'SMB Operations • 3 min ago', 'Priority: Medium']
-        ]
-      },
-      workflow: {
-        badge: 'Simple Workflow',
-        headline: '3-step flow: connect, monitor, capture',
-        lead: 'From setup to lead capture in under 5 minutes. Built for non-technical teams and solo operators.',
-        metrics: [
-          ['Step 1', 'Choose target groups'],
-          ['Step 2', 'Enable monitoring'],
-          ['Step 3', 'Export and follow up']
-        ],
-        pills: ['Beginner-friendly', 'Structured lead queue', 'No coding required', 'Works with your CRM'],
-        feedTitle: 'Workflow preview',
-        feedMeta: 'Simple and repeatable',
-        ctaText: 'Ideal for agencies and closers',
-        ctaButton: 'See Workflow',
-        items: [
-          ['Connect your Facebook session', 'Secure local extension setup', 'Setup step'],
-          ['Select relevant groups and keywords', 'Filter out low-intent noise', 'Monitoring step'],
-          ['Capture and export interested prospects', 'Send outreach while intent is fresh', 'Capture step'],
-          ['Track outcomes and optimize targeting', 'Improve conversion over time', 'Scale step']
-        ]
-      },
-      socialproof: {
-        badge: 'Performance Snapshot',
-        headline: 'Teams use GrabClientsNow to increase outbound conversion quality',
-        lead: 'Focus reps on buyers already asking for help, instead of cold outreach with low reply rates.',
-        metrics: [
-          ['3.1x', 'More qualified conversations'],
-          ['58%', 'Lower prospecting time'],
-          ['41%', 'Higher appointment rate']
-        ],
-        pills: ['Higher signal quality', 'Actionable lead context', 'Built for daily pipeline', 'Faster deal velocity'],
-        feedTitle: 'Qualified lead examples',
-        feedMeta: 'Intent-first scoring',
-        ctaText: 'Data shown for illustration',
-        ctaButton: 'Grow Pipeline',
-        items: [
-          ['Need emergency plumber in Miami now', 'Home Owners Network • 40 sec ago', 'Score: 92/100'],
-          ['Hiring PPC specialist for gym chain', 'Marketing Leaders Club • 2 min ago', 'Score: 88/100'],
-          ['Looking for mortgage advisor this week', 'Real Estate Questions • 3 min ago', 'Score: 90/100'],
-          ['Best app developer for MVP launch?', 'Startup Builders • 5 min ago', 'Score: 83/100']
-        ]
-      },
-      marquee: {
-        badge: 'Chrome Extension',
-        headline: 'Monitor Facebook groups and capture leads in real time',
-        lead: 'Find buyers early, respond faster, and keep your pipeline full with live intent signals.',
-        metrics: [
-          ['Live', 'Group monitoring'],
-          ['Fast', 'Lead identification'],
-          ['Ready', 'For outreach']
-        ],
-        pills: ['Real-time lead discovery', 'Intent-focused opportunities', 'Built for sales velocity'],
-        feedTitle: 'Live opportunity stream',
-        feedMeta: 'For growth teams and founders',
-        ctaText: 'Install and start monitoring',
-        ctaButton: 'Add to Chrome',
-        items: [
-          ['Looking for logo designer this week', 'Creators Market • now', 'Opportunity open'],
-          ['Anyone recommend moving company?', 'Community Requests • now', 'Opportunity open'],
-          ['Need accountant for startup setup', 'Founder Hub • now', 'Opportunity open']
-        ],
-        classes: ['wide-layout', 'scene-single']
-      },
-      promoSmall: {
-        badge: 'Chrome Extension',
-        headline: 'Capture high-intent leads from Facebook groups',
-        lead: 'Monitor, qualify, and act fast.',
-        metrics: [
-          ['Live', 'Monitor'],
-          ['Smart', 'Score'],
-          ['Fast', 'Respond']
-        ],
-        pills: ['Real-time', 'Lead-ready', 'Simple setup'],
-        feedTitle: 'Opportunity feed',
-        feedMeta: 'Always on',
-        ctaText: 'Built for conversion',
-        ctaButton: 'Install Now',
-        items: [
-          ['Need social media manager today', 'Business Owners • now', 'Hot lead'],
-          ['Looking for roof repair quote', 'Local Services • now', 'Hot lead']
-        ],
-        classes: ['small-layout', 'scene-single']
-      }
-    };
-
-    const params = new URLSearchParams(window.location.search);
-    const scene = params.get('scene') || 'dashboard';
-    const data = scenarios[scene] || scenarios.dashboard;
-
-    const frame = document.getElementById('frame');
-    (data.classes || []).forEach((cls) => frame.classList.add(cls));
-
-    document.getElementById('badge').textContent = data.badge;
-    document.getElementById('headline').innerHTML = data.headline;
-    document.getElementById('lead').textContent = data.lead;
-    document.getElementById('feedTitle').textContent = data.feedTitle;
-    document.getElementById('feedMeta').textContent = data.feedMeta;
-    document.getElementById('ctaText').textContent = data.ctaText;
-    document.getElementById('ctaButton').textContent = data.ctaButton;
-
-    const metrics = document.getElementById('metrics');
-    data.metrics.forEach(([k, l]) => {
-      const node = document.createElement('div');
-      node.className = 'metric';
-      node.innerHTML = `<div class="k">${k}</div><div class="l">${l}</div>`;
-      metrics.appendChild(node);
-    });
-
-    const pills = document.getElementById('pills');
-    data.pills.forEach((text) => {
-      const node = document.createElement('div');
-      node.className = 'pill';
-      node.textContent = text;
-      pills.appendChild(node);
-    });
-
-    const feed = document.getElementById('feed');
-    data.items.forEach(([title, meta, status]) => {
-      const node = document.createElement('div');
-      node.className = 'item';
-      node.innerHTML = `<div class="title">${title}</div><div class="meta">${meta}</div><div class="status">${status}</div>`;
-      feed.appendChild(node);
-    });
-  </script>
+  <footer class="bottom-strip">
+    <span class="brand">GrabClientsNow</span>
+    <span class="dot">·</span>
+    <span>Local Facebook Groups</span>
+    <span class="dot">·</span>
+    <span>Reply First. Win Every Job.</span>
+  </footer>
 </body>
 </html>

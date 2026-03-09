@@ -32,8 +32,8 @@ export function buildWorkspaceResetState(defaultFrequency, now = Date.now()) {
       lastAnnouncedAt: 0,
     },
     globalMonitorFrequency: {
-      min: Number(defaultFrequency?.min) || 15,
-      max: Number(defaultFrequency?.max) || 20,
+      min: Number(defaultFrequency?.min) || 3,
+      max: Number(defaultFrequency?.max) || 8,
     },
     notificationSettings: buildDefaultNotificationSettings(),
     planState: buildLocalFreePlanState(now),

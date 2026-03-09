@@ -27,7 +27,7 @@ test("buildLocalFreePlanState seeds a local free plan cache entry", () => {
 });
 
 test("buildWorkspaceResetState clears local workspace and restores free defaults", () => {
-  const result = buildWorkspaceResetState({ min: 15, max: 20 }, 9999);
+  const result = buildWorkspaceResetState({ min: 3, max: 8 }, 9999);
 
   assert.deepEqual(result.selectedGroupIds, []);
   assert.deepEqual(result.savedProfiles, []);
@@ -35,7 +35,7 @@ test("buildWorkspaceResetState clears local workspace and restores free defaults
   assert.deepEqual(result.leadsHistory, []);
   assert.equal(result.onboardingState, "welcome");
   assert.equal(result.onboardingAutoGroupLoadAttempted, false);
-  assert.deepEqual(result.globalMonitorFrequency, { min: 15, max: 20 });
+  assert.deepEqual(result.globalMonitorFrequency, { min: 3, max: 8 });
   assert.deepEqual(result.notificationSettings, buildDefaultNotificationSettings());
   assert.deepEqual(result.planState, buildLocalFreePlanState(9999));
 });

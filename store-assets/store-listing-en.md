@@ -1,37 +1,43 @@
 # Chrome Web Store Listing Copy (EN)
 
 ## Short Description
-Monitor Facebook groups and capture leads in real time.
+Be first. Win the job. Get Facebook group lead alerts in minutes.
 
 ## Detailed Description
-GrabClientsNow helps sales teams, agencies, and founders discover buyer intent faster by monitoring Facebook group activity in real time.
+GrabClientsNow helps local service businesses spot buyer-intent posts inside Facebook groups before competitors flood the comments.
 
-Instead of manually checking dozens of groups, you get a live stream of relevant opportunities so you can respond while intent is still high.
+Instead of refreshing groups all day or paying for recycled marketplace leads, you can monitor the communities that matter, filter for the keywords you care about, and reply while the homeowner is still actively looking.
 
-What you can do with GrabClientsNow:
-- Monitor multiple Facebook groups from one workflow.
-- Detect posts that indicate buying intent.
-- Prioritize hot opportunities and act quickly.
-- Keep prospecting consistent without spreadsheet chaos.
+Built for:
+- Plumbers
+- Electricians
+- Painters
+- Roofers
+- Landscapers
+- Handymen
+- Remodelers
+- Local operators who need speed-to-lead
 
-Why users install it:
-- Faster speed-to-lead improves conversion potential.
-- Real-time visibility reduces missed opportunities.
-- Structured lead capture makes outreach more repeatable.
-- Simple setup for operators, closers, and small teams.
+What GrabClientsNow does:
+- Watches your selected Facebook groups from one dashboard.
+- Flags urgent buyer language like recommend, quote, need, and near me.
+- Filters low-quality noise with include and exclude keywords.
+- Pushes new lead alerts to desktop, Telegram, or webhook.
+- Helps you open the post fast and reply before the thread gets crowded.
+
+Why users buy it:
+- $0 per lead once installed.
+- Faster reply windows improve close rate.
+- Better than shared marketplace leads.
+- Cleaner workflow for owners and office managers.
+- No need to babysit dozens of tabs manually.
 
 ## Suggested Category
-Developer Tools
+Productivity
 
 ## Assets Generated
-- Store icon: 128x128 PNG
-- Screenshots: 5x JPG (1280x800)
-- Small promo tile: 440x280 JPG
-- Marquee promo tile: 1400x560 JPG
-- Promo video: MP4 1280x800 motion-style showcase with captions
-
-## Notes Before Upload
-- Screenshots and promo images are generated from the real extension UI (dist/index.html).
-- Final files are exported as 24-bit JPG (no alpha) where required.
-- The promo video uses motion treatment (intro + animated scene pans + captions).
-- Add your own open-source track at store-assets/audio/music-open-source.mp3 for final publish audio.
+- Store icons: PNG sizes 16, 48, 128, and icon-store
+- Chrome screenshots: 5x PNG at 1280x800
+- Gumroad cover generated separately at 1280x720
+- Promo marquee: PNG 1400x560 plus JPEG derivatives
+- Promo video generated separately via Remotion at 1920x1080

@@ -1,7 +1,8 @@
-import { execFileSync } from 'node:child_process';
+import {execFileSync} from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import {fileURLToPath} from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -11,30 +12,32 @@ const outputRoot = path.join(rootDir, 'store-assets');
 const iconDir = path.join(outputRoot, 'icons');
 const screenshotDir = path.join(outputRoot, 'screenshots');
 const promoDir = path.join(outputRoot, 'promo');
-const videoDir = path.join(outputRoot, 'video');
-const tempDir = path.join(outputRoot, '.tmp');
-const chromeProfileDir = path.join(outputRoot, '.chrome-profile');
+const captureTemplatePath = path.join(__dirname, 'templates', 'store-real-capture.html');
+const promoTemplatePath = path.join(__dirname, 'templates', 'store-showcase.html');
+const promoOnly = process.argv.includes('--promo-only');
 
-const templatePath = path.join(__dirname, 'templates', 'store-real-capture.html');
-const baseIconPath = path.join(rootDir, 'assets', 'icon.png');
-
-const screenshotScenes = ['home', 'groups', 'leads', 'alerts', 'notifications'];
+const screenshotScenes = [
+  {scene: 'hero', filename: 'screenshot-1-hero.png'},
+  {scene: 'howto', filename: 'screenshot-2-howto.png'},
+  {scene: 'dashboard', filename: 'screenshot-3-dashboard.png'},
+  {scene: 'comparison', filename: 'screenshot-4-comparison.png'},
+  {scene: 'social', filename: 'screenshot-5-social.png'},
+];
 
 function run(command, args, stdio = 'inherit') {
-  execFileSync(command, args, { stdio });
+  execFileSync(command, args, {stdio});
 }
 
 function ensureDir(dirPath) {
-  fs.mkdirSync(dirPath, { recursive: true });
+  fs.mkdirSync(dirPath, {recursive: true});
 }
 
 function resetDir(dirPath) {
-  fs.rmSync(dirPath, { recursive: true, force: true });
-  fs.mkdirSync(dirPath, { recursive: true });
+  fs.rmSync(dirPath, {recursive: true, force: true});
+  fs.mkdirSync(dirPath, {recursive: true});
 }
 
-function chromeCapture({ scene, width, height, outputPng }) {
-  const url = `file://${templatePath}?scene=${encodeURIComponent(scene)}`;
+function chromeCapture({url, width, height, outputPng, chromeProfileDir}) {
   run('google-chrome', [
     '--headless=new',
     '--no-sandbox',
@@ -46,7 +49,7 @@ function chromeCapture({ scene, width, height, outputPng }) {
     '--disable-gpu',
     '--hide-scrollbars',
     '--force-device-scale-factor=1',
-    '--virtual-time-budget=4000',
+    '--virtual-time-budget=4500',
     `--user-data-dir=${chromeProfileDir}`,
     `--window-size=${width},${height}`,
     `--screenshot=${outputPng}`,
@@ -54,20 +57,23 @@ function chromeCapture({ scene, width, height, outputPng }) {
   ]);
 }
 
-function pngToJpeg24(inputPng, outputJpg, quality = '92') {
+function optimizePng(filePath) {
+  const tempPath = `${filePath}.tmp.png`;
   run('convert', [
-    inputPng,
-    '-alpha',
-    'off',
-    '-colorspace',
-    'sRGB',
-    '-quality',
-    quality,
-    outputJpg,
+    filePath,
+    '-strip',
+    '-define',
+    'png:compression-level=9',
+    '-define',
+    'png:compression-filter=5',
+    '-define',
+    'png:compression-strategy=1',
+    tempPath,
   ]);
+  fs.renameSync(tempPath, filePath);
 }
 
-function imageToJpeg24(inputImage, outputJpg, width, height, quality = '92') {
+function imageToJpeg(inputImage, outputJpg, width, height, quality = '92') {
   run('convert', [
     inputImage,
     '-resize',
@@ -86,15 +92,11 @@ function imageToJpeg24(inputImage, outputJpg, width, height, quality = '92') {
   ]);
 }
 
-function resizeIcon(inputPath, outputPath, size) {
+function rasterizeSvg(inputPath, outputPath, size, background = 'none') {
   run('convert', [
     inputPath,
     '-background',
-    '#050e0a',
-    '-alpha',
-    'remove',
-    '-alpha',
-    'off',
+    background,
     '-resize',
     `${size}x${size}`,
     '-gravity',
@@ -105,279 +107,146 @@ function resizeIcon(inputPath, outputPath, size) {
   ]);
 }
 
-function pickMusicTrack() {
-  const candidates = [
-    path.join(outputRoot, 'audio', 'music-open-source.mp3'),
-    path.join(outputRoot, 'audio', 'music-open-source.wav'),
-    path.join(rootDir, 'assets', 'music-open-source.mp3'),
-    path.join(rootDir, 'assets', 'music-open-source.wav'),
-  ];
-  return candidates.find((candidate) => fs.existsSync(candidate)) || null;
-}
-
-function tryDownloadMusicFromInternet(targetPath) {
-  const urls = [
-    process.env.STORE_ASSETS_MUSIC_URL,
-    'https://cdn.pixabay.com/download/audio/2022/03/15/audio_c8c8a73467.mp3?filename=future-bass-background-music-121353.mp3',
-    'https://cdn.pixabay.com/download/audio/2022/10/25/audio_2e1f529d22.mp3?filename=technology-126231.mp3',
-    'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
-  ].filter(Boolean);
-
-  for (const url of urls) {
-    try {
-      run(
-        'curl',
-        ['-L', '--fail', '--max-time', '45', url, '-o', targetPath],
-        'ignore',
-      );
-      if (fs.existsSync(targetPath) && fs.statSync(targetPath).size > 50_000) {
-        return targetPath;
-      }
-    } catch {
-      // Try next URL.
-    }
-  }
-
-  return null;
-}
-
-function createFallbackMusic(outputPath, durationSeconds = 20) {
-  run('ffmpeg', [
-    '-y',
-    '-f', 'lavfi',
-    '-i', `anoisesrc=color=violet:amplitude=0.006:duration=${durationSeconds}`,
-    '-f', 'lavfi',
-    '-i', `sine=frequency=98:duration=${durationSeconds}`,
-    '-f', 'lavfi',
-    '-i', `sine=frequency=196:duration=${durationSeconds}`,
-    '-filter_complex',
-    '[0:a]volume=0.34[n];[1:a]volume=0.025[b1];[2:a]volume=0.018[b2];[n][b1][b2]amix=inputs=3:normalize=0,alimiter=limit=0.95[a]',
-    '-map',
-    '[a]',
-    '-c:a',
-    'aac',
-    '-b:a',
-    '192k',
-    outputPath,
-  ]);
-}
-
-function createVideoFromScreenshots() {
-  const motionVideo = path.join(tempDir, 'promo-motion.mp4');
-  run('ffmpeg', [
-    '-y',
-    '-f',
-    'lavfi',
-    '-i',
-    'color=c=#06110B:s=1280x800:d=20',
-    '-loop',
-    '1',
-    '-i',
-    baseIconPath,
-    '-filter_complex',
-    "[0:v]drawbox=x=0:y=0:width=iw:height=ih:color=0x06110B:t=fill," +
-      "drawbox=x=90:y=90:width=1100:height=610:color=0x0B1720DD:t=fill," +
-      "drawbox=x=105:y=105:width=1070:height=575:color=0x243647:t=2," +
-      "drawbox=x=450:y=710:width=380:height=58:color=0x0A1620:t=fill," +
-      "drawbox=x=530:y=731:width=220:height=14:color=0x1E2D3D:t=fill[base];" +
-      "[1:v]scale=78:78[icon];" +
-      "[base][icon]overlay=140:128:enable='between(t,0,20)'[v0];" +
-      "[v0]" +
-      "drawtext=text='GrabClientsNow':x=240:y=144:fontsize=42:fontcolor=0xEFFFF8:fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:enable='between(t,0,20)'," +
-      "drawtext=text='Capture clients before competitors reply':x=240:y=196:fontsize=28:fontcolor=0xA9E9D2:fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf:enable='between(t,0,5)'," +
-      "drawtext=text='Monitor Facebook groups in real time':x=240:y=196:fontsize=28:fontcolor=0xA9E9D2:fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf:enable='between(t,5,10)'," +
-      "drawtext=text='Get instant lead alerts and respond first':x=240:y=196:fontsize=28:fontcolor=0xA9E9D2:fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf:enable='between(t,10,15)'," +
-      "drawtext=text='Fill pipeline faster with high-intent posts':x=240:y=196:fontsize=28:fontcolor=0xA9E9D2:fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf:enable='between(t,15,20)'," +
-      "drawbox=x=145:y=250:width=940:height=84:color=0x07120D:t=fill:enable='between(t,3,20)'," +
-      "drawbox=x=145:y=344:width=940:height=84:color=0x07120D:t=fill:enable='between(t,4,20)'," +
-      "drawbox=x=145:y=438:width=940:height=84:color=0x07120D:t=fill:enable='between(t,5,20)'," +
-      "drawbox=x=145:y=532:width=940:height=84:color=0x07120D:t=fill:enable='between(t,6,20)'," +
-      "drawtext=text='Lead signal: Need roofer quote today':x=170:y=300:fontsize=26:fontcolor=0xE8FFF7:fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:enable='between(t,3,20)'," +
-      "drawtext=text='Lead signal: Looking for accountant this week':x=170:y=394:fontsize=26:fontcolor=0xE8FFF7:fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:enable='between(t,4,20)'," +
-      "drawtext=text='Lead signal: Need ads specialist ASAP':x=170:y=488:fontsize=26:fontcolor=0xE8FFF7:fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:enable='between(t,5,20)'," +
-      "drawtext=text='Lead signal: Recommendation request posted':x=170:y=582:fontsize=26:fontcolor=0xE8FFF7:fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:enable='between(t,6,20)'," +
-      "drawbox=x=835:y=86:width=365:height=72:color=0x08150FEE:t=fill:enable='between(t,6,8.7)'," +
-      "drawbox=x=835:y=86:width=365:height=72:color=0x22D4A6:t=2:enable='between(t,6,8.7)'," +
-      "drawtext=text='Alert: New client in your niche':x=858:y=130:fontsize=23:fontcolor=0xE7FFF5:fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:enable='between(t,6,8.7)'," +
-      "drawbox=x=835:y=168:width=365:height=72:color=0x08150FEE:t=fill:enable='between(t,10,12.7)'," +
-      "drawbox=x=835:y=168:width=365:height=72:color=0x22D4A6:t=2:enable='between(t,10,12.7)'," +
-      "drawtext=text='Telegram: reply before competitors':x=858:y=212:fontsize=23:fontcolor=0xE7FFF5:fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:enable='between(t,10,12.7)'," +
-      "drawbox=x=835:y=250:width=365:height=72:color=0x08150FEE:t=fill:enable='between(t,14,16.7)'," +
-      "drawbox=x=835:y=250:width=365:height=72:color=0x22D4A6:t=2:enable='between(t,14,16.7)'," +
-      "drawtext=text='CRM synced: lead assigned instantly':x=858:y=294:fontsize=23:fontcolor=0xE7FFF5:fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:enable='between(t,14,16.7)'," +
-      "drawbox=x=90:y=86:width=1100:height=610:color=0x1E3344:t=2," +
-      "drawbox=x=0:y=708:width=1280:height=92:color=0x04110BDD:t=fill," +
-      "drawtext=text='Get clients first. Reply before everyone else.':x=(w-text_w)/2:y=764:fontsize=42:fontcolor=0xEFFFF8:fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:enable='between(t,16,20)'[outv]",
-    '-map',
-    '[outv]',
-    '-t',
-    '20',
-    '-r',
-    '30',
-    '-c:v',
-    'libx264',
-    '-preset',
-    'medium',
-    '-crf',
-    '20',
-    '-pix_fmt',
-    'yuv420p',
-    motionVideo,
-  ]);
-
-  const fallbackMusic = path.join(tempDir, 'fallback-music.m4a');
-  const downloadedMusic = tryDownloadMusicFromInternet(
-    path.join(outputRoot, 'audio', 'music-downloaded.mp3'),
-  );
-  const musicTrack = downloadedMusic || pickMusicTrack();
-  if (!musicTrack) {
-    createFallbackMusic(fallbackMusic, 22);
-  }
-
-  const selectedMusicTrack = musicTrack || fallbackMusic;
-  run('ffmpeg', [
-    '-y',
-    '-i',
-    motionVideo,
-    '-stream_loop',
-    '-1',
-    '-i',
-    selectedMusicTrack,
-    '-map',
-    '0:v:0',
-    '-map',
-    '1:a:0',
-    '-filter:a',
-    'volume=0.22,afade=t=in:st=0:d=1.2',
-    '-c:v',
-    'copy',
-    '-c:a',
-    'aac',
-    '-b:a',
-    '192k',
-    '-shortest',
-    path.join(videoDir, 'promo-demo-1280x800.mp4'),
-  ]);
-}
-
-function writeMusicGuide() {
-  const guide = `# Open-Source / Royalty-Free Music Guide
-
-Place your chosen track at one of these paths before running \`npm run generate:store-assets\`:
-- \`store-assets/audio/music-open-source.mp3\`
-- \`assets/music-open-source.mp3\`
-- Or set env var \`STORE_ASSETS_MUSIC_URL=\"https://...mp3\"\` to auto-download.
-
-If no file is found, the generator creates a synthetic ambient fallback track.
-
-Suggested sources (check each license page before final upload):
-- Pixabay music library: https://pixabay.com/music/
-- Pixabay license FAQ: https://pixabay.com/service/faq/
-- Mixkit free stock music: https://mixkit.co/free-stock-music/
-`;
-  fs.mkdirSync(path.join(outputRoot, 'audio'), { recursive: true });
-  fs.writeFileSync(path.join(outputRoot, 'audio', 'MUSIC_SOURCES.md'), guide, 'utf8');
-}
-
 function writeListingCopy() {
   const listing = `# Chrome Web Store Listing Copy (EN)
 
 ## Short Description
-Monitor Facebook groups and capture leads in real time.
+Be first. Win the job. Get Facebook group lead alerts in minutes.
 
 ## Detailed Description
-GrabClientsNow helps sales teams, agencies, and founders discover buyer intent faster by monitoring Facebook group activity in real time.
+GrabClientsNow helps local service businesses spot buyer-intent posts inside Facebook groups before competitors flood the comments.
 
-Instead of manually checking dozens of groups, you get a live stream of relevant opportunities so you can respond while intent is still high.
+Instead of refreshing groups all day or paying for recycled marketplace leads, you can monitor the communities that matter, filter for the keywords you care about, and reply while the homeowner is still actively looking.
 
-What you can do with GrabClientsNow:
-- Monitor multiple Facebook groups from one workflow.
-- Detect posts that indicate buying intent.
-- Prioritize hot opportunities and act quickly.
-- Keep prospecting consistent without spreadsheet chaos.
+Built for:
+- Plumbers
+- Electricians
+- Painters
+- Roofers
+- Landscapers
+- Handymen
+- Remodelers
+- Local operators who need speed-to-lead
 
-Why users install it:
-- Faster speed-to-lead improves conversion potential.
-- Real-time visibility reduces missed opportunities.
-- Structured lead capture makes outreach more repeatable.
-- Simple setup for operators, closers, and small teams.
+What GrabClientsNow does:
+- Watches your selected Facebook groups from one dashboard.
+- Flags urgent buyer language like recommend, quote, need, and near me.
+- Filters low-quality noise with include and exclude keywords.
+- Pushes new lead alerts to desktop, Telegram, or webhook.
+- Helps you open the post fast and reply before the thread gets crowded.
+
+Why users buy it:
+- $0 per lead once installed.
+- Faster reply windows improve close rate.
+- Better than shared marketplace leads.
+- Cleaner workflow for owners and office managers.
+- No need to babysit dozens of tabs manually.
 
 ## Suggested Category
-Developer Tools
+Productivity
 
 ## Assets Generated
-- Store icon: 128x128 PNG
-- Screenshots: 5x JPG (1280x800)
-- Small promo tile: 440x280 JPG
-- Marquee promo tile: 1400x560 JPG
-- Promo video: MP4 1280x800 motion-style showcase with captions
-
-## Notes Before Upload
-- Screenshots and promo images are generated from the real extension UI (dist/index.html).
-- Final files are exported as 24-bit JPG (no alpha) where required.
-- The promo video uses motion treatment (intro + animated scene pans + captions).
-- Add your own open-source track at store-assets/audio/music-open-source.mp3 for final publish audio.
+- Store icons: PNG sizes 16, 48, 128, and icon-store
+- Chrome screenshots: 5x PNG at 1280x800
+- Gumroad cover generated separately at 1280x720
+- Promo marquee: PNG 1400x560 plus JPEG derivatives
+- Promo video generated separately via Remotion at 1920x1080
 `;
 
   fs.writeFileSync(path.join(outputRoot, 'store-listing-en.md'), listing, 'utf8');
 }
 
 function main() {
-  if (!fs.existsSync(templatePath)) {
-    throw new Error(`Template not found: ${templatePath}`);
+  const baseIconSvg = path.join(rootDir, 'assets', 'icon.svg');
+  const baseIconMiniSvg = path.join(rootDir, 'assets', 'icon-16.svg');
+
+  if (!fs.existsSync(captureTemplatePath)) {
+    throw new Error(`Template not found: ${captureTemplatePath}`);
   }
 
-  if (!fs.existsSync(baseIconPath)) {
-    throw new Error(`Base icon not found: ${baseIconPath}`);
+  if (!fs.existsSync(promoTemplatePath)) {
+    throw new Error(`Template not found: ${promoTemplatePath}`);
   }
 
-  if (!fs.existsSync(path.join(rootDir, 'dist', 'index.html'))) {
-    throw new Error('dist/index.html not found. Run the build first (npm run build:dev).');
+  if (!promoOnly && (!fs.existsSync(baseIconSvg) || !fs.existsSync(baseIconMiniSvg))) {
+    throw new Error('Expected assets/icon.svg and assets/icon-16.svg to exist.');
+  }
+
+  if (!promoOnly && !fs.existsSync(path.join(rootDir, 'dist', 'index.html'))) {
+    throw new Error('dist/index.html not found. Run npm run build first.');
   }
 
   ensureDir(outputRoot);
-  resetDir(iconDir);
-  resetDir(screenshotDir);
+  if (!promoOnly) {
+    resetDir(iconDir);
+    resetDir(screenshotDir);
+    rasterizeSvg(baseIconMiniSvg, path.join(iconDir, 'icon-16.png'), 16);
+    rasterizeSvg(baseIconSvg, path.join(iconDir, 'icon-48.png'), 48);
+    rasterizeSvg(baseIconSvg, path.join(iconDir, 'icon-128.png'), 128);
+    rasterizeSvg(baseIconSvg, path.join(iconDir, 'icon-store.png'), 128);
+    rasterizeSvg(baseIconSvg, path.join(iconDir, 'icon-32.png'), 32);
+    rasterizeSvg(baseIconSvg, path.join(iconDir, 'store-icon-128.png'), 128);
+  }
   resetDir(promoDir);
-  resetDir(videoDir);
-  resetDir(tempDir);
-  resetDir(chromeProfileDir);
 
-  resizeIcon(baseIconPath, path.join(iconDir, 'store-icon-128.png'), 128);
-  resizeIcon(baseIconPath, path.join(iconDir, 'icon-16.png'), 16);
-  resizeIcon(baseIconPath, path.join(iconDir, 'icon-32.png'), 32);
-  resizeIcon(baseIconPath, path.join(iconDir, 'icon-48.png'), 48);
-  resizeIcon(baseIconPath, path.join(iconDir, 'icon-128.png'), 128);
+  const chromeProfileDir = fs.mkdtempSync(
+    path.join(os.tmpdir(), 'grabclientsnow-store-profile-'),
+  );
 
-  screenshotScenes.forEach((scene, index) => {
-    const tempPng = path.join(tempDir, `shot-${scene}.png`);
-    const outJpg = path.join(
-      screenshotDir,
-      `screenshot-${String(index + 1).padStart(2, '0')}-${scene}.jpg`,
-    );
-    chromeCapture({ scene, width: 1280, height: 800, outputPng: tempPng });
-    pngToJpeg24(tempPng, outJpg);
-  });
+  try {
+    if (!promoOnly) {
+      screenshotScenes.forEach(({scene, filename}) => {
+        const outputPath = path.join(screenshotDir, filename);
+        chromeCapture({
+          url: `file://${captureTemplatePath}?scene=${encodeURIComponent(scene)}`,
+          width: 1280,
+          height: 800,
+          outputPng: outputPath,
+          chromeProfileDir,
+        });
+        optimizePng(outputPath);
+      });
+    }
 
-  imageToJpeg24(
-    path.join(screenshotDir, 'screenshot-01-home.jpg'),
+    const promoPng = path.join(promoDir, 'promo-marquee-1400x560.png');
+    const promoRawPng = path.join(promoDir, 'promo-marquee-1400x560.raw.png');
+    chromeCapture({
+      url: `file://${promoTemplatePath}`,
+      width: 1400,
+      height: 680,
+      outputPng: promoRawPng,
+      chromeProfileDir,
+    });
+    run('convert', [
+      promoRawPng,
+      '-crop',
+      '1400x560+0+0',
+      '+repage',
+      promoPng,
+    ]);
+    fs.rmSync(promoRawPng, {force: true});
+    optimizePng(promoPng);
+  } finally {
+    fs.rmSync(chromeProfileDir, {recursive: true, force: true});
+  }
+
+  imageToJpeg(
+    promoOnly
+      ? path.join(promoDir, 'promo-marquee-1400x560.png')
+      : path.join(screenshotDir, 'screenshot-1-hero.png'),
     path.join(promoDir, 'promo-small-440x280.jpg'),
     440,
     280,
   );
-  imageToJpeg24(
-    path.join(screenshotDir, 'screenshot-02-groups.jpg'),
+  imageToJpeg(
+    path.join(promoDir, 'promo-marquee-1400x560.png'),
     path.join(promoDir, 'promo-marquee-1400x560.jpg'),
     1400,
     560,
   );
 
-  createVideoFromScreenshots();
-  writeListingCopy();
-  writeMusicGuide();
+  if (!promoOnly) writeListingCopy();
 
-  fs.rmSync(tempDir, { recursive: true, force: true });
-  fs.rmSync(chromeProfileDir, { recursive: true, force: true });
   console.log(`\nStore assets generated at: ${outputRoot}`);
 }
 

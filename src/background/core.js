@@ -528,7 +528,7 @@ let monitorConfig = {
   negativeKeywords: [],
   profileName: "",
   minMinutes: 3,
-  maxMinutes: 7,
+  maxMinutes: 8,
 };
 let monitorConnectionIssue = null;
 let isSleepModeActive = false;
@@ -1095,7 +1095,7 @@ function postMatchesKeywordConfig(post, config) {
 
 function getRandomMonitorDelayMs(minMinutes, maxMinutes) {
   const min = Math.max(1, Number(minMinutes) || 3);
-  const max = Math.max(min, Number(maxMinutes) || 7);
+  const max = Math.max(min, Number(maxMinutes) || 8);
   const randomMinutes = min + Math.random() * (max - min);
   return Math.floor(randomMinutes * 60 * 1000);
 }

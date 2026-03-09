@@ -574,8 +574,8 @@ function syncOnboardingAlertFromSelectedProfile() {
       ? profile.negativeKeywords.map((v) => String(v || "").trim()).filter(Boolean)
       : [];
     onboardAlertFrequency = {
-      min: Number(globalMonitorFrequency?.min) || 5,
-      max: Number(globalMonitorFrequency?.max) || 10,
+      min: Number(globalMonitorFrequency?.min) || 3,
+      max: Number(globalMonitorFrequency?.max) || 8,
     };
   } else {
     const defaults =
@@ -616,13 +616,17 @@ function renderOnboardKeywordChips(kind) {
   list.forEach((kw, idx) => {
     const chip = document.createElement("span");
     chip.className = `tag-chip ${isWatch ? "pos" : "neg"}`;
-    chip.textContent = kw;
+    const label = document.createElement("span");
+    label.className = "tag-chip-label";
+    label.textContent = kw;
     const close = document.createElement("button");
+    close.type = "button";
     close.textContent = "×";
     close.addEventListener("click", () => {
       list.splice(idx, 1);
       renderOnboardKeywordChips(kind);
     });
+    chip.appendChild(label);
     chip.appendChild(close);
     container.appendChild(chip);
   });
@@ -692,14 +696,18 @@ function renderProfileKeywordChips(kind) {
   list.forEach((kw, idx) => {
     const chip = document.createElement("span");
     chip.className = `tag-chip ${isWatch ? "pos" : "neg"}`;
-    chip.textContent = kw;
+    const label = document.createElement("span");
+    label.className = "tag-chip-label";
+    label.textContent = kw;
     const close = document.createElement("button");
+    close.type = "button";
     close.textContent = "×";
     close.addEventListener("click", () => {
       list.splice(idx, 1);
       renderProfileKeywordChips(kind);
       updateProfileKeywordPreview();
     });
+    chip.appendChild(label);
     chip.appendChild(close);
     container.appendChild(chip);
   });
@@ -1634,15 +1642,23 @@ function setLoginStatus(ok, label = "") {
   isFacebookConnected = !!ok;
   if (!ok) lastFacebookUserId = "";
   const el = qs("loginStatus");
-  const dotColor = ok ? "var(--green)" : "#ff8800";
-  el.innerHTML = `<span class="status-dot" style="background:${dotColor}"></span> ${label || getFacebookStatusLabel()}`;
+  const dotColor = ok ? "var(--green)" : "var(--warn)";
+  if (el) {
+    el.classList.toggle("disconnected", !ok);
+    el.classList.remove("error");
+    el.innerHTML = `<span class="status-dot" style="background:${dotColor}"></span> ${label || getFacebookStatusLabel()}`;
+  }
   const checkBtn = qs("btnCheckLoginHero");
   const hint = qs("loginHint");
   if (checkBtn) checkBtn.style.display = ok ? "none" : "inline-flex";
   if (hint) hint.classList.toggle("show", !ok);
   const footerDot = qs("fbFooterDot");
   const footerText = qs("fbFooterText");
-  if (footerDot) footerDot.style.background = ok ? "var(--green)" : "#ff8800";
+  const footerBadge = footerDot?.closest(".fb-status");
+  if (footerDot) footerDot.style.background = ok ? "var(--green)" : "var(--warn)";
+  if (footerBadge) {
+    footerBadge.dataset.state = ok ? "connected" : "disconnected";
+  }
   if (footerText)
     footerText.textContent = ok
       ? translate("status.fb_connected")
@@ -1679,9 +1695,15 @@ function setButtonLoading(id, loading) {
 function syncHomeNextScanLabel() {
   const nextScan = qs("homeNextScanStatus");
   if (!nextScan) return;
-  nextScan.textContent = translate("home.next_scan_label", {
-    value: qs("monitorNextRun")?.textContent || translate("monitor.waiting"),
-  });
+  const rawValue = qs("monitorNextRun")?.textContent || translate("monitor.waiting");
+  const compactValue = rawValue.includes(":")
+    ? rawValue.split(":").slice(1).join(":").trim()
+    : rawValue.trim();
+  const displayValue = compactValue.replace(/^~\s*/, "").trim() || translate("monitor.waiting");
+  const fallbackValue = displayValue.length > 24 ? translate("monitor.waiting") : displayValue;
+  nextScan.textContent = fallbackValue;
+  nextScan.title = rawValue;
+  nextScan.classList.toggle("compact", fallbackValue.length > 10);
 }
 
 const runningUiActions = new Set();
@@ -1885,15 +1907,20 @@ function renderHomeInsights() {
   const topGroups = qs("homeTopGroups");
   const trendSvg = qs("homeTrendChart");
   const trendMeta = qs("homeTrendMeta");
-  if (!status || !summary || !topGroups || !trendSvg || !trendMeta) return;
-
-  const dotColor = isMonitorRunning ? "var(--green)" : "var(--warn)";
-  status.innerHTML = `<span class="status-dot" style="background:${dotColor}"></span> ${
-    isMonitorRunning ? translate("home.system_running") : translate("home.system_idle")
-  }`;
 
   const recent = Array.isArray(leadsHistory) ? leadsHistory : [];
-  summary.textContent = translate("home.leads_7d", { count: recent.length });
+  if (status) {
+    const dotColor = isMonitorRunning ? "var(--green)" : "var(--warn)";
+    status.innerHTML = `<span class="status-dot" style="background:${dotColor}"></span> ${
+      isMonitorRunning ? translate("home.system_running") : translate("home.system_idle")
+    }`;
+    status.classList.toggle("disconnected", !isMonitorRunning);
+  }
+  if (summary) {
+    summary.textContent = String(recent.length);
+    summary.title = translate("home.leads_7d", { count: recent.length });
+    summary.dataset.count = String(recent.length);
+  }
   const lastLead = qs("homeLastLead");
   if (lastLead) {
     const lastTs = recent
@@ -1912,6 +1939,8 @@ function renderHomeInsights() {
       lastLead.textContent = translate("home.last_lead_time", { time: value });
     }
   }
+
+  if (!topGroups || !trendSvg || !trendMeta) return;
 
   const byGroup = new Map();
   recent.forEach((lead) => {
@@ -2111,7 +2140,7 @@ async function loadPersistedGroups() {
 function fallbackAvatarDataUri() {
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36">` +
-    `<rect width="36" height="36" fill="#e2e8f0"/>` +
+    `<rect width="36" height="36" rx="8" fill="#f5f4f2"/>` +
     `</svg>`;
   return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
 }
@@ -2138,7 +2167,14 @@ function createGroupCard(g) {
 
   const meta = document.createElement("div");
   meta.className = "meta";
-  meta.textContent = `${g.privacy || ""} · ${g.members || ""} · ID: ${g.id ?? ""}`;
+  const metaParts = [
+    g.privacy,
+    g.members,
+    g.id != null && g.id !== "" ? `ID: ${g.id}` : "",
+  ]
+    .map((part) => String(part || "").trim())
+    .filter(Boolean);
+  meta.textContent = metaParts.join(" · ");
 
   const checkbox = document.createElement("input");
   checkbox.type = "checkbox";
@@ -2181,9 +2217,9 @@ function createGroupCard(g) {
   info.appendChild(meta);
 
   top.appendChild(img);
+  top.appendChild(info);
   top.appendChild(checkbox);
   card.appendChild(top);
-  card.appendChild(info);
 
   return card;
 }
@@ -2202,8 +2238,7 @@ function renderGroupsLoadingSkeleton(count = 8) {
     const sk = document.createElement("div");
     sk.className = "group-card skeleton";
     sk.innerHTML =
-      `<div class="group-top"><div class="thumb"></div><div class="group-select"></div></div>` +
-      `<div><div class="bar"></div><div class="bar short"></div></div>`;
+      `<div class="group-top"><div class="thumb"></div><div><div class="bar"></div><div class="bar short"></div></div><div class="group-select"></div></div>`;
     list.appendChild(sk);
   }
 }
@@ -2527,8 +2562,8 @@ function buildMonitorConfigFromUi() {
     profileName: selected?.name || "",
     positiveKeywords: selected?.positiveKeywords || [],
     negativeKeywords: selected?.negativeKeywords || [],
-    minMinutes: Number(globalMonitorFrequency?.min) || 5,
-    maxMinutes: Number(globalMonitorFrequency?.max) || 10,
+    minMinutes: Number(globalMonitorFrequency?.min) || 3,
+    maxMinutes: Number(globalMonitorFrequency?.max) || 8,
     selectedProfileId: selectedProfileId || "",
   };
 }
@@ -2863,31 +2898,10 @@ function getWizardLocaleCopy() {
     btnSave: translate("btn.create_alert"),
     btnUpdate: translate("btn.save_changes"),
     btnStart: pt ? "Iniciar monitoramento" : "Start monitoring",
-    freeFrequencyLock: pt
-      ? "Plano Free permite apenas 15-20 min."
-      : "Free plan only allows 15-20 min.",
   };
 }
 
 function applyWizardPlanLocks() {
-  const level = resolvePlanLevel();
-  const isBlocked = level === "blocked";
-
-  qsa(".freq-card").forEach((card) => {
-    const proOnly = card.dataset.proOnly === "1";
-    card.classList.toggle("locked", isBlocked && proOnly);
-    const title = card.querySelector(".title");
-    if (!title) return;
-    const existing = title.querySelector(".lock-badge");
-    if (existing) existing.remove();
-    if (isBlocked && proOnly) {
-      const badge = document.createElement("span");
-      badge.className = "lock-badge";
-      badge.textContent = translate("btn.upgrade");
-      title.appendChild(badge);
-    }
-  });
-
   const notifyWebhookWrap = qs("notifyWebhookWrap");
   const notifyTelegramWrap = qs("notifyTelegramWrap");
   if (notifyWebhookWrap) notifyWebhookWrap.classList.remove("locked");
@@ -2910,8 +2924,6 @@ function updateProfileSummaryCard() {
 }
 
 function getDefaultFrequencyForPlan() {
-  const level = resolvePlanLevel();
-  if (level === "blocked") return { min: 15, max: 20 };
   return { min: 3, max: 8 };
 }
 
@@ -2959,27 +2971,14 @@ function renderGlobalFrequencyUi() {
   const hint = qs("globalFrequencyHint");
   if (!cards.length || !hint) return;
 
-  const level = resolvePlanLevel();
-  const isBlocked = level === "blocked";
   cards.forEach((card) => {
     const min = Number(card.dataset.min) || 0;
     const max = Number(card.dataset.max) || 0;
-    const proOnly = card.dataset.proOnly === "1";
-    card.classList.toggle("locked", isBlocked && proOnly);
     card.classList.toggle(
       "active",
       min === globalMonitorFrequency.min && max === globalMonitorFrequency.max,
     );
   });
-
-  if (isBlocked && globalMonitorFrequency.min < 15) {
-    globalMonitorFrequency = { min: 15, max: 20 };
-    cards.forEach((card) => {
-      const min = Number(card.dataset.min) || 0;
-      const max = Number(card.dataset.max) || 0;
-      card.classList.toggle("active", min === 15 && max === 20);
-    });
-  }
 
   hint.textContent = translate("settings.frequency_current", {
     min: globalMonitorFrequency.min,
@@ -3282,8 +3281,8 @@ function selectProfile(profileId, syncMonitorFields) {
     qs("profileEditorMin").value = String(globalMonitorFrequency.min);
     qs("profileEditorMax").value = String(globalMonitorFrequency.max);
     updateFrequencyCardSelection(
-      Number(globalMonitorFrequency.min) || 5,
-      Number(globalMonitorFrequency.max) || 10,
+      Number(globalMonitorFrequency.min) || 3,
+      Number(globalMonitorFrequency.max) || 8,
     );
 
     if (syncMonitorFields) void persistMonitorConfigFromUi();
@@ -3367,8 +3366,8 @@ async function saveProfileFromEditor() {
   const negativeKeywords = parseKeywordsInput(
     qs("profileEditorNegative").value,
   );
-  const minMinutes = Number(globalMonitorFrequency.min) || 5;
-  const maxMinutes = Number(globalMonitorFrequency.max) || 10;
+  const minMinutes = Number(globalMonitorFrequency.min) || 3;
+  const maxMinutes = Number(globalMonitorFrequency.max) || 8;
   qs("profileEditorMin").value = String(minMinutes);
   qs("profileEditorMax").value = String(maxMinutes);
 
@@ -3529,29 +3528,15 @@ function setupProfileActions() {
 
   qsa(".freq-card").forEach((card) => {
     card.addEventListener("click", () => {
-      const copy = getWizardLocaleCopy();
-      const level = resolvePlanLevel();
-      const proOnly = card.dataset.proOnly === "1";
-      if (level === "blocked" && proOnly) {
-        appendLog("logGeneral", copy.freeFrequencyLock, "warn");
-        const warning = qs("profileFrequencyWarning");
-        if (warning) warning.textContent = copy.freeFrequencyLock;
-        return;
-      }
-
-      const min = Number(card.dataset.min) || 5;
-      const max = Number(card.dataset.max) || 10;
+      const min = Number(card.dataset.min) || 3;
+      const max = Number(card.dataset.max) || 8;
       qs("profileEditorMin").value = String(min);
       qs("profileEditorMax").value = String(max);
       updateFrequencyCardSelection(min, max);
 
       const warning = qs("profileFrequencyWarning");
       const highRisk = min <= 5;
-      if (level === "blocked" && min < 15) {
-        if (warning) {
-          warning.textContent = copy.freeFrequencyLock;
-        }
-      } else if (warning) {
+      if (warning) {
         warning.textContent = highRisk
           ? "Frequent checks increase detection risk. Use with caution."
           : "Monitoring runs in background. No need to keep this window open.";
@@ -3672,7 +3657,7 @@ chrome.runtime.onMessage.addListener((message) => {
 
   if (message?.type === "monitorTick") {
     if (message.phase === "start") {
-      setOrbState("connecting");
+      setOrbState(isMonitorRunning ? "monitoring" : "connecting");
       appendLog("logGeneral", message.message || translate("log.cycle_started"), "info");
       qs("monitorNextRun").textContent = translate("status.checking_now");
       syncHomeNextScanLabel();
@@ -4078,6 +4063,7 @@ qs("btnStartMonitor").addEventListener("click", () => {
         appendLog("logPosts", translate("log.sleep_mode_active"), "warn");
         return;
       }
+      setOrbState("monitoring");
       appendLog("logPosts", translate("log.monitor_started"), "ok");
       void setOnboardingState("ready");
     },
@@ -4667,21 +4653,14 @@ qs("groupsSearch").addEventListener("input", () => {
 qsa(".settings-freq-card").forEach((card) => {
   card.addEventListener("click", async () => {
     const pair = {
-      min: Number(card.dataset.min) || 5,
-      max: Number(card.dataset.max) || 10,
+      min: Number(card.dataset.min) || 3,
+      max: Number(card.dataset.max) || 8,
     };
-    const level = resolvePlanLevel();
-    const proOnly = card.dataset.proOnly === "1";
-    if (level === "blocked" && proOnly) {
-      appendLog("logGeneral", translate("plan.locked_action"), "warn");
-      await persistGlobalMonitorFrequency({ min: 15, max: 20 });
-      return;
-    }
 
     if (pair.min === 3) {
       if (pair.max !== 8) {
-      const confirmed = window.confirm(translate("settings.freq_confirm_3_5"));
-      if (!confirmed) return;
+        const confirmed = window.confirm(translate("settings.freq_confirm_3_5"));
+        if (!confirmed) return;
       }
     }
 

@@ -54,6 +54,7 @@ export const I18N = {
     "home.weekly_trend": "Weekly trend",
     "home.no_group_data": "No lead data yet.",
     "home.leads_7d": "{count} leads in last 7 days",
+    "home.leads_card_label": "Leads in 7 days",
     "home.machine_on": "Monitoring is ON",
     "home.machine_off": "Monitoring is OFF",
     "home.sleep_banner":
@@ -62,6 +63,7 @@ export const I18N = {
     "home.start_monitoring_main": "Start monitoring",
     "home.active_alert": "Active alert",
     "home.checking_groups": "Checking {count} groups",
+    "home.next_scan_card_label": "Next scan",
     "home.next_scan_label": "Next scan: {value}",
     "home.last_lead_none": "Last lead: none yet",
     "home.last_lead_time": "Last lead: {time} ago",
@@ -210,6 +212,9 @@ export const I18N = {
     "monitor.waiting": "waiting...",
     "settings.language": "Language",
     "settings.advanced_title": "Advanced Settings",
+    "settings.advanced_badge": "Important",
+    "settings.advanced_hint":
+      "Sleep schedule, frequency and safety controls live here. Review before monitoring.",
     "settings.language_hint": "Applies instantly across the extension UI.",
     "settings.account": "Account",
     "settings.data": "Data",
@@ -431,14 +436,19 @@ export const I18N = {
       "Best for instant alerts while you work on this device.",
     "settings.notify_telegram_title": "Telegram notifications:",
     "settings.notify_telegram_body":
-      "Use the GrabClientsNow bot to receive instant lead alerts on Telegram.",
+      "You will use 2 bots: GrabClientsNow sends alerts; @userinfobot only shows your chat_id.",
+    "settings.telegram_bot_main":
+      "GrabClientsNow bot = receives your alerts",
+    "settings.telegram_bot_info":
+      "@userinfobot = shows your chat_id",
     "settings.telegram_how_1":
-      "Open Telegram and search for GrabClientsNow bot.",
-    "settings.telegram_how_2": "Send /start to the bot once.",
+      "Bot 1: search for GrabClientsNow bot and open the chat.",
+    "settings.telegram_how_2":
+      "Inside GrabClientsNow bot, send /start once.",
     "settings.telegram_how_3":
-      "Use @userinfobot to get your numeric chat_id.",
+      "Bot 2: search for @userinfobot and copy your numeric chat_id.",
     "settings.telegram_how_4":
-      "Paste that chat_id below and click Test Telegram.",
+      "Paste that chat_id below and click Test Telegram to receive the sample alert.",
     "settings.notify_webhook_title": "Custom webhook:",
     "settings.notify_webhook_body":
       "For technical users. Send leads to your own app, n8n, Make, Zapier, or internal APIs.",
@@ -621,6 +631,7 @@ export const I18N = {
     "home.weekly_trend": "Tendência semanal",
     "home.no_group_data": "Sem dados de leads ainda.",
     "home.leads_7d": "{count} leads nos últimos 7 dias",
+    "home.leads_card_label": "Leads em 7 dias",
     "home.machine_on": "Monitoramento está LIGADO",
     "home.machine_off": "Monitoramento está DESLIGADO",
     "home.sleep_banner":
@@ -629,6 +640,7 @@ export const I18N = {
     "home.start_monitoring_main": "Iniciar monitoramento",
     "home.active_alert": "Alerta ativo",
     "home.checking_groups": "Verificando {count} grupos",
+    "home.next_scan_card_label": "Próxima checagem",
     "home.next_scan_label": "Próxima checagem: {value}",
     "home.last_lead_none": "Último lead: nenhum ainda",
     "home.last_lead_time": "Último lead: há {time}",
@@ -679,6 +691,9 @@ export const I18N = {
     "monitor.stop": "Parar Monitoramento",
     "settings.language": "Idioma",
     "settings.advanced_title": "Configurações Avançadas",
+    "settings.advanced_badge": "Importante",
+    "settings.advanced_hint":
+      "Horário de descanso, frequência e controles de segurança ficam aqui. Revise antes de monitorar.",
     "settings.language_hint":
       "Aplicação instantânea em toda a interface da extensão.",
     "settings.data": "Dados",
@@ -1108,14 +1123,19 @@ export const I18N = {
       "Melhor para alertas instantâneos enquanto você trabalha neste dispositivo.",
     "settings.notify_telegram_title": "Notificações Telegram:",
     "settings.notify_telegram_body":
-      "Use o bot GrabClientsNow para receber alertas de lead instantâneos no Telegram.",
+      "Você vai usar 2 bots: o GrabClientsNow envia os alertas; o @userinfobot só mostra seu chat_id.",
+    "settings.telegram_bot_main":
+      "bot GrabClientsNow = recebe seus alertas",
+    "settings.telegram_bot_info":
+      "@userinfobot = mostra seu chat_id",
     "settings.telegram_how_1":
-      "Abra o Telegram e procure o bot GrabClientsNow.",
-    "settings.telegram_how_2": "Envie /start para o bot uma vez.",
+      "Bot 1: procure o bot GrabClientsNow e abra a conversa.",
+    "settings.telegram_how_2":
+      "Dentro do bot GrabClientsNow, envie /start uma vez.",
     "settings.telegram_how_3":
-      "Use @userinfobot para pegar seu chat_id numérico.",
+      "Bot 2: procure @userinfobot e copie seu chat_id numérico.",
     "settings.telegram_how_4":
-      "Cole esse chat_id abaixo e clique em Testar Telegram.",
+      "Cole esse chat_id abaixo e clique em Testar Telegram para receber o alerta de teste.",
     "settings.notify_webhook_title": "Webhook custom:",
     "settings.notify_webhook_body":
       "Para usuários técnicos. Envie leads para seu app, n8n, Make, Zapier ou APIs internas.",
@@ -1780,6 +1800,23 @@ Object.assign(I18N.de, {
   "settings.sleep_title": "Schlafzeitplan",
   "settings.frequency_title": "Prüffrequenz (global)",
   "settings.notifications_title": "Benachrichtigungen (global)",
+  "settings.notify_telegram_body":
+    "Du nutzt 2 Bots: GrabClientsNow sendet die Alerts; @userinfobot zeigt nur deine chat_id.",
+  "settings.telegram_bot_main":
+    "GrabClientsNow-Bot = empfängt deine Alerts",
+  "settings.telegram_bot_info":
+    "@userinfobot = zeigt deine chat_id",
+  "settings.telegram_how_1":
+    "Bot 1: Suche nach dem GrabClientsNow-Bot und öffne den Chat.",
+  "settings.telegram_how_2":
+    "Sende im GrabClientsNow-Bot einmal /start.",
+  "settings.telegram_how_3":
+    "Bot 2: Suche nach @userinfobot und kopiere deine numerische chat_id.",
+  "settings.telegram_how_4":
+    "Füge diese chat_id unten ein und klicke auf Telegram testen, um den Test-Alert zu erhalten.",
+  "settings.advanced_badge": "Wichtig",
+  "settings.advanced_hint":
+    "Schlafzeitplan, Frequenz und Sicherheitskontrollen findest du hier. Vor dem Monitoring prüfen.",
   "plan.pro": "pro",
   "plan.free": "kostenlos",
   "plan.trial": "Trial aktiv. Endet in {time}.",
@@ -1862,6 +1899,9 @@ I18N.es = {
   "home.start_monitoring_main": "Iniciar monitoreo",
   "settings.language": "Idioma",
   "settings.advanced_title": "Configuración avanzada",
+  "settings.advanced_badge": "Importante",
+  "settings.advanced_hint":
+    "Aquí están el horario de descanso, la frecuencia y los controles de seguridad. Revísalos antes de monitorear.",
   "settings.language_hint":
     "Se aplica de inmediato en toda la interfaz de la extensión.",
   "settings.account": "Cuenta",
@@ -1885,14 +1925,19 @@ I18N.es = {
     "Ideal para alertas instantáneas mientras trabajas en este dispositivo.",
   "settings.notify_telegram_title": "Notificaciones por Telegram:",
   "settings.notify_telegram_body":
-    "Usa el bot de GrabClientsNow para recibir alertas de leads al instante en Telegram.",
+    "Vas a usar 2 bots: GrabClientsNow envía las alertas; @userinfobot solo muestra tu chat_id.",
+  "settings.telegram_bot_main":
+    "bot GrabClientsNow = recibe tus alertas",
+  "settings.telegram_bot_info":
+    "@userinfobot = muestra tu chat_id",
   "settings.telegram_how_1":
-    "Abre Telegram y busca el bot de GrabClientsNow.",
-  "settings.telegram_how_2": "Envía /start al bot una vez.",
+    "Bot 1: busca el bot GrabClientsNow y abre el chat.",
+  "settings.telegram_how_2":
+    "Dentro del bot GrabClientsNow, envía /start una vez.",
   "settings.telegram_how_3":
-    "Usa @userinfobot para obtener tu chat_id numérico.",
+    "Bot 2: busca @userinfobot y copia tu chat_id numérico.",
   "settings.telegram_how_4":
-    "Pega ese chat_id abajo y haz clic en Probar Telegram.",
+    "Pega ese chat_id abajo y haz clic en Probar Telegram para recibir la alerta de prueba.",
   "settings.notify_webhook_title": "Webhook personalizado:",
   "settings.notify_webhook_body":
     "Para usuarios técnicos. Envía leads a tu app, n8n, Make, Zapier o APIs internas.",
@@ -1981,6 +2026,9 @@ I18N.fr = {
   "home.start_monitoring_main": "Démarrer le monitoring",
   "settings.language": "Langue",
   "settings.advanced_title": "Paramètres avancés",
+  "settings.advanced_badge": "Important",
+  "settings.advanced_hint":
+    "Le mode sommeil, la fréquence et les contrôles de sécurité se trouvent ici. Vérifiez-les avant de lancer le monitoring.",
   "settings.language_hint":
     "S'applique immédiatement à toute l'interface de l'extension.",
   "settings.account": "Compte",
@@ -2004,14 +2052,19 @@ I18N.fr = {
     "Idéal pour des alertes instantanées pendant que vous travaillez sur cet appareil.",
   "settings.notify_telegram_title": "Notifications Telegram :",
   "settings.notify_telegram_body":
-    "Utilisez le bot GrabClientsNow pour recevoir des alertes de leads instantanées sur Telegram.",
+    "Vous allez utiliser 2 bots : GrabClientsNow envoie les alertes ; @userinfobot affiche seulement votre chat_id.",
+  "settings.telegram_bot_main":
+    "bot GrabClientsNow = reçoit vos alertes",
+  "settings.telegram_bot_info":
+    "@userinfobot = affiche votre chat_id",
   "settings.telegram_how_1":
-    "Ouvrez Telegram et recherchez le bot GrabClientsNow.",
-  "settings.telegram_how_2": "Envoyez /start au bot une fois.",
+    "Bot 1 : recherchez le bot GrabClientsNow et ouvrez le chat.",
+  "settings.telegram_how_2":
+    "Dans le bot GrabClientsNow, envoyez /start une fois.",
   "settings.telegram_how_3":
-    "Utilisez @userinfobot pour récupérer votre chat_id numérique.",
+    "Bot 2 : recherchez @userinfobot puis copiez votre chat_id numérique.",
   "settings.telegram_how_4":
-    "Collez ce chat_id ci-dessous puis cliquez sur Tester Telegram.",
+    "Collez ce chat_id ci-dessous puis cliquez sur Tester Telegram pour recevoir l'alerte de test.",
   "settings.notify_webhook_title": "Webhook personnalisé :",
   "settings.notify_webhook_body":
     "Pour les utilisateurs techniques. Envoyez les leads vers votre app, n8n, Make, Zapier ou vos API internes.",
